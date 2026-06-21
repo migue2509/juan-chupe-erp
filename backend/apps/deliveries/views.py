@@ -1,0 +1,16 @@
+from rest_framework import viewsets
+from core.permissions import IsOperative
+from apps.shifts.models import Shift
+from .models import Delivery
+from .serializers import DeliverySerializer
+
+
+class DeliveryViewSet(viewsets.ModelViewSet):
+    queryset = Delivery.objects.select_related('sale', 'delivery_person').all()
+    serializer_class = DeliverySerializer
+    permission_classes = [IsOperative]
+    filterset_fields = ['status', 'shift']
+
+    def perform_create(self, serializer):
+        shift = Shift.get_active()
+        serializer.save(shift=shift)

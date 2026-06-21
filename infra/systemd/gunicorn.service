@@ -1,0 +1,19 @@
+[Unit]
+Description=Juan Chupe ERP — Gunicorn
+After=network.target
+
+[Service]
+User=www-data
+Group=www-data
+WorkingDirectory=/var/www/juan-chupe-erp/backend
+EnvironmentFile=/var/www/juan-chupe-erp/backend/.env
+ExecStart=/var/www/juan-chupe-erp/venv/bin/gunicorn \
+    --workers 3 \
+    --bind 127.0.0.1:8000 \
+    --timeout 120 \
+    config.wsgi:application
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
