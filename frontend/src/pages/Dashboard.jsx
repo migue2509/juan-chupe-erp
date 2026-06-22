@@ -62,16 +62,26 @@ export default function Dashboard() {
   // ── Stats computed from filtered sales ──
   const totalDinero    = filteredSales.reduce((sum, s) => sum + Number(s.total), 0)
   const cantidadVentas = filteredSales.length
-  // Efectivo real = lo que entregaron menos el cambio devuelto
-  const totalEfectivo  = filteredSales.reduce((sum, s) =>
-    sum + Math.max(0, Number(s.cash_received || 0) - Number(s.change_given || 0)), 0)
-  const totalTransf    = filteredSales.reduce((sum, s) => sum + Number(s.transfer_amount || 0), 0)
+
+  // Efectivo = ventas cash (total completo) + porción cash de ventas mixtas
+  const totalEfectivo = filteredSales.reduce((sum, s) => {
+    const total = Number(s.total || 0)
+    const trf   = Number(s.transfer_amount || 0)
+    if (s.payment_method === 'cash')     return sum + total
+    if (s.payment_method === 'mixed')    return sum + Math.max(0, total - trf)
+    return sum
+  }, 0)
+
+  // Transferencias = todas las ventas por transferencia + porción transfer de mixtas
+  const totalTransf = filteredSales.reduce((sum, s) => sum + Number(s.transfer_amount || 0), 0)
+
   const filteredExpenses = expenses.filter(e => {
     if (filter === 'pos')      return e.origin === 'pos'
     if (filter === 'delivery') return e.origin === 'delivery'
     return true
   })
   const totalGastos = filteredExpenses.reduce((sum, e) => sum + Number(e.amount || 0), 0)
+  const netoEnCaja  = totalDinero - totalGastos
 
   const recentSales = [...filteredSales].sort(
     (a, b) => new Date(b.created_at) - new Date(a.created_at)
@@ -145,8 +155,8 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* ── Stats 5-col ── */}
-      <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
+      {/* ── Stats 6-col ── */}
+      <div className="grid grid-cols-2 lg:grid-cols-6 gap-4">
         {/* Total dinero */}
         <div className="stat-card lg:col-span-1">
           <div className="flex items-center justify-between mb-1">
@@ -201,10 +211,24 @@ export default function Dashboard() {
           </div>
           <span className="stat-value text-red-500 text-xl">{fmt(totalGastos)}</span>
         </div>
+
+        {/* Neto en caja */}
+        <div className="stat-card">
+          <div className="flex items-center justify-between mb-1">
+            <span className="stat-label">Neto en caja</span>
+            <span className="w-7 h-7 rounded-lg bg-violet-50 flex items-center justify-center text-violet-600">
+              <Icon name="cash" className="w-3.5 h-3.5" />
+            </span>
+          </div>
+          <span className={`stat-value text-xl ${netoEnCaja >= 0 ? 'text-gray-900' : 'text-red-500'}`}>
+            {fmt(netoEnCaja)}
+          </span>
+          <p className="text-[10px] text-gray-400 mt-0.5">Ventas − Gastos</p>
+        </div>
       </div>
 
       {/* ── Bottom row ── */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 items-start">
 
         {/* Ventas recientes */}
         <div className="lg:col-span-2 card p-0 overflow-hidden">
@@ -263,28 +287,69 @@ export default function Dashboard() {
           )}
         </div>
 
-        {/* Alertas de stock */}
-        <div className="card p-0 overflow-hidden">
-          <div className="flex items-center gap-2 px-5 py-4 border-b border-gray-50">
-            <Icon name="alert" className={`w-4 h-4 ${alerts.length > 0 ? 'text-amber-500' : 'text-gray-300'}`} />
-            <h2>Alertas de stock</h2>
-            {alerts.length > 0 && <span className="badge-amber ml-auto">{alerts.length}</span>}
-          </div>
-          <div className="divide-y divide-gray-50">
-            {alerts.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-10 text-gray-300 px-5">
-                <Icon name="check" className="w-7 h-7 mb-2" />
-                <p className="text-sm text-center">Stock en niveles normales</p>
-              </div>
-            ) : (
-              alerts.map(a => (
-                <div key={a.id} className="flex items-center justify-between px-5 py-3">
-                  <span className="text-sm font-medium text-gray-700">{a.flavor_name}</span>
-                  <span className="badge-amber">{Number(a.stock_ml).toFixed(0)} ml</span>
+        {/* Columna derecha: alertas + gastos */}
+        <div className="space-y-5">
+
+          {/* Alertas de stock */}
+          <div className="card p-0 overflow-hidden">
+            <div className="flex items-center gap-2 px-5 py-4 border-b border-gray-50">
+              <Icon name="alert" className={`w-4 h-4 ${alerts.length > 0 ? 'text-amber-500' : 'text-gray-300'}`} />
+              <h2>Alertas de stock</h2>
+              {alerts.length > 0 && <span className="badge-amber ml-auto">{alerts.length}</span>}
+            </div>
+            <div className="divide-y divide-gray-50">
+              {alerts.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-10 text-gray-300 px-5">
+                  <Icon name="check" className="w-7 h-7 mb-2" />
+                  <p className="text-sm text-center">Stock en niveles normales</p>
                 </div>
-              ))
+              ) : (
+                alerts.map(a => (
+                  <div key={a.id} className="flex items-center justify-between px-5 py-3">
+                    <span className="text-sm font-medium text-gray-700">{a.flavor_name}</span>
+                    <span className="badge-amber">{Number(a.stock_ml).toFixed(0)} ml</span>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+
+          {/* Gastos de la jornada */}
+          <div className="card p-0 overflow-hidden">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-gray-50">
+              <div className="flex items-center gap-2">
+                <Icon name="expenses" className="w-4 h-4 text-red-400" />
+                <h2>Gastos</h2>
+              </div>
+              <span className="badge-gray">{filteredExpenses.length}</span>
+            </div>
+            <div className="divide-y divide-gray-50 max-h-56 overflow-y-auto">
+              {filteredExpenses.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-8 text-gray-300 px-5">
+                  <p className="text-sm">Sin gastos registrados</p>
+                </div>
+              ) : (
+                filteredExpenses.map(e => (
+                  <div key={e.id} className="flex items-start justify-between px-5 py-3 gap-3">
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium text-gray-800 truncate">{e.description}</p>
+                      <p className="text-xs text-gray-400 mt-0.5">{e.category_label || e.category}</p>
+                    </div>
+                    <span className="text-sm font-semibold text-red-500 tabular-nums flex-shrink-0">
+                      -{fmt(e.amount)}
+                    </span>
+                  </div>
+                ))
+              )}
+            </div>
+            {filteredExpenses.length > 0 && (
+              <div className="flex items-center justify-between px-5 py-3 border-t border-gray-100 bg-slate-50">
+                <span className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Total gastos</span>
+                <span className="text-sm font-bold text-red-500 tabular-nums">-{fmt(totalGastos)}</span>
+              </div>
             )}
           </div>
+
         </div>
 
       </div>
