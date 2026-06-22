@@ -99,7 +99,7 @@ class SaleViewSet(viewsets.ReadOnlyModelViewSet):
             if data.get('seller_id'):
                 try:
                     seller = User.objects.get(id=data['seller_id'])
-                except User.DoesNotExist:
+                except (User.DoesNotExist, ValueError, TypeError):
                     pass
 
             promotion = None
@@ -175,39 +175,41 @@ class SaleViewSet(viewsets.ReadOnlyModelViewSet):
 
         with transaction.atomic():
             # ── Campos sin impacto en inventario ──
-            simple_fields = ['cash_received', 'transfer_amount',
-                             'transfer_reference', 'is_delivery', 'notes']
+            decimal_fields = {'cash_received', 'transfer_amount'}
+            simple_fields  = ['cash_received', 'transfer_amount',
+                              'transfer_reference', 'is_delivery', 'notes']
             for field in simple_fields:
                 if field in request.data:
-                    setattr(sale, field, request.data[field])
+                    val = request.data[field]
+                    if field in decimal_fields:
+                        val = Decimal(str(val or 0))
+                    setattr(sale, field, val)
 
             # ── Método de pago: limpiar montos contrarios automáticamente ──
             if 'payment_method' in request.data:
                 sale.payment_method = request.data['payment_method']
                 pm = sale.payment_method
                 if pm == 'cash':
-                    # Solo efectivo: zerear transferencia
                     sale.transfer_amount    = Decimal('0')
                     sale.transfer_reference = ''
-                    # Recalcular cambio con el cash_received actual (puede ser > total)
-                    sale.change_given = max(Decimal('0'), sale.cash_received - sale.total)
+                    sale.change_given = max(Decimal('0'), Decimal(str(sale.cash_received)) - sale.total)
                 elif pm == 'transfer':
-                    # Solo transferencia: zerear efectivo y cambio
-                    sale.cash_received = Decimal('0')
-                    sale.change_given  = Decimal('0')
-                    if 'transfer_amount' not in request.data:
-                        sale.transfer_amount = sale.total
+                    sale.cash_received   = Decimal('0')
+                    sale.change_given    = Decimal('0')
+                    sale.transfer_amount = Decimal(str(sale.transfer_amount or 0)) or sale.total
                 elif pm == 'mixed':
-                    # Mixto: recalcular cambio si hubo ajuste de efectivo
-                    sale.change_given = max(
-                        Decimal('0'),
-                        sale.cash_received - max(Decimal('0'), sale.total - sale.transfer_amount)
-                    )
+                    cash = Decimal(str(sale.cash_received or 0))
+                    trf  = Decimal(str(sale.transfer_amount or 0))
+                    sale.change_given = max(Decimal('0'), cash - max(Decimal('0'), sale.total - trf))
 
             if 'seller_id' in request.data:
-                try:
-                    sale.seller = User.objects.get(id=request.data['seller_id'])
-                except User.DoesNotExist:
+                seller_id = request.data['seller_id']
+                if seller_id:
+                    try:
+                        sale.seller = User.objects.get(id=seller_id)
+                    except (User.DoesNotExist, ValueError, TypeError):
+                        sale.seller = None
+                else:
                     sale.seller = None
 
             # ── Si vienen items nuevos → revertir inventario y reemplazar ──

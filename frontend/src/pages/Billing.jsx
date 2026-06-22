@@ -56,7 +56,7 @@ export default function Billing() {
       transfer_reference: s.transfer_reference || '',
       is_delivery:        s.is_delivery,
       notes:              s.notes || '',
-      seller_id:          s.seller || '',
+      seller_id:          s.seller || null,
     })
   }
 
@@ -73,7 +73,10 @@ export default function Billing() {
   const handleSave = async () => {
     setSaving(true)
     try {
-      const payload = { ...eForm }
+      const payload = {
+        ...eForm,
+        seller_id: eForm.seller_id || null,
+      }
       await editSale(selected.sale_detail.id, payload)
       toast.success('Factura actualizada')
       await load()
