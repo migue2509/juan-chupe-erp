@@ -44,6 +44,9 @@ export default function Expenses() {
   const [showForm,   setShowForm]   = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [filterOrigin, setFilterOrigin] = useState('all')
+  const [descSearch,   setDescSearch]   = useState('')
+  const [dateFrom,     setDateFrom]     = useState('')
+  const [dateTo,       setDateTo]       = useState('')
 
   const load = () =>
     getExpenses().then(r => setExpenses(r.data?.results ?? r.data ?? []))
@@ -66,9 +69,20 @@ export default function Expenses() {
     setSubmitting(false)
   }
 
-  const filtered = filterOrigin === 'all'
-    ? expenses
-    : expenses.filter(e => e.origin === filterOrigin)
+  const filtered = expenses.filter(e => {
+    if (filterOrigin !== 'all' && e.origin !== filterOrigin) return false
+    if (descSearch && !(e.description || '').toLowerCase().includes(descSearch.toLowerCase())) return false
+    if (dateFrom || dateTo) {
+      const d = new Date(e.created_at)
+      d.setHours(0, 0, 0, 0)
+      if (dateFrom && d < new Date(dateFrom)) return false
+      if (dateTo   && d > new Date(dateTo))   return false
+    }
+    return true
+  })
+
+  const hasFilters   = descSearch || dateFrom || dateTo
+  const clearFilters = () => { setDescSearch(''); setDateFrom(''); setDateTo('') }
 
   const totalAll      = expenses.reduce((s, e) => s + Number(e.amount), 0)
   const totalPos      = expenses.filter(e => e.origin === 'pos').reduce((s, e) => s + Number(e.amount), 0)
@@ -185,10 +199,38 @@ export default function Expenses() {
         </div>
       )}
 
+      {/* Filtros búsqueda / fecha */}
+      <div className="card py-3 px-4 flex flex-wrap items-center gap-3">
+        <div className="flex items-center gap-2 flex-1 min-w-[180px]">
+          <Icon name="search" className="w-4 h-4 text-gray-400 shrink-0" />
+          <input
+            className="input py-1.5 text-sm flex-1"
+            placeholder="Buscar por descripción..."
+            value={descSearch}
+            onChange={e => setDescSearch(e.target.value)}
+          />
+        </div>
+        <div className="flex items-center gap-2">
+          <label className="text-xs text-gray-400 whitespace-nowrap">Desde</label>
+          <input type="date" className="input py-1.5 text-sm w-36"
+            value={dateFrom} onChange={e => setDateFrom(e.target.value)} />
+        </div>
+        <div className="flex items-center gap-2">
+          <label className="text-xs text-gray-400 whitespace-nowrap">Hasta</label>
+          <input type="date" className="input py-1.5 text-sm w-36"
+            value={dateTo} onChange={e => setDateTo(e.target.value)} />
+        </div>
+        {hasFilters && (
+          <button onClick={clearFilters} className="text-xs text-gray-400 hover:text-gray-600 underline whitespace-nowrap">
+            Limpiar
+          </button>
+        )}
+      </div>
+
       {/* Filter + Table */}
       <div className="card p-0 overflow-hidden">
         <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
-          <h2>Historial</h2>
+          <h2>Historial <span className="text-sm font-normal text-gray-400">({filtered.length})</span></h2>
           <div className="flex gap-1 p-1 bg-gray-100 rounded-xl">
             {[{ k: 'all', l: 'Todos' }, { k: 'pos', l: 'POS' }, { k: 'delivery', l: 'Domicilios' }].map(f => (
               <button key={f.k} onClick={() => setFilterOrigin(f.k)}
@@ -213,7 +255,7 @@ export default function Expenses() {
           {filtered.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-14 text-gray-300">
               <Icon name="expenses" className="w-8 h-8 mb-2" />
-              <p className="text-sm">Sin gastos registrados</p>
+              <p className="text-sm">{hasFilters ? 'Sin resultados' : 'Sin gastos registrados'}</p>
             </div>
           ) : filtered.map(e => (
             <div key={e.id}
