@@ -19,15 +19,20 @@ const PAYMENT_MODES = [
 
 export default function Billing() {
   const { isAdmin } = useAuth()
-  const [invoices,   setInvoices]   = useState([])
-  const [loading,    setLoading]    = useState(true)
-  const [selected,   setSelected]   = useState(null)   // invoice abierto
-  const [editMode,   setEditMode]   = useState(false)
-  const [flavors,    setFlavors]    = useState([])
-  const [cupSizes,   setCupSizes]   = useState([])
-  const [toppings,   setToppings]   = useState([])
-  const [operatives, setOperatives] = useState([])
-  const [saving,     setSaving]     = useState(false)
+  const [invoices,    setInvoices]   = useState([])
+  const [loading,     setLoading]    = useState(true)
+  const [selected,    setSelected]   = useState(null)
+  const [editMode,    setEditMode]   = useState(false)
+  const [flavors,     setFlavors]    = useState([])
+  const [cupSizes,    setCupSizes]   = useState([])
+  const [toppings,    setToppings]   = useState([])
+  const [operatives,  setOperatives] = useState([])
+  const [saving,      setSaving]     = useState(false)
+
+  // Filtros
+  const [sellerSearch, setSellerSearch] = useState('')
+  const [dateFrom,     setDateFrom]     = useState('')
+  const [dateTo,       setDateTo]       = useState('')
 
   // Formulario de edición
   const [eForm, setEForm] = useState({})
@@ -91,6 +96,22 @@ export default function Billing() {
 
   const sale = selected?.sale_detail
 
+  // Filtrado local
+  const filtered = invoices.filter(inv => {
+    const name = (inv.sale_detail?.seller_name || '').toLowerCase()
+    if (sellerSearch && !name.includes(sellerSearch.toLowerCase())) return false
+    if (dateFrom || dateTo) {
+      const d = new Date(inv.created_at)
+      d.setHours(0, 0, 0, 0)
+      if (dateFrom && d < new Date(dateFrom)) return false
+      if (dateTo   && d > new Date(dateTo))   return false
+    }
+    return true
+  })
+
+  const clearFilters = () => { setSellerSearch(''); setDateFrom(''); setDateTo('') }
+  const hasFilters   = sellerSearch || dateFrom || dateTo
+
   if (loading) return (
     <div className="flex justify-center py-16">
       <div className="w-8 h-8 border-4 border-brand-pink border-t-transparent rounded-full animate-spin" />
@@ -102,7 +123,37 @@ export default function Billing() {
 
       <div>
         <h1>Facturas</h1>
-        <p className="text-sm text-gray-400 mt-0.5">{invoices.length} factura{invoices.length !== 1 ? 's' : ''} registrada{invoices.length !== 1 ? 's' : ''}</p>
+        <p className="text-sm text-gray-400 mt-0.5">
+          {filtered.length} de {invoices.length} factura{invoices.length !== 1 ? 's' : ''}
+        </p>
+      </div>
+
+      {/* Filtros */}
+      <div className="card py-3 px-4 flex flex-wrap items-center gap-3">
+        <div className="flex items-center gap-2 flex-1 min-w-[180px]">
+          <Icon name="search" className="w-4 h-4 text-gray-400 shrink-0" />
+          <input
+            className="input py-1.5 text-sm flex-1"
+            placeholder="Buscar vendedora..."
+            value={sellerSearch}
+            onChange={e => setSellerSearch(e.target.value)}
+          />
+        </div>
+        <div className="flex items-center gap-2">
+          <label className="text-xs text-gray-400 whitespace-nowrap">Desde</label>
+          <input type="date" className="input py-1.5 text-sm w-36"
+            value={dateFrom} onChange={e => setDateFrom(e.target.value)} />
+        </div>
+        <div className="flex items-center gap-2">
+          <label className="text-xs text-gray-400 whitespace-nowrap">Hasta</label>
+          <input type="date" className="input py-1.5 text-sm w-36"
+            value={dateTo} onChange={e => setDateTo(e.target.value)} />
+        </div>
+        {hasFilters && (
+          <button onClick={clearFilters} className="text-xs text-gray-400 hover:text-gray-600 underline whitespace-nowrap">
+            Limpiar
+          </button>
+        )}
       </div>
 
       <div className="card p-0 overflow-hidden">
@@ -113,12 +164,12 @@ export default function Billing() {
         </div>
 
         <div className="divide-y divide-gray-50">
-          {invoices.length === 0 ? (
+          {filtered.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-14 text-gray-300">
               <Icon name="billing" className="w-8 h-8 mb-2" />
-              <p className="text-sm">Sin facturas</p>
+              <p className="text-sm">{hasFilters ? 'Sin resultados' : 'Sin facturas'}</p>
             </div>
-          ) : invoices.map(inv => (
+          ) : filtered.map(inv => (
             <div key={inv.id}
               onClick={() => openDetail(inv)}
               className="grid px-5 py-3.5 items-center gap-3 hover:bg-slate-50 transition-colors cursor-pointer"
