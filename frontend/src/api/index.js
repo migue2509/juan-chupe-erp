@@ -62,9 +62,14 @@ export const getPurchases = (params) => api.get('/purchases/', { params })
 export const createPurchase = (data) => api.post('/purchases/', data)
 
 // Deliveries
-export const getDeliveries = (params) => api.get('/deliveries/', { params })
-export const createDelivery = (data) => api.post('/deliveries/', data)
-export const updateDelivery = (id, data) => api.patch(`/deliveries/${id}/`, data)
+export const getDeliveries      = (params) => api.get('/deliveries/', { params })
+export const createDelivery     = (data)   => api.post('/deliveries/', data)
+export const updateDelivery     = (id, data) => api.patch(`/deliveries/${id}/`, data)
+
+// Domiciliarios
+export const getDomiciliarios   = ()       => api.get('/deliveries/domiciliarios/')
+export const createDomiciliario = (data)   => api.post('/deliveries/domiciliarios/', data)
+export const updateDomiciliario = (id, data) => api.patch(`/deliveries/domiciliarios/${id}/`, data)
 
 // Cash audit
 export const getCashAuditPrefill = () => api.get('/cash/prefill/')
@@ -84,8 +89,4 @@ export const changePassword = (id, data) => api.post(`/auth/users/${id}/change-p
 export const toggleUserActive = (id) => api.post(`/auth/users/${id}/toggle-active/`)
 
 // Reports
-export const getDailyReport = (shiftId) =>
-  api.get('/reports/daily/', { params: shiftId ? { shift_id: shiftId } : {} })
-export const getWeeklyReport = () => api.get('/reports/weekly/')
-export const getMonthlyReport = () => api.get('/reports/monthly/')
-export const getInventoryStatus = () => api.get('/reports/inventory/')
+export const getD

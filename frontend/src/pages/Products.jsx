@@ -545,33 +545,4 @@ export default function Products() {
                 ) : (
                   <div className={`grid px-5 py-3.5 items-center gap-3 hover:bg-slate-50 transition-colors ${!t.is_active ? 'opacity-40' : ''}`}
                     style={{ gridTemplateColumns: '1fr 90px 100px 160px 1fr 180px' }}>
-                    <span className="font-semibold text-sm text-gray-800">{t.name}</span>
-                    <span className="text-sm font-semibold text-brand-pink">{fmt(t.price ?? 2000)}</span>
-                    <span className="text-sm text-gray-600">{t.min_stock ?? 0} uds.</span>
-                    <span>
-                      {t.linked_category
-                        ? <span className="badge-cyan text-xs">{TOPPING_CATS.find(c => c.value === t.linked_category)?.label ?? t.linked_category}</span>
-                        : <span className="text-gray-300 text-xs">—</span>
-                      }
-                    </span>
-                    <div className="flex flex-col gap-0.5">
-                      <Timestamp label="Creado" date={t.created_at} />
-                      <Timestamp label="Editado" date={t.updated_at} />
-                    </div>
-                    <RowActions
-                      isActive={t.is_active}
-                      onToggle={() => toggleTopping(t)}
-                      onEdit={() => setEditing({ type: 'topping', id: t.id })}
-                      onDelete={() => handleToppingDelete(t)}
-                    />
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-    </div>
-  )
-}
+                    <span className="font-semibo
