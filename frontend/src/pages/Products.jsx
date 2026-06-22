@@ -9,9 +9,9 @@ import { Icon } from '../components/Icons'
 import toast from 'react-hot-toast'
 
 const FLAVOR_CATS = [
-  { value: 'water',      label: 'Granizado en Agua' },
-  { value: 'creamy',     label: 'Granizado Cremoso' },
-  { value: 'refreshing', label: 'Refrescante' },
+  { value: 'creamy',        label: 'Cremoso' },
+  { value: 'refreshing',    label: 'Refrescante' },
+  { value: 'non_alcoholic', label: 'Sin Alcohol' },
 ]
 
 const TABS = [
@@ -22,7 +22,13 @@ const TABS = [
 
 const EMPTY_FLAVOR  = { name: '', category: 'water', color: '#00E5FF', min_stock_ml: 500 }
 const EMPTY_CUP     = { size: '', ml: '', price: '', min_quantity: 10 }
-const EMPTY_TOPPING = { name: '', min_stock: 0 }
+const EMPTY_TOPPING = { name: '', price: 2000, min_stock: 0, linked_category: '' }
+
+const TOPPING_CATS = [
+  { value: 'creamy',       label: 'Bolsa Cremosos (auto)' },
+  { value: 'refreshing',   label: 'Bolsa Refrescantes (auto)' },
+  { value: 'non_alcoholic',label: 'Bolsa Sin Alcohol (auto)' },
+]
 
 const fmt     = (n) => `$${Number(n).toLocaleString('es-CO')}`
 const fmtDate = (d) => d ? new Date(d).toLocaleDateString('es-CO', { day: '2-digit', month: '2-digit', year: '2-digit' }) : '—'
@@ -193,7 +199,7 @@ export default function Products() {
   const handleToppingCreate = async (e) => {
     e.preventDefault(); setSaving(true)
     try {
-      await createTopping(toppingForm)
+      await createTopping({ ...toppingForm, price: Number(toppingForm.price), linked_category: toppingForm.linked_category || null })
       toast.success(`Topping "${toppingForm.name}" creado`)
       setToppingForm(EMPTY_TOPPING); setShowCreate(false); load()
     } catch { toast.error('Error al crear topping') }
@@ -202,7 +208,12 @@ export default function Products() {
   const handleToppingSave = async (form) => {
     setSaving(true)
     try {
-      await updateTopping(editing.id, { name: form.name, min_stock: Number(form.min_stock) })
+      await updateTopping(editing.id, {
+        name: form.name,
+        price: Number(form.price),
+        min_stock: Number(form.min_stock),
+        linked_category: form.linked_category || null,
+      })
       toast.success('Topping actualizado'); setEditing(null); load()
     } catch { toast.error('Error al actualizar') }
     setSaving(false)
@@ -216,10 +227,6 @@ export default function Products() {
     await updateTopping(t.id, { is_active: !t.is_active })
     toast.success(t.is_active ? 'Desactivado' : 'Activado'); load()
   }
-
-  const flavorsByCategory = FLAVOR_CATS.map(cat => ({
-    ...cat, items: flavors.filter(f => f.category === cat.value),
-  })).filter(g => g.items.length > 0)
 
   return (
     <div className="space-y-5">
@@ -341,16 +348,30 @@ export default function Products() {
         <div className="card border-l-4 border-brand-purple">
           <h2 className="mb-4">Nuevo Topping</h2>
           <form onSubmit={handleToppingCreate} className="space-y-4">
-            <div className="grid grid-cols-2 gap-4 max-w-md">
+            <div className="grid grid-cols-2 gap-4 max-w-xl">
               <div>
                 <label className="label">Nombre</label>
-                <input className="input" placeholder="Ej: Gomitas, Oreo" required
+                <input className="input" placeholder="Ej: Bolsa Cremosos, Gomitas" required
                   value={toppingForm.name} onChange={e => setToppingForm(f => ({ ...f, name: e.target.value }))} />
+              </div>
+              <div>
+                <label className="label">Precio de venta</label>
+                <input type="number" className="input" placeholder="2000"
+                  value={toppingForm.price} onChange={e => setToppingForm(f => ({ ...f, price: e.target.value }))} />
               </div>
               <div>
                 <label className="label">Mínimo (unidades)</label>
                 <input type="number" className="input" placeholder="0"
                   value={toppingForm.min_stock} onChange={e => setToppingForm(f => ({ ...f, min_stock: e.target.value }))} />
+              </div>
+              <div className="col-span-2">
+                <label className="label">Bolsa automática para categoría</label>
+                <select className="input" value={toppingForm.linked_category}
+                  onChange={e => setToppingForm(f => ({ ...f, linked_category: e.target.value }))}>
+                  <option value="">Sin descuento automático</option>
+                  {TOPPING_CATS.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
+                </select>
+                <p className="text-xs text-gray-400 mt-1">Si asignas una categoría, esta bolsa se descuenta automáticamente en cada venta de ese tipo de sabor.</p>
               </div>
             </div>
             <div className="flex gap-2">
@@ -366,64 +387,58 @@ export default function Products() {
 
       {/* ══ BOLSAS ══ */}
       {tab === 'bags' && (
-        <div className="space-y-5">
-          {flavors.length === 0 && (
-            <div className="card flex flex-col items-center justify-center py-14 text-gray-300">
-              <Icon name="products" className="w-10 h-10 mb-2" />
-              <p className="text-sm">No hay bolsas registradas</p>
-            </div>
-          )}
-          {flavorsByCategory.map(group => (
-            <div key={group.value}>
-              <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-3">{group.label}</p>
-              <div className="card p-0 overflow-hidden">
-                <div className="grid px-5 py-3 bg-slate-50 border-b border-gray-100 text-[10px] font-semibold text-gray-400 uppercase tracking-widest gap-3"
-                  style={{ gridTemplateColumns: '2rem 1fr 160px 80px 100px 1fr 180px' }}>
-                  {['', 'Nombre', 'Categoría', 'Color', 'Mín. ml', 'Fechas', 'Acciones'].map(h => <span key={h}>{h}</span>)}
-                </div>
-                <div className="divide-y divide-gray-50">
-                  {group.items.map(f => (
-                    <div key={f.id}>
-                      {editing?.type === 'flavor' && editing.id === f.id ? (
-                        <EditRow
-                          fields={[
-                            { key: 'name',         label: 'Nombre',    width: 160 },
-                            { key: 'category',     label: 'Categoría', type: 'select', width: 190, options: FLAVOR_CATS.map(c => ({ value: c.value, label: c.label })) },
-                            { key: 'color',        label: 'Color',     type: 'color',  width: 190 },
-                            { key: 'min_stock_ml', label: 'Mín. ml',  type: 'number', width: 100, placeholder: '500' },
-                          ]}
-                          initial={{ name: f.name, category: f.category, color: f.color, min_stock_ml: f.bag?.min_stock_ml ?? 500 }}
-                          onSave={handleFlavorSave}
-                          onCancel={() => setEditing(null)}
-                          saving={saving}
-                        />
-                      ) : (
-                        <div className={`grid px-5 py-3 items-center gap-3 hover:bg-slate-50 transition-colors ${!f.is_active ? 'opacity-40' : ''}`}
-                          style={{ gridTemplateColumns: '2rem 1fr 160px 80px 100px 1fr 180px' }}>
-                          <div className="w-7 h-7 rounded-full border-2 border-white shadow flex-shrink-0"
-                            style={{ background: f.color || '#e5e7eb' }} />
-                          <span className="font-medium text-sm text-gray-800">{f.name}</span>
-                          <span className="text-sm text-gray-500">{FLAVOR_CATS.find(c => c.value === f.category)?.label}</span>
-                          <span className="text-xs font-mono text-gray-400">{f.color}</span>
-                          <span className="text-sm text-gray-600 tabular-nums">{f.bag?.min_stock_ml ?? '—'} ml</span>
-                          <div className="flex flex-col gap-0.5">
-                            <Timestamp label="Creado" date={f.created_at} />
-                            <Timestamp label="Editado" date={f.updated_at} />
-                          </div>
-                          <RowActions
-                            isActive={f.is_active}
-                            onToggle={() => toggleFlavor(f)}
-                            onEdit={() => setEditing({ type: 'flavor', id: f.id, bagId: f.bag?.id })}
-                            onDelete={() => handleFlavorDelete(f)}
-                          />
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
+        <div className="card p-0 overflow-hidden">
+          <div className="grid px-5 py-3 bg-slate-50 border-b border-gray-100 text-[10px] font-semibold text-gray-400 uppercase tracking-widest gap-3"
+            style={{ gridTemplateColumns: '2rem 1fr 140px 80px 100px 1fr 180px' }}>
+            {['', 'Nombre', 'Categoría', 'Color', 'Mín. ml', 'Fechas', 'Acciones'].map(h => <span key={h}>{h}</span>)}
+          </div>
+          <div className="divide-y divide-gray-50">
+            {flavors.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-14 text-gray-300">
+                <Icon name="products" className="w-10 h-10 mb-2" />
+                <p className="text-sm">No hay bolsas registradas</p>
               </div>
-            </div>
-          ))}
+            ) : flavors.map(f => (
+              <div key={f.id}>
+                {editing?.type === 'flavor' && editing.id === f.id ? (
+                  <EditRow
+                    fields={[
+                      { key: 'name',         label: 'Nombre',    width: 160 },
+                      { key: 'category',     label: 'Categoría', type: 'select', width: 180, options: FLAVOR_CATS.map(c => ({ value: c.value, label: c.label })) },
+                      { key: 'color',        label: 'Color',     type: 'color',  width: 180 },
+                      { key: 'min_stock_ml', label: 'Mín. ml',  type: 'number', width: 100, placeholder: '500' },
+                    ]}
+                    initial={{ name: f.name, category: f.category, color: f.color, min_stock_ml: f.bag?.min_stock_ml ?? 500 }}
+                    onSave={handleFlavorSave}
+                    onCancel={() => setEditing(null)}
+                    saving={saving}
+                  />
+                ) : (
+                  <div className={`grid px-5 py-3 items-center gap-3 hover:bg-slate-50 transition-colors ${!f.is_active ? 'opacity-40' : ''}`}
+                    style={{ gridTemplateColumns: '2rem 1fr 140px 80px 100px 1fr 180px' }}>
+                    <div className="w-7 h-7 rounded-full border-2 border-white shadow flex-shrink-0"
+                      style={{ background: f.color || '#e5e7eb' }} />
+                    <span className="font-medium text-sm text-gray-800">{f.name}</span>
+                    <span className="text-sm text-gray-500">
+                      {FLAVOR_CATS.find(c => c.value === f.category)?.label ?? f.category}
+                    </span>
+                    <span className="text-xs font-mono text-gray-400">{f.color}</span>
+                    <span className="text-sm text-gray-600 tabular-nums">{f.bag?.min_stock_ml ?? '—'} ml</span>
+                    <div className="flex flex-col gap-0.5">
+                      <Timestamp label="Creado" date={f.created_at} />
+                      <Timestamp label="Editado" date={f.updated_at} />
+                    </div>
+                    <RowActions
+                      isActive={f.is_active}
+                      onToggle={() => toggleFlavor(f)}
+                      onEdit={() => setEditing({ type: 'flavor', id: f.id, bagId: f.bag?.id })}
+                      onDelete={() => handleFlavorDelete(f)}
+                    />
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
         </div>
       )}
 
@@ -484,8 +499,8 @@ export default function Products() {
       {tab === 'toppings' && (
         <div className="card p-0 overflow-hidden">
           <div className="grid px-5 py-3 bg-slate-50 border-b border-gray-100 text-[10px] font-semibold text-gray-400 uppercase tracking-widest gap-3"
-            style={{ gridTemplateColumns: '1fr 110px 1fr 180px' }}>
-            {['Nombre', 'Mín. uds.', 'Fechas', 'Acciones'].map(h => <span key={h}>{h}</span>)}
+            style={{ gridTemplateColumns: '1fr 90px 100px 160px 1fr 180px' }}>
+            {['Nombre', 'Precio', 'Mín. uds.', 'Bolsa auto', 'Fechas', 'Acciones'].map(h => <span key={h}>{h}</span>)}
           </div>
           <div className="divide-y divide-gray-50">
             {toppings.length === 0 ? (
@@ -498,19 +513,29 @@ export default function Products() {
                 {editing?.type === 'topping' && editing.id === t.id ? (
                   <EditRow
                     fields={[
-                      { key: 'name',      label: 'Nombre',    width: 220 },
-                      { key: 'min_stock', label: 'Mín. uds', type: 'number', width: 100 },
+                      { key: 'name',           label: 'Nombre',    width: 180 },
+                      { key: 'price',          label: 'Precio',    type: 'number', width: 90 },
+                      { key: 'min_stock',      label: 'Mín. uds', type: 'number', width: 80 },
+                      { key: 'linked_category', label: 'Bolsa auto', type: 'select', width: 160,
+                        options: [{ value: '', label: 'Sin auto' }, ...TOPPING_CATS.map(c => ({ value: c.value, label: c.label }))] },
                     ]}
-                    initial={{ name: t.name, min_stock: String(t.min_stock ?? 0) }}
+                    initial={{ name: t.name, price: String(t.price ?? 2000), min_stock: String(t.min_stock ?? 0), linked_category: t.linked_category ?? '' }}
                     onSave={handleToppingSave}
                     onCancel={() => setEditing(null)}
                     saving={saving}
                   />
                 ) : (
                   <div className={`grid px-5 py-3.5 items-center gap-3 hover:bg-slate-50 transition-colors ${!t.is_active ? 'opacity-40' : ''}`}
-                    style={{ gridTemplateColumns: '1fr 110px 1fr 180px' }}>
+                    style={{ gridTemplateColumns: '1fr 90px 100px 160px 1fr 180px' }}>
                     <span className="font-semibold text-sm text-gray-800">{t.name}</span>
+                    <span className="text-sm font-semibold text-brand-pink">{fmt(t.price ?? 2000)}</span>
                     <span className="text-sm text-gray-600">{t.min_stock ?? 0} uds.</span>
+                    <span>
+                      {t.linked_category
+                        ? <span className="badge-cyan text-xs">{TOPPING_CATS.find(c => c.value === t.linked_category)?.label ?? t.linked_category}</span>
+                        : <span className="text-gray-300 text-xs">—</span>
+                      }
+                    </span>
                     <div className="flex flex-col gap-0.5">
                       <Timestamp label="Creado" date={t.created_at} />
                       <Timestamp label="Editado" date={t.updated_at} />

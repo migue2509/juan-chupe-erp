@@ -5,9 +5,9 @@ from decimal import Decimal
 class FlavorBag(models.Model):
     """Bolsa de granizado asociada a un sabor — stock en ml"""
     CATEGORY_CHOICES = [
-        ('creamy', 'Bolsa Cremosos'),
-        ('refreshing', 'Bolsa Refrescantes'),
-        ('water', 'Bolsa Agua'),
+        ('creamy',       'Cremoso'),
+        ('refreshing',   'Refrescante'),
+        ('non_alcoholic','Sin Alcohol'),
     ]
 
     flavor = models.OneToOneField(
@@ -71,6 +71,35 @@ class CupStock(models.Model):
         self.save()
 
 
+class ToppingStock(models.Model):
+    """Stock de toppings físicos"""
+    topping = models.OneToOneField(
+        'products.Topping', on_delete=models.CASCADE, related_name='stock'
+    )
+    quantity = models.IntegerField(default=0)
+    min_quantity = models.IntegerField(default=0, help_text='Alerta cuando baje de este valor')
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = 'Stock de Topping'
+        verbose_name_plural = 'Stock de Toppings'
+
+    def __str__(self):
+        return f'Topping {self.topping.name} — {self.quantity} unidades'
+
+    @property
+    def is_low_stock(self):
+        return self.min_quantity > 0 and self.quantity <= self.min_quantity
+
+    def consume(self, qty: int = 1):
+        self.quantity = max(0, self.quantity - qty)
+        self.save()
+
+    def add_stock(self, qty: int):
+        self.quantity += qty
+        self.save()
+
+
 class StockMovement(models.Model):
     """Historial de movimientos de inventario"""
     MOVEMENT_TYPE = [
@@ -87,8 +116,13 @@ class StockMovement(models.Model):
     cup_stock = models.ForeignKey(
         CupStock, on_delete=models.SET_NULL, null=True, blank=True, related_name='movements'
     )
+    topping_stock = models.ForeignKey(
+        ToppingStock, on_delete=models.SET_NULL, null=True, blank=True, related_name='movements'
+    )
     quantity_ml = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
     quantity_units = models.IntegerField(null=True, blank=True)
+    purchase_amount = models.DecimalField(max_digits=12, decimal_places=0, null=True, blank=True,
+        help_text='Valor pagado en compra (solo para vasos y bolsas)')
     notes = models.CharField(max_length=200, blank=True)
     created_by = models.ForeignKey('users.User', on_delete=models.SET_NULL, null=True)
     created_at = models.DateTimeField(auto_now_add=True)

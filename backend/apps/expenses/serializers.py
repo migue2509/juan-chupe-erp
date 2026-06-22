@@ -3,12 +3,20 @@ from .models import Expense
 
 
 class ExpenseSerializer(serializers.ModelSerializer):
-    registered_by_name = serializers.CharField(source='registered_by.full_name', read_only=True, default='')
+    registered_by_name = serializers.SerializerMethodField()
+    category_label     = serializers.CharField(source='get_category_display', read_only=True)
+    origin_label       = serializers.CharField(source='get_origin_display',   read_only=True)
+
+    def get_registered_by_name(self, obj):
+        if obj.registered_by:
+            return obj.registered_by.full_name or obj.registered_by.username
+        return '—'
 
     class Meta:
-        model = Expense
+        model  = Expense
         fields = [
             'id', 'shift', 'registered_by', 'registered_by_name',
-            'category', 'description', 'amount', 'from_daily_cash', 'notes', 'created_at'
+            'category', 'category_label', 'origin', 'origin_label',
+            'description', 'amount', 'from_daily_cash', 'notes', 'created_at',
         ]
         read_only_fields = ['id', 'created_at', 'registered_by', 'shift']

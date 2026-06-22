@@ -1,63 +1,327 @@
 import { useEffect, useState } from 'react'
-import { getInvoices } from '../api'
+import { getInvoices, editSale, getAllFlavors, getCupSizes, getToppings, getOperatives } from '../api'
+import { Icon } from '../components/Icons'
+import { useAuth } from '../context/AuthContext'
+import toast from 'react-hot-toast'
 
-const fmt = n => `$${Number(n).toLocaleString('es-CO')}`
+const fmt     = n  => `$${Number(n).toLocaleString('es-CO')}`
+const fmtTime = dt => new Date(dt).toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' })
+const fmtDate = dt => new Date(dt).toLocaleDateString('es-CO', { day: '2-digit', month: '2-digit', year: '2-digit' })
+
+const PAYMENT_LABELS = { cash: 'Efectivo', transfer: 'Transferencia', mixed: 'Mixto' }
+const PAYMENT_BADGE  = { cash: 'badge-gray', transfer: 'badge-cyan', mixed: 'badge-lime' }
+
+const PAYMENT_MODES = [
+  { key: 'cash',     label: 'Efectivo' },
+  { key: 'transfer', label: 'Transferencia' },
+  { key: 'mixed',    label: 'Mixto' },
+]
 
 export default function Billing() {
-  const [invoices, setInvoices] = useState([])
-  const [loading, setLoading] = useState(true)
+  const { isAdmin } = useAuth()
+  const [invoices,   setInvoices]   = useState([])
+  const [loading,    setLoading]    = useState(true)
+  const [selected,   setSelected]   = useState(null)   // invoice abierto
+  const [editMode,   setEditMode]   = useState(false)
+  const [flavors,    setFlavors]    = useState([])
+  const [cupSizes,   setCupSizes]   = useState([])
+  const [toppings,   setToppings]   = useState([])
+  const [operatives, setOperatives] = useState([])
+  const [saving,     setSaving]     = useState(false)
+
+  // Formulario de edición
+  const [eForm, setEForm] = useState({})
+
+  const load = () =>
+    getInvoices({ ordering: '-created_at' })
+      .then(r => { setInvoices(r.data?.results ?? r.data ?? []); setLoading(false) })
 
   useEffect(() => {
-    getInvoices().then(r => {
-      setInvoices(r.data.results || r.data)
-      setLoading(false)
-    })
+    load()
+    const x = r => r.data?.results ?? r.data ?? []
+    Promise.all([getAllFlavors(), getCupSizes(), getToppings(), getOperatives()])
+      .then(([f, c, t, o]) => {
+        setFlavors(x(f)); setCupSizes(x(c)); setToppings(x(t)); setOperatives(x(o))
+      }).catch(() => {})
   }, [])
 
-  if (loading) return <div className="flex justify-center py-16"><div className="w-8 h-8 border-4 border-brand-pink border-t-transparent rounded-full animate-spin" /></div>
+  const openDetail = (inv) => {
+    setSelected(inv)
+    setEditMode(false)
+    const s = inv.sale_detail
+    setEForm({
+      payment_method:     s.payment_method,
+      cash_received:      s.cash_received,
+      transfer_amount:    s.transfer_amount,
+      transfer_reference: s.transfer_reference || '',
+      is_delivery:        s.is_delivery,
+      notes:              s.notes || '',
+      seller_id:          s.seller || '',
+    })
+  }
+
+  const handlePaymentChange = (method) => {
+    const total = Number(sale?.total || 0)
+    setEForm(f => ({
+      ...f,
+      payment_method:  method,
+      cash_received:   method === 'transfer' ? '0' : method === 'cash' ? String(total) : f.cash_received,
+      transfer_amount: method === 'cash'     ? '0' : method === 'transfer' ? String(total) : f.transfer_amount,
+    }))
+  }
+
+  const handleSave = async () => {
+    setSaving(true)
+    try {
+      const payload = { ...eForm }
+      await editSale(selected.sale_detail.id, payload)
+      toast.success('Factura actualizada')
+      await load()
+      // Refrescar el selected con los nuevos datos
+      setSelected(null)
+      setEditMode(false)
+    } catch (err) {
+      toast.error(err?.response?.data?.detail || 'Error al guardar', { duration: 6000 })
+    }
+    setSaving(false)
+  }
+
+  const sale = selected?.sale_detail
+
+  if (loading) return (
+    <div className="flex justify-center py-16">
+      <div className="w-8 h-8 border-4 border-brand-pink border-t-transparent rounded-full animate-spin" />
+    </div>
+  )
 
   return (
-    <div className="space-y-6">
-      <h1 className="text-brand-navy">Facturas</h1>
-      <div className="card">
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-gray-100 text-left text-xs text-gray-400 uppercase tracking-wide">
-                <th className="pb-3 pr-4">Número</th>
-                <th className="pb-3 pr-4">Hora</th>
-                <th className="pb-3 pr-4">Vendedora</th>
-                <th className="pb-3 pr-4">Total</th>
-                <th className="pb-3 pr-4">Pago</th>
-                <th className="pb-3">Estado</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-50">
-              {invoices.length === 0 && (
-                <tr><td colSpan="6" className="py-8 text-center text-gray-400">Sin facturas</td></tr>
-              )}
-              {invoices.map(inv => (
-                <tr key={inv.id}>
-                  <td className="py-3 pr-4 font-mono font-medium text-brand-navy">{inv.invoice_number}</td>
-                  <td className="py-3 pr-4 text-gray-500">
-                    {new Date(inv.created_at).toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' })}
-                  </td>
-                  <td className="py-3 pr-4">{inv.sale_detail?.seller_name || '—'}</td>
-                  <td className="py-3 pr-4 font-bold text-brand-pink">{fmt(inv.sale_detail?.total || 0)}</td>
-                  <td className="py-3 pr-4">
-                    <span className="badge-gray capitalize">{inv.sale_detail?.payment_method}</span>
-                  </td>
-                  <td className="py-3">
-                    {inv.voided
-                      ? <span className="badge-pink">Anulada</span>
-                      : <span className="badge-lime">Válida</span>}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+    <div className="space-y-5">
+
+      <div>
+        <h1>Facturas</h1>
+        <p className="text-sm text-gray-400 mt-0.5">{invoices.length} factura{invoices.length !== 1 ? 's' : ''} registrada{invoices.length !== 1 ? 's' : ''}</p>
+      </div>
+
+      <div className="card p-0 overflow-hidden">
+        {/* Header */}
+        <div className="grid px-5 py-3 bg-slate-50 border-b border-gray-100 text-[10px] font-semibold text-gray-400 uppercase tracking-widest gap-3"
+          style={{ gridTemplateColumns: '130px 70px 70px 1fr 110px 90px 90px 80px 50px' }}>
+          {['Número', 'Hora', 'Fecha', 'Vendedora', 'Total', 'Canal', 'Pago', 'Estado', ''].map(h => <span key={h}>{h}</span>)}
+        </div>
+
+        <div className="divide-y divide-gray-50">
+          {invoices.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-14 text-gray-300">
+              <Icon name="billing" className="w-8 h-8 mb-2" />
+              <p className="text-sm">Sin facturas</p>
+            </div>
+          ) : invoices.map(inv => (
+            <div key={inv.id}
+              onClick={() => openDetail(inv)}
+              className="grid px-5 py-3.5 items-center gap-3 hover:bg-slate-50 transition-colors cursor-pointer"
+              style={{ gridTemplateColumns: '130px 70px 70px 1fr 110px 90px 90px 80px 50px' }}>
+              <span className="font-mono font-semibold text-brand-navy text-sm">{inv.invoice_number}</span>
+              <span className="text-sm tabular-nums text-gray-500">{fmtTime(inv.created_at)}</span>
+              <span className="text-sm tabular-nums text-gray-400">{fmtDate(inv.created_at)}</span>
+              <span className="text-sm text-gray-700">{inv.sale_detail?.seller_name || '—'}</span>
+              <span className="text-sm font-bold text-brand-pink tabular-nums">{fmt(inv.sale_detail?.total || 0)}</span>
+              <span className={`badge text-xs w-fit ${inv.sale_detail?.is_delivery ? 'badge-cyan' : 'badge-pink'}`}>
+                {inv.sale_detail?.is_delivery ? 'Domicilio' : 'POS'}
+              </span>
+              <span className={`badge text-xs w-fit ${PAYMENT_BADGE[inv.sale_detail?.payment_method] ?? 'badge-gray'}`}>
+                {PAYMENT_LABELS[inv.sale_detail?.payment_method] ?? inv.sale_detail?.payment_method}
+              </span>
+              <span className={`badge text-xs w-fit ${inv.voided ? 'badge-pink' : 'badge-lime'}`}>
+                {inv.voided ? 'Anulada' : 'Válida'}
+              </span>
+              <Icon name="chevronRight" className="w-4 h-4 text-gray-300" />
+            </div>
+          ))}
         </div>
       </div>
+
+      {/* ── Modal detalle / edición ── */}
+      {selected && sale && (
+        <div className="fixed inset-0 bg-black/30 flex items-start justify-center z-50 p-4 overflow-y-auto">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-2xl my-8">
+
+            {/* Header modal */}
+            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+              <div>
+                <h2 className="font-bold text-gray-900">{selected.invoice_number}</h2>
+                <p className="text-xs text-gray-400 mt-0.5">{fmtDate(selected.created_at)} · {fmtTime(selected.created_at)}</p>
+              </div>
+              <div className="flex items-center gap-2">
+                {!selected.voided && !editMode && (
+                  <button onClick={() => setEditMode(true)} className="btn-secondary py-1.5 text-xs">
+                    <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+                      <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                    </svg>
+                    Editar
+                  </button>
+                )}
+                <button onClick={() => { setSelected(null); setEditMode(false) }}
+                  className="w-8 h-8 rounded-lg flex items-center justify-center text-gray-400 hover:bg-gray-100">
+                  <Icon name="x" className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+
+            <div className="px-6 py-5 space-y-5">
+
+              {/* Items de la venta */}
+              <div>
+                <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-2">Productos</p>
+                <div className="divide-y divide-gray-50 border border-gray-100 rounded-xl overflow-hidden">
+                  {sale.items?.length === 0 ? (
+                    <p className="px-4 py-3 text-sm text-gray-400">Sin items</p>
+                  ) : sale.items?.map(item => (
+                    <div key={item.id} className="px-4 py-3 flex items-center justify-between">
+                      <div>
+                        <p className="text-sm font-medium text-gray-800">
+                          {item.cup_size_label || item.topping_name || 'Topping'}
+                          {item.quantity > 1 && <span className="text-gray-400"> ×{item.quantity}</span>}
+                        </p>
+                        <p className="text-xs text-gray-400 mt-0.5">
+                          {item.flavors_detail?.map(f => f.name).join(' + ')}
+                          {item.cup_size_label && item.topping_name && ` · ${item.topping_name}`}
+                        </p>
+                      </div>
+                      <span className="text-sm font-semibold text-gray-800">{fmt(item.subtotal)}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Campos editables o solo vista */}
+              {editMode ? (
+                <div className="space-y-4">
+                  <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest">Editar pago e info</p>
+
+                  <div>
+                    <label className="label">Vendedora</label>
+                    <select className="input" value={eForm.seller_id}
+                      onChange={e => setEForm(f => ({ ...f, seller_id: e.target.value }))}>
+                      <option value="">Sin asignar</option>
+                      {operatives.map(o => <option key={o.id} value={o.id}>{o.full_name}</option>)}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="label">Método de pago</label>
+                    <div className="flex gap-2">
+                      {PAYMENT_MODES.map(m => (
+                        <button key={m.key} type="button"
+                          onClick={() => handlePaymentChange(m.key)}
+                          className={`flex-1 py-2 rounded-xl text-sm font-medium border transition-all ${
+                            eForm.payment_method === m.key
+                              ? 'border-brand-navy bg-brand-navy text-white'
+                              : 'border-gray-200 text-gray-500 hover:border-gray-300'
+                          }`}>
+                          {m.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {(eForm.payment_method === 'cash' || eForm.payment_method === 'mixed') && (
+                    <div>
+                      <label className="label">Efectivo recibido</label>
+                      <input type="number" className="input" value={eForm.cash_received}
+                        onChange={e => setEForm(f => ({ ...f, cash_received: e.target.value }))} />
+                    </div>
+                  )}
+
+                  {(eForm.payment_method === 'transfer' || eForm.payment_method === 'mixed') && (
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="label">Monto transferencia</label>
+                        <input type="number" className="input" value={eForm.transfer_amount}
+                          onChange={e => setEForm(f => ({ ...f, transfer_amount: e.target.value }))} />
+                      </div>
+                      <div>
+                        <label className="label">Referencia</label>
+                        <input className="input" value={eForm.transfer_reference}
+                          onChange={e => setEForm(f => ({ ...f, transfer_reference: e.target.value }))} />
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="flex items-center gap-2">
+                    <input type="checkbox" id="is_delivery" checked={eForm.is_delivery}
+                      onChange={e => setEForm(f => ({ ...f, is_delivery: e.target.checked }))}
+                      className="w-4 h-4 accent-brand-pink" />
+                    <label htmlFor="is_delivery" className="text-sm text-gray-600 cursor-pointer">Es domicilio</label>
+                  </div>
+
+                  <div>
+                    <label className="label">Notas</label>
+                    <input className="input" value={eForm.notes}
+                      onChange={e => setEForm(f => ({ ...f, notes: e.target.value }))} />
+                  </div>
+
+                  <div className="flex gap-2 pt-2">
+                    <button onClick={handleSave} disabled={saving} className="btn-primary flex-1">
+                      {saving && <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />}
+                      Guardar cambios
+                    </button>
+                    <button onClick={() => setEditMode(false)} className="btn-secondary flex-1">Cancelar</button>
+                  </div>
+                </div>
+              ) : (
+                /* Vista solo lectura */
+                <div className="grid grid-cols-2 gap-4 text-sm">
+                  <div>
+                    <p className="text-xs text-gray-400 mb-0.5">Vendedora</p>
+                    <p className="font-medium text-gray-800">{sale.seller_name || '—'}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-400 mb-0.5">Método de pago</p>
+                    <span className={`badge ${PAYMENT_BADGE[sale.payment_method] ?? 'badge-gray'}`}>
+                      {PAYMENT_LABELS[sale.payment_method] ?? sale.payment_method}
+                    </span>
+                  </div>
+                  {sale.cash_received > 0 && (
+                    <div>
+                      <p className="text-xs text-gray-400 mb-0.5">Efectivo recibido</p>
+                      <p className="font-medium">{fmt(sale.cash_received)}</p>
+                    </div>
+                  )}
+                  {sale.transfer_amount > 0 && (
+                    <div>
+                      <p className="text-xs text-gray-400 mb-0.5">Transferencia</p>
+                      <p className="font-medium">{fmt(sale.transfer_amount)}</p>
+                    </div>
+                  )}
+                  {sale.change_given > 0 && (
+                    <div>
+                      <p className="text-xs text-gray-400 mb-0.5">Cambio entregado</p>
+                      <p className="font-medium text-green-600">{fmt(sale.change_given)}</p>
+                    </div>
+                  )}
+                  <div>
+                    <p className="text-xs text-gray-400 mb-0.5">Canal</p>
+                    <span className={`badge ${sale.is_delivery ? 'badge-cyan' : 'badge-pink'}`}>
+                      {sale.is_delivery ? 'Domicilio' : 'Punto de Venta'}
+                    </span>
+                  </div>
+                  {sale.notes && (
+                    <div className="col-span-2">
+                      <p className="text-xs text-gray-400 mb-0.5">Notas</p>
+                      <p className="text-gray-600">{sale.notes}</p>
+                    </div>
+                  )}
+                  <div className="col-span-2 pt-2 border-t border-gray-100 flex justify-between items-center">
+                    <span className="text-sm font-semibold text-gray-500">Total</span>
+                    <span className="text-xl font-bold text-brand-pink">{fmt(sale.total)}</span>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

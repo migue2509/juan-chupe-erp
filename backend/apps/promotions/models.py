@@ -5,6 +5,10 @@ from decimal import Decimal
 class Promotion(models.Model):
     name = models.CharField(max_length=100)
     description = models.TextField(blank=True)
+    cup_size = models.ForeignKey(
+        'products.CupSize', on_delete=models.SET_NULL,
+        null=True, blank=True, related_name='promotions'
+    )
     quantity_included = models.PositiveIntegerField(default=2, help_text='Ej: 2 granizados')
     promo_price = models.DecimalField(max_digits=10, decimal_places=0)
     is_active = models.BooleanField(default=True)

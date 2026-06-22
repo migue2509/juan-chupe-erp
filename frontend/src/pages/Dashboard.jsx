@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { getActiveShift, getTodaySales, getInventoryAlerts, getExpenses, openShift, closeShift } from '../api'
+import { getActiveShift, getTodaySales, getInventoryAlerts, getTodayExpenses, openShift, closeShift } from '../api'
 import { useAuth } from '../context/AuthContext'
 import { Icon } from '../components/Icons'
 import toast from 'react-hot-toast'
@@ -28,25 +28,16 @@ export default function Dashboard() {
   const load = async () => {
     setLoading(true)
     try {
-      const [shiftRes, salesRes, alertsRes] = await Promise.all([
+      const [shiftRes, salesRes, alertsRes, expRes] = await Promise.all([
         getActiveShift(),
         getTodaySales(),
         getInventoryAlerts(),
+        getTodayExpenses(),
       ])
-      const shiftData = shiftRes.data.shift
-      setShift(shiftData)
+      setShift(shiftRes.data.shift)
       setAllSales(salesRes.data.sales || [])
       setAlerts(alertsRes.data)
-
-      // Load expenses for current shift
-      if (shiftData?.id) {
-        try {
-          const expRes = await getExpenses({ shift: shiftData.id })
-          setExpenses(expRes.data?.results ?? expRes.data ?? [])
-        } catch { setExpenses([]) }
-      } else {
-        setExpenses([])
-      }
+      setExpenses(expRes.data?.results ?? expRes.data ?? [])
     } catch {}
     setLoading(false)
   }
@@ -69,11 +60,18 @@ export default function Dashboard() {
   })
 
   // ── Stats computed from filtered sales ──
-  const totalDinero      = filteredSales.reduce((sum, s) => sum + Number(s.total), 0)
-  const cantidadVentas   = filteredSales.length
-  const totalEfectivo    = filteredSales.reduce((sum, s) => sum + Number(s.cash_received || 0), 0)
-  const totalTransf      = filteredSales.reduce((sum, s) => sum + Number(s.transfer_amount || 0), 0)
-  const totalGastos      = expenses.reduce((sum, e) => sum + Number(e.amount || 0), 0)
+  const totalDinero    = filteredSales.reduce((sum, s) => sum + Number(s.total), 0)
+  const cantidadVentas = filteredSales.length
+  // Efectivo real = lo que entregaron menos el cambio devuelto
+  const totalEfectivo  = filteredSales.reduce((sum, s) =>
+    sum + Math.max(0, Number(s.cash_received || 0) - Number(s.change_given || 0)), 0)
+  const totalTransf    = filteredSales.reduce((sum, s) => sum + Number(s.transfer_amount || 0), 0)
+  const filteredExpenses = expenses.filter(e => {
+    if (filter === 'pos')      return e.origin === 'pos'
+    if (filter === 'delivery') return e.origin === 'delivery'
+    return true
+  })
+  const totalGastos = filteredExpenses.reduce((sum, e) => sum + Number(e.amount || 0), 0)
 
   const recentSales = [...filteredSales].sort(
     (a, b) => new Date(b.created_at) - new Date(a.created_at)
@@ -217,7 +215,7 @@ export default function Dashboard() {
 
           {/* Table header */}
           <div className="grid grid-cols-5 gap-2 px-5 py-2.5 bg-slate-50 border-b border-gray-100">
-            {['Hora', 'Vendedora', 'Categoría', 'Total', 'Pago'].map(col => (
+            {['Hora', 'Vendedora', 'Canal', 'Total', 'Pago'].map(col => (
               <span key={col} className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest">{col}</span>
             ))}
           </div>

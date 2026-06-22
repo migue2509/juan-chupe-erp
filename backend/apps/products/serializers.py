@@ -54,7 +54,7 @@ class ToppingSerializer(serializers.ModelSerializer):
     class Meta:
         model = Topping
         fields = [
-            'id', 'name', 'is_active', 'min_stock',
+            'id', 'name', 'price', 'is_active', 'min_stock', 'linked_category',
             'created_at', 'updated_at',
         ]
         extra_kwargs = {

@@ -22,12 +22,7 @@ class FlavorViewSet(viewsets.ModelViewSet):
         from apps.inventory.models import FlavorBag
         flavor = serializer.save()
         min_stock = self.request.data.get('min_stock_ml', 500)
-        bag_category_map = {
-            'water':      'water',
-            'creamy':     'creamy',
-            'refreshing': 'refreshing',
-        }
-        bag_cat = bag_category_map.get(flavor.category, 'water')
+        bag_cat = flavor.category  # mismo valor en ambos modelos
         FlavorBag.objects.get_or_create(
             flavor=flavor,
             defaults={'category': bag_cat, 'min_stock_ml': min_stock}
@@ -40,6 +35,15 @@ class CupSizeViewSet(viewsets.ModelViewSet):
     serializer_class = CupSizeSerializer
     permission_classes = [IsAdminOrReadOnly]
 
+    def perform_create(self, serializer):
+        """Auto-crea CupStock al crear un vaso"""
+        from apps.inventory.models import CupStock
+        cup = serializer.save()
+        CupStock.objects.get_or_create(
+            cup_size=cup,
+            defaults={'min_quantity': cup.min_quantity}
+        )
+
 
 class ProductViewSet(viewsets.ModelViewSet):
     queryset = Product.objects.all()
@@ -49,6 +53,15 @@ class ProductViewSet(viewsets.ModelViewSet):
 
 
 class ToppingViewSet(viewsets.ModelViewSet):
-    queryset = Topping.objects.all()          # todos, incluyendo inactivos
+    queryset = Topping.objects.all()
     serializer_class = ToppingSerializer
     permission_classes = [IsAdminOrReadOnly]
+
+    def perform_create(self, serializer):
+        """Auto-crea ToppingStock al crear un topping"""
+        from apps.inventory.models import ToppingStock
+        topping = serializer.save()
+        ToppingStock.objects.get_or_create(
+            topping=topping,
+            defaults={'min_quantity': topping.min_stock}
+        )

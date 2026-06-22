@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import FlavorBag, CupStock, StockMovement
+from .models import FlavorBag, CupStock, ToppingStock, StockMovement
 
 
 class FlavorBagSerializer(serializers.ModelSerializer):
@@ -27,15 +27,37 @@ class CupStockSerializer(serializers.ModelSerializer):
 
 class StockMovementSerializer(serializers.ModelSerializer):
     created_by_name = serializers.CharField(source='created_by.full_name', read_only=True)
+    item_name = serializers.SerializerMethodField()
+
+    def get_item_name(self, obj):
+        if obj.flavor_bag_id:
+            try: return obj.flavor_bag.flavor.name
+            except: pass
+        if obj.cup_stock_id:
+            try: return obj.cup_stock.cup_size.size
+            except: pass
+        if obj.topping_stock_id:
+            try: return obj.topping_stock.topping.name
+            except: pass
+        return '—'
 
     class Meta:
         model = StockMovement
         fields = [
-            'id', 'movement_type', 'flavor_bag', 'cup_stock',
-            'quantity_ml', 'quantity_units', 'notes', 'created_by',
-            'created_by_name', 'created_at', 'shift'
+            'id', 'movement_type', 'flavor_bag', 'cup_stock', 'topping_stock',
+            'quantity_ml', 'quantity_units', 'purchase_amount', 'notes',
+            'created_by', 'created_by_name', 'item_name', 'created_at', 'shift'
         ]
         read_only_fields = ['id', 'created_at', 'created_by']
+
+
+class ToppingStockSerializer(serializers.ModelSerializer):
+    topping_name = serializers.CharField(source='topping.name', read_only=True)
+    is_low_stock  = serializers.BooleanField(read_only=True)
+
+    class Meta:
+        model  = ToppingStock
+        fields = ['id', 'topping', 'topping_name', 'quantity', 'min_quantity', 'is_low_stock', 'updated_at']
 
 
 class StockEntrySerializer(serializers.Serializer):

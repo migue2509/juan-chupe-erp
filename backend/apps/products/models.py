@@ -4,9 +4,9 @@ from decimal import Decimal
 
 class Flavor(models.Model):
     CATEGORY_CHOICES = [
-        ('water', 'Granizado en Agua'),
-        ('creamy', 'Granizado Cremoso'),
-        ('refreshing', 'Refrescante'),
+        ('creamy',       'Cremoso'),
+        ('refreshing',   'Refrescante'),
+        ('non_alcoholic','Sin Alcohol'),
     ]
 
     name = models.CharField(max_length=100, unique=True)
@@ -68,9 +68,21 @@ class Product(models.Model):
 
 
 class Topping(models.Model):
+    LINKED_CATEGORY_CHOICES = [
+        ('creamy',       'Bolsa Cremosos (auto)'),
+        ('refreshing',   'Bolsa Refrescantes (auto)'),
+        ('non_alcoholic','Bolsa Sin Alcohol (auto)'),
+    ]
+
     name = models.CharField(max_length=100, unique=True)
+    price = models.DecimalField(max_digits=10, decimal_places=0, default=2000, help_text='Precio al vender como topping adicional')
     is_active = models.BooleanField(default=True)
     min_stock = models.IntegerField(default=0, help_text='Cantidad mínima de referencia')
+    linked_category = models.CharField(
+        max_length=20, choices=LINKED_CATEGORY_CHOICES,
+        null=True, blank=True,
+        help_text='Si se define, se descuenta automáticamente en cada venta con esa categoría de sabor'
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

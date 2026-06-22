@@ -30,6 +30,9 @@ export const getCupStocks = () => api.get('/inventory/cups/')
 export const addBagStock = (id, data) => api.post(`/inventory/bags/${id}/add-stock/`, data)
 export const addCupStock = (id, data) => api.post(`/inventory/cups/${id}/add-stock/`, data)
 export const getInventoryAlerts = () => api.get('/inventory/bags/alerts/')
+export const getToppingStocks  = ()       => api.get('/inventory/toppings/')
+export const addToppingStock   = (id, data) => api.post(`/inventory/toppings/${id}/add-stock/`, data)
+export const getMovements      = (params)   => api.get('/inventory/movements/', { params })
 
 // Sales
 export const createSale = (data) => api.post('/sales/create-sale/', data)
@@ -37,8 +40,10 @@ export const getTodaySales = () => api.get('/sales/today/')
 export const getSales = (params) => api.get('/sales/', { params })
 
 // Billing
-export const getInvoices = (params) => api.get('/billing/', { params })
-export const voidInvoice = (id, data) => api.post(`/billing/${id}/void/`, data)
+export const getInvoices  = (params)     => api.get('/billing/', { params })
+export const getInvoice   = (id)         => api.get(`/billing/${id}/`)
+export const voidInvoice  = (id, data)   => api.post(`/billing/${id}/void/`, data)
+export const editSale     = (id, data)   => api.patch(`/sales/${id}/edit/`, data)
 
 // Promotions
 export const getPromotions = () => api.get('/promotions/')
@@ -48,7 +53,8 @@ export const updatePromotion = (id, data) => api.patch(`/promotions/${id}/`, dat
 export const togglePromotion = (id) => api.patch(`/promotions/${id}/toggle/`)
 
 // Expenses
-export const getExpenses = (params) => api.get('/expenses/', { params })
+export const getExpenses      = (params) => api.get('/expenses/', { params })
+export const getTodayExpenses = ()       => api.get('/expenses/today/')
 export const createExpense = (data) => api.post('/expenses/', data)
 
 // Purchases
