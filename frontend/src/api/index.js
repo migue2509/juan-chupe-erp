@@ -55,7 +55,9 @@ export const togglePromotion = (id) => api.patch(`/promotions/${id}/toggle/`)
 // Expenses
 export const getExpenses      = (params) => api.get('/expenses/', { params })
 export const getTodayExpenses = ()       => api.get('/expenses/today/')
-export const createExpense = (data) => api.post('/expenses/', data)
+export const createExpense    = (data)   => api.post('/expenses/', data)
+export const updateExpense    = (id, data) => api.patch(`/expenses/${id}/`, data)
+export const deleteExpense    = (id)     => api.delete(`/expenses/${id}/`)
 
 // Purchases
 export const getPurchases = (params) => api.get('/purchases/', { params })

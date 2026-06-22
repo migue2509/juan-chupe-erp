@@ -80,7 +80,10 @@ export default function Dashboard() {
     if (filter === 'delivery') return e.origin === 'delivery'
     return true
   })
-  const totalGastos = filteredExpenses.reduce((sum, e) => sum + Number(e.amount || 0), 0)
+  // Solo los que afectan caja impactan el total del dashboard
+  const totalGastos = filteredExpenses
+    .filter(e => e.from_daily_cash)
+    .reduce((sum, e) => sum + Number(e.amount || 0), 0)
   const netoEnCaja  = totalDinero - totalGastos
 
   const recentSales = [...filteredSales].sort(
