@@ -91,9 +91,22 @@ export default function Deliveries() {
     } catch { toast.error('Error') }
   }
 
-  const filtered = statusFilter === 'all'
-    ? deliveries
-    : deliveries.filter(d => d.status === statusFilter)
+  const [dateFrom, setDateFrom] = useState('')
+  const [dateTo,   setDateTo]   = useState('')
+
+  const filtered = deliveries.filter(d => {
+    if (statusFilter !== 'all' && d.status !== statusFilter) return false
+    if (dateFrom || dateTo) {
+      const d2 = new Date(d.created_at)
+      d2.setHours(0, 0, 0, 0)
+      if (dateFrom && d2 < new Date(dateFrom)) return false
+      if (dateTo   && d2 > new Date(dateTo))   return false
+    }
+    return true
+  })
+
+  const hasDateFilter = dateFrom || dateTo
+  const clearDates    = () => { setDateFrom(''); setDateTo('') }
 
   const counts = Object.keys(STATUS).reduce((acc, k) => {
     acc[k] = deliveries.filter(d => d.status === k).length
@@ -127,6 +140,26 @@ export default function Deliveries() {
             <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${s.cls}`}>{s.label}</span>
           </button>
         ))}
+      </div>
+
+      {/* Filtro fechas */}
+      <div className="card py-3 px-4 flex flex-wrap items-center gap-3">
+        <div className="flex items-center gap-2">
+          <label className="text-xs text-gray-400 whitespace-nowrap">Desde</label>
+          <input type="date" className="input py-1.5 text-sm w-36"
+            value={dateFrom} onChange={e => setDateFrom(e.target.value)} />
+        </div>
+        <div className="flex items-center gap-2">
+          <label className="text-xs text-gray-400 whitespace-nowrap">Hasta</label>
+          <input type="date" className="input py-1.5 text-sm w-36"
+            value={dateTo} onChange={e => setDateTo(e.target.value)} />
+        </div>
+        {hasDateFilter && (
+          <button onClick={clearDates} className="text-xs text-gray-400 hover:text-gray-600 underline whitespace-nowrap">
+            Limpiar
+          </button>
+        )}
+        <span className="ml-auto text-xs text-gray-400">{filtered.length} de {deliveries.length} domicilios</span>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 items-start">
