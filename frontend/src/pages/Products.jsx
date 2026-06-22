@@ -121,6 +121,7 @@ export default function Products() {
   const [cupForm,     setCupForm]     = useState(EMPTY_CUP)
   const [toppingForm, setToppingForm] = useState(EMPTY_TOPPING)
   const [saving, setSaving] = useState(false)
+  const [search, setSearch] = useState('')
 
   const load = async () => {
     try {
@@ -133,7 +134,12 @@ export default function Products() {
 
   useEffect(() => { load() }, [])
 
-  const handleTabChange = (key) => { setTab(key); setShowCreate(false); setEditing(null) }
+  const handleTabChange = (key) => { setTab(key); setShowCreate(false); setEditing(null); setSearch('') }
+
+  const q = search.toLowerCase()
+  const filteredFlavors  = q ? flavors.filter(f  => f.name.toLowerCase().includes(q))  : flavors
+  const filteredCups     = q ? cups.filter(c    => c.size.toLowerCase().includes(q))    : cups
+  const filteredToppings = q ? toppings.filter(t => t.name.toLowerCase().includes(q))   : toppings
   const confirmDelete = (name) => confirm(`¿Eliminar "${name}"? Esta acción no se puede deshacer.`)
 
   // ── FLAVORS ──
@@ -388,17 +394,21 @@ export default function Products() {
       {/* ══ BOLSAS ══ */}
       {tab === 'bags' && (
         <div className="card p-0 overflow-hidden">
+          <div className="flex items-center justify-between px-5 py-3 border-b border-gray-100">
+            <input className="input py-1.5 text-sm w-52" placeholder="Buscar bolsa..."
+              value={search} onChange={e => setSearch(e.target.value)} />
+          </div>
           <div className="grid px-5 py-3 bg-slate-50 border-b border-gray-100 text-[10px] font-semibold text-gray-400 uppercase tracking-widest gap-3"
             style={{ gridTemplateColumns: '2rem 1fr 140px 80px 100px 1fr 180px' }}>
             {['', 'Nombre', 'Categoría', 'Color', 'Mín. ml', 'Fechas', 'Acciones'].map(h => <span key={h}>{h}</span>)}
           </div>
           <div className="divide-y divide-gray-50">
-            {flavors.length === 0 ? (
+            {filteredFlavors.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-14 text-gray-300">
                 <Icon name="products" className="w-10 h-10 mb-2" />
                 <p className="text-sm">No hay bolsas registradas</p>
               </div>
-            ) : flavors.map(f => (
+            ) : filteredFlavors.map(f => (
               <div key={f.id}>
                 {editing?.type === 'flavor' && editing.id === f.id ? (
                   <EditRow
@@ -445,17 +455,21 @@ export default function Products() {
       {/* ══ VASOS ══ */}
       {tab === 'cups' && (
         <div className="card p-0 overflow-hidden">
+          <div className="flex items-center justify-between px-5 py-3 border-b border-gray-100">
+            <input className="input py-1.5 text-sm w-52" placeholder="Buscar vaso..."
+              value={search} onChange={e => setSearch(e.target.value)} />
+          </div>
           <div className="grid px-5 py-3 bg-slate-50 border-b border-gray-100 text-[10px] font-semibold text-gray-400 uppercase tracking-widest gap-3"
             style={{ gridTemplateColumns: '1fr 100px 130px 110px 1fr 180px' }}>
             {['Nombre', 'ml', 'Precio', 'Mín. uds.', 'Fechas', 'Acciones'].map(h => <span key={h}>{h}</span>)}
           </div>
           <div className="divide-y divide-gray-50">
-            {cups.length === 0 ? (
+            {filteredCups.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-14 text-gray-300">
                 <Icon name="cup" className="w-10 h-10 mb-2" />
                 <p className="text-sm">No hay vasos registrados</p>
               </div>
-            ) : cups.map(c => (
+            ) : filteredCups.map(c => (
               <div key={c.id}>
                 {editing?.type === 'cup' && editing.id === c.id ? (
                   <EditRow
@@ -498,17 +512,21 @@ export default function Products() {
       {/* ══ TOPPINGS ══ */}
       {tab === 'toppings' && (
         <div className="card p-0 overflow-hidden">
+          <div className="flex items-center justify-between px-5 py-3 border-b border-gray-100">
+            <input className="input py-1.5 text-sm w-52" placeholder="Buscar topping..."
+              value={search} onChange={e => setSearch(e.target.value)} />
+          </div>
           <div className="grid px-5 py-3 bg-slate-50 border-b border-gray-100 text-[10px] font-semibold text-gray-400 uppercase tracking-widest gap-3"
             style={{ gridTemplateColumns: '1fr 90px 100px 160px 1fr 180px' }}>
             {['Nombre', 'Precio', 'Mín. uds.', 'Bolsa auto', 'Fechas', 'Acciones'].map(h => <span key={h}>{h}</span>)}
           </div>
           <div className="divide-y divide-gray-50">
-            {toppings.length === 0 ? (
+            {filteredToppings.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-14 text-gray-300">
                 <Icon name="promotions" className="w-10 h-10 mb-2" />
                 <p className="text-sm">No hay toppings registrados</p>
               </div>
-            ) : toppings.map(t => (
+            ) : filteredToppings.map(t => (
               <div key={t.id}>
                 {editing?.type === 'topping' && editing.id === t.id ? (
                   <EditRow
