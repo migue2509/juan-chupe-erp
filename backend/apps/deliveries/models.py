@@ -15,6 +15,7 @@ class Delivery(models.Model):
         'users.User', on_delete=models.SET_NULL, null=True, blank=True,
         related_name='deliveries', limit_choices_to={'role': 'delivery'}
     )
+    four_digits = models.CharField(max_length=4, blank=True, default='', help_text='Últimos 4 dígitos del cliente')
     address = models.CharField(max_length=300)
     status = models.CharField(max_length=15, choices=STATUS_CHOICES, default='pending')
     notes = models.TextField(blank=True)

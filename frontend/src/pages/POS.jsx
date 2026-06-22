@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { getFlavors, getCupSizes, getToppings, getActivePromotions, createSale } from '../api/index'
+import { getFlavors, getCupSizes, getToppings, getActivePromotions, createSale, createDelivery } from '../api/index'
 import { Icon } from '../components/Icons'
 import { useAuth } from '../context/AuthContext'
 import toast from 'react-hot-toast'
@@ -45,6 +45,9 @@ export default function POS() {
   const [transferAmount, setTransferAmount] = useState('')
   const [transferRef,    setTransferRef]    = useState('')
   const [isDelivery,     setIsDelivery]     = useState(false)
+  const [deliveryAddress,   setDeliveryAddress]   = useState('')
+  const [deliveryFourDigits, setDeliveryFourDigits] = useState('')
+  const [deliveryNotes,     setDeliveryNotes]     = useState('')
   const [submitting,     setSubmitting]     = useState(false)
 
   useEffect(() => {
@@ -143,13 +146,16 @@ export default function POS() {
   // ─── Submit ───────────────────────────────────────────────────────────────
   const handleSubmit = async () => {
     if (items.length === 0) { toast.error('Agrega al menos un producto'); return }
+    if (isDelivery && !deliveryAddress.trim()) { toast.error('Ingresa la dirección del domicilio'); return }
+    if (isDelivery && deliveryFourDigits && deliveryFourDigits.length !== 4) {
+      toast.error('Los dígitos deben ser exactamente 4'); return
+    }
     setSubmitting(true)
     try {
-      // Si todos los items son de la misma promo, la marcamos en la venta
       const promoIds = [...new Set(items.map(i => i.promoId).filter(Boolean))]
       const singlePromo = promoIds.length === 1 && items.every(i => i.promoId) ? promoIds[0] : null
 
-      await createSale({
+      const saleRes = await createSale({
         seller_id: user?.id,
         promotion_id: singlePromo,
         payment_method: paymentMethod,
@@ -165,6 +171,19 @@ export default function POS() {
           quantity:    i.qty,
         }))
       })
+
+      // Si es domicilio, crear el registro de domicilio
+      if (isDelivery) {
+        try {
+          await createDelivery({
+            sale: saleRes.data.id,
+            address: deliveryAddress.trim(),
+            four_digits: deliveryFourDigits,
+            notes: deliveryNotes.trim(),
+          })
+        } catch { /* el domicilio falla silencioso, la venta ya quedó */ }
+      }
+
       toast.success('Venta registrada')
       setItems([])
       setCurrent(emptyItem())
@@ -174,6 +193,9 @@ export default function POS() {
       setTransferAmount('')
       setTransferRef('')
       setIsDelivery(false)
+      setDeliveryAddress('')
+      setDeliveryFourDigits('')
+      setDeliveryNotes('')
       setPaymentMethod('cash')
     } catch (err) {
       toast.error(err?.response?.data?.detail || 'Error al registrar la venta', { duration: 6000 })
@@ -494,7 +516,7 @@ export default function POS() {
           )}
 
           {/* Delivery toggle */}
-          <label className="flex items-center gap-2.5 mb-4 cursor-pointer select-none">
+          <label className="flex items-center gap-2.5 cursor-pointer select-none">
             <input type="checkbox" checked={isDelivery} onChange={e => setIsDelivery(e.target.checked)}
               className="w-4 h-4 accent-brand-pink" />
             <span className="text-sm text-gray-600 flex items-center gap-1.5">
@@ -502,6 +524,31 @@ export default function POS() {
               Es domicilio
             </span>
           </label>
+
+          {/* Campos domicilio */}
+          {isDelivery && (
+            <div className="space-y-2 p-3 bg-cyan-50 border border-cyan-100 rounded-xl">
+              <div className="flex gap-2">
+                <div className="flex-1">
+                  <label className="label">Dirección <span className="text-red-400">*</span></label>
+                  <input className="input text-sm" placeholder="Calle, barrio..."
+                    value={deliveryAddress} onChange={e => setDeliveryAddress(e.target.value)} />
+                </div>
+                <div className="w-20">
+                  <label className="label">4 dígitos</label>
+                  <input className="input text-sm" placeholder="0000" maxLength={4}
+                    value={deliveryFourDigits}
+                    onChange={e => setDeliveryFourDigits(e.target.value.replace(/\D/g, '').slice(0, 4))} />
+                </div>
+              </div>
+              <div>
+                <label className="label">Notas del pedido</label>
+                <input className="input text-sm" placeholder="Indicaciones adicionales..."
+                  value={deliveryNotes} onChange={e => setDeliveryNotes(e.target.value)} />
+              </div>
+            </div>
+          )}
+
 
           {/* Total + submit */}
           <div className="border-t border-gray-100 pt-4">
