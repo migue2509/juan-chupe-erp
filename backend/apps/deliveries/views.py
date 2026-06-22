@@ -13,4 +13,10 @@ class DomiciliarioViewSet(viewsets.ModelViewSet):
 
 class DeliveryViewSet(viewsets.ModelViewSet):
     queryset = Delivery.objects.select_related('sale', 'delivery_person').all()
-    serializer_class =
+    serializer_class = DeliverySerializer
+    permission_classes = [IsOperative]
+    filterset_fields = ['status', 'shift']
+
+    def perform_create(self, serializer):
+        shift = Shift.get_active()
+        serializer.save(shift=shift)

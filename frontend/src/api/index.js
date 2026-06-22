@@ -89,4 +89,8 @@ export const changePassword = (id, data) => api.post(`/auth/users/${id}/change-p
 export const toggleUserActive = (id) => api.post(`/auth/users/${id}/toggle-active/`)
 
 // Reports
-export const getD
+export const getDailyReport = (shiftId) =>
+  api.get('/reports/daily/', { params: shiftId ? { shift_id: shiftId } : {} })
+export const getWeeklyReport = () => api.get('/reports/weekly/')
+export const getMonthlyReport = () => api.get('/reports/monthly/')
+export const getInventoryStatus = () => api.get('/reports/inventory/')

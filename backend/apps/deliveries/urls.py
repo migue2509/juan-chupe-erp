@@ -4,4 +4,6 @@ from .views import DeliveryViewSet, DomiciliarioViewSet
 
 router = DefaultRouter()
 router.register(r'domiciliarios', DomiciliarioViewSet, basename='domiciliarios')
-router
+router.register(r'', DeliveryViewSet, basename='deliveries')
+
+urlpatterns = [path('', include(router.urls))]

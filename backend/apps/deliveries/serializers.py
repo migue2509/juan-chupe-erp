@@ -16,3 +16,10 @@ class DeliverySerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Delivery
+        fields = [
+            'id', 'sale', 'sale_detail', 'shift',
+            'delivery_person', 'delivery_person_name',
+            'four_digits', 'address', 'status', 'notes',
+            'created_at', 'delivered_at',
+        ]
+        read_only_fields = ['id', 'created_at', 'shift']

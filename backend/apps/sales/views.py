@@ -295,4 +295,7 @@ class SaleViewSet(viewsets.ReadOnlyModelViewSet):
         sales = Sale.objects.filter(shift=shift)
         total = sum(s.total for s in sales)
         return Response({
- 
+            'sales': SaleSerializer(sales, many=True).data,
+            'total': total,
+            'count': sales.count()
+        })
