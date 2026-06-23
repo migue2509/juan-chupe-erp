@@ -91,6 +91,16 @@ export const updateUser = (id, data) => api.patch(`/auth/users/${id}/`, data)
 export const changePassword = (id, data) => api.post(`/auth/users/${id}/change-password/`, data)
 export const toggleUserActive = (id) => api.post(`/auth/users/${id}/toggle-active/`)
 
+// Payroll
+export const getPayrollSummary    = ()         => api.get('/payroll/payments/summary/')
+export const getAllSchedules       = ()         => api.get('/payroll/schedules/all-employees/')
+export const upsertSchedule       = (data)     => api.post('/payroll/schedules/upsert/', data)
+export const getWorkLogs          = (params)   => api.get('/payroll/logs/', { params })
+export const addManualWorkLog     = (data)     => api.post('/payroll/logs/manual/', data)
+export const removeWorkLog        = (id)       => api.delete(`/payroll/logs/${id}/remove/`)
+export const payWages             = (data)     => api.post('/payroll/payments/pay/', data)
+export const getPaymentHistory    = (params)   => api.get('/payroll/payments/', { params })
+
 // Reports
 export const getDailyReport    = (shiftId) => api.get('/reports/daily/', { params: shiftId ? { shift_id: shiftId } : {} })
 export const getWeeklyReport   = () => api.get('/reports/weekly/')

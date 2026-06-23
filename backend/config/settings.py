@@ -35,6 +35,7 @@ INSTALLED_APPS = [
     'apps.attendance',
     'apps.reports',
     'apps.audit',
+    'apps.payroll',
 ]
 
 MIDDLEWARE = [
@@ -112,6 +113,7 @@ REST_FRAMEWORK = {
     ),
     'DEFAULT_PERMISSION_CLASSES': (
         'rest_framework.permissions.IsAuthenticated',
+        'core.permissions.WorkSchedulePermission',
     ),
     'DEFAULT_FILTER_BACKENDS': (
         'django_filters.rest_framework.DjangoFilterBackend',

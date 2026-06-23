@@ -1,0 +1,459 @@
+import { useEffect, useState } from 'react'
+import {
+  getPayrollSummary, getAllSchedules, upsertSchedule,
+  addManualWorkLog, removeWorkLog, payWages, getPaymentHistory
+} from '../api'
+import { Icon } from '../components/Icons'
+import toast from 'react-hot-toast'
+
+const fmt = n => `$${Number(n).toLocaleString('es-CO')}`
+
+const DAYS = [
+  { key: 'monday',    label: 'Lun' },
+  { key: 'tuesday',   label: 'Mar' },
+  { key: 'wednesday', label: 'Mié' },
+  { key: 'thursday',  label: 'Jue' },
+  { key: 'friday',    label: 'Vie' },
+  { key: 'saturday',  label: 'Sáb' },
+  { key: 'sunday',    label: 'Dom' },
+]
+
+const fmtDate = d => {
+  if (!d) return '—'
+  const [y, m, day] = d.split('-')
+  return `${day}/${m}/${y.slice(2)}`
+}
+
+// ── Tab selector ────────────────────────────────────────────────────────────
+function TabBtn({ active, onClick, children }) {
+  return (
+    <button onClick={onClick}
+      className={`px-4 py-2 text-sm font-semibold rounded-lg transition-all ${
+        active ? 'bg-brand-navy text-white' : 'text-gray-500 hover:bg-gray-100'
+      }`}>
+      {children}
+    </button>
+  )
+}
+
+// ── Schedule editor modal ────────────────────────────────────────────────────
+function ScheduleModal({ employee, onClose, onSaved }) {
+  const [form, setForm] = useState(() => {
+    const f = { user: employee.user }
+    DAYS.forEach(({ key }) => {
+      f[`works_${key}`] = employee[`works_${key}`] ?? true
+      f[`${key}_wage`]  = employee[`${key}_wage`]  ?? 0
+    })
+    return f
+  })
+  const [saving, setSaving] = useState(false)
+
+  const toggle = key => setForm(p => ({ ...p, [`works_${key}`]: !p[`works_${key}`] }))
+  const setWage = (key, val) => setForm(p => ({ ...p, [`${key}_wage`]: val }))
+
+  const save = async () => {
+    setSaving(true)
+    try {
+      await upsertSchedule(form)
+      toast.success('Horario guardado')
+      onSaved()
+      onClose()
+    } catch { toast.error('Error al guardar') }
+    setSaving(false)
+  }
+
+  const weeklyTotal = DAYS.reduce((s, { key }) =>
+    s + (form[`works_${key}`] ? Number(form[`${key}_wage`] || 0) : 0), 0)
+
+  return (
+    <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-2xl shadow-xl w-[560px] overflow-hidden">
+        <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+          <div>
+            <h2>Horario — {employee.user_name}</h2>
+            <p className="text-xs text-gray-400 mt-0.5">Activa los días que trabaja y asigna la tarifa</p>
+          </div>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
+            <Icon name="x" className="w-5 h-5" />
+          </button>
+        </div>
+
+        <div className="px-6 py-5 space-y-3">
+          {/* Header */}
+          <div className="grid grid-cols-3 gap-3 text-[10px] font-semibold text-gray-400 uppercase tracking-widest mb-1">
+            <span>Día</span><span>¿Trabaja?</span><span>Tarifa del día</span>
+          </div>
+          {DAYS.map(({ key, label }) => (
+            <div key={key} className="grid grid-cols-3 gap-3 items-center">
+              <span className="text-sm font-medium text-gray-700">{label}</span>
+              <button
+                onClick={() => toggle(key)}
+                className={`w-10 h-5 rounded-full transition-all relative ${
+                  form[`works_${key}`] ? 'bg-green-500' : 'bg-gray-200'
+                }`}>
+                <span className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-all ${
+                  form[`works_${key}`] ? 'left-5' : 'left-0.5'
+                }`} />
+              </button>
+              <input
+                type="number"
+                disabled={!form[`works_${key}`]}
+                className="input py-1.5 text-sm disabled:opacity-40"
+                placeholder="0"
+                value={form[`${key}_wage`] || ''}
+                onChange={e => setWage(key, e.target.value)}
+              />
+            </div>
+          ))}
+        </div>
+
+        <div className="px-6 pb-5 flex items-center justify-between">
+          <div>
+            <p className="text-xs text-gray-400">Total semanal</p>
+            <p className="text-lg font-bold text-brand-navy">{fmt(weeklyTotal)}</p>
+          </div>
+          <div className="flex gap-2">
+            <button onClick={onClose} className="btn-secondary py-2 text-sm">Cancelar</button>
+            <button onClick={save} disabled={saving} className="btn-primary py-2 text-sm">
+              {saving ? 'Guardando...' : 'Guardar'}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ── Pay modal ────────────────────────────────────────────────────────────────
+function PayModal({ employee, onClose, onPaid }) {
+  const [selected, setSelected] = useState(() =>
+    (employee.unpaid_logs || []).map(l => l.id)
+  )
+  const [notes, setNotes]   = useState('')
+  const [paying, setPaying] = useState(false)
+
+  const toggle = id => setSelected(p =>
+    p.includes(id) ? p.filter(x => x !== id) : [...p, id]
+  )
+  const total = (employee.unpaid_logs || [])
+    .filter(l => selected.includes(l.id))
+    .reduce((s, l) => s + Number(l.wage_earned), 0)
+
+  const pay = async () => {
+    if (!selected.length) return toast.error('Selecciona al menos un día')
+    setPaying(true)
+    try {
+      await payWages({ user: employee.user_id, log_ids: selected, notes })
+      toast.success(`Pago registrado: ${fmt(total)}`)
+      onPaid()
+      onClose()
+    } catch { toast.error('Error al registrar pago') }
+    setPaying(false)
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-2xl shadow-xl w-[480px] overflow-hidden">
+        <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+          <div>
+            <h2>Pagar — {employee.user_name}</h2>
+            <p className="text-xs text-gray-400 mt-0.5">Selecciona los días a pagar</p>
+          </div>
+          <button onClick={onClose}><Icon name="x" className="w-5 h-5 text-gray-400" /></button>
+        </div>
+
+        <div className="px-6 py-4 space-y-2 max-h-72 overflow-y-auto">
+          {(employee.unpaid_logs || []).length === 0 ? (
+            <p className="text-sm text-gray-400 text-center py-6">No hay días pendientes</p>
+          ) : (employee.unpaid_logs || []).map(log => (
+            <label key={log.id} className="flex items-center justify-between p-3 rounded-xl border border-gray-100 hover:bg-slate-50 cursor-pointer">
+              <div className="flex items-center gap-3">
+                <input type="checkbox" className="w-4 h-4 accent-brand-navy"
+                  checked={selected.includes(log.id)}
+                  onChange={() => toggle(log.id)} />
+                <div>
+                  <p className="text-sm font-medium text-gray-800">{log.day_label} {fmtDate(log.date)}</p>
+                </div>
+              </div>
+              <span className="text-sm font-semibold text-gray-900 tabular-nums">{fmt(log.wage_earned)}</span>
+            </label>
+          ))}
+        </div>
+
+        <div className="px-6 py-4 border-t border-gray-100 space-y-3">
+          <input className="input text-sm w-full" placeholder="Notas (opcional)"
+            value={notes} onChange={e => setNotes(e.target.value)} />
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-xs text-gray-400">Total a pagar</p>
+              <p className="text-xl font-bold text-green-600 tabular-nums">{fmt(total)}</p>
+            </div>
+            <div className="flex gap-2">
+              <button onClick={onClose} className="btn-secondary py-2 text-sm">Cancelar</button>
+              <button onClick={pay} disabled={paying || !selected.length} className="btn-primary py-2 text-sm">
+                {paying ? 'Registrando...' : 'Confirmar Pago'}
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ── Main page ────────────────────────────────────────────────────────────────
+export default function Payroll() {
+  const [tab, setTab]             = useState('summary')
+  const [summary, setSummary]     = useState([])
+  const [schedules, setSchedules] = useState([])
+  const [history, setHistory]     = useState([])
+  const [loading, setLoading]     = useState(true)
+  const [scheduleModal, setScheduleModal] = useState(null)
+  const [payModal, setPayModal]           = useState(null)
+
+  const load = async () => {
+    setLoading(true)
+    try {
+      const [sumRes, schRes, histRes] = await Promise.all([
+        getPayrollSummary(),
+        getAllSchedules(),
+        getPaymentHistory(),
+      ])
+      setSummary(sumRes.data)
+      setSchedules(schRes.data)
+      setHistory(histRes.data?.results ?? histRes.data ?? [])
+    } catch {}
+    setLoading(false)
+  }
+
+  useEffect(() => { load() }, [])
+
+  // Dashboard KPIs
+  const totalUnpaid      = summary.reduce((s, e) => s + e.amount_unpaid, 0)
+  const totalDaysUnpaid  = summary.reduce((s, e) => s + e.days_unpaid, 0)
+  const totalPaidEver    = summary.reduce((s, e) => s + e.total_paid_ever, 0)
+  const maxPaid          = Math.max(...summary.map(e => e.total_paid_ever), 1)
+
+  if (loading) return (
+    <div className="flex justify-center py-16">
+      <div className="w-8 h-8 border-4 border-brand-navy border-t-transparent rounded-full animate-spin" />
+    </div>
+  )
+
+  return (
+    <div className="space-y-5">
+
+      {/* Header */}
+      <div>
+        <h1>Nómina</h1>
+        <p className="text-sm text-gray-400 mt-0.5">Gestión de pagos y horarios de empleadas</p>
+      </div>
+
+      {/* Tabs */}
+      <div className="card py-2 px-2 flex gap-1 w-fit">
+        <TabBtn active={tab === 'summary'}   onClick={() => setTab('summary')}>Resumen</TabBtn>
+        <TabBtn active={tab === 'schedules'} onClick={() => setTab('schedules')}>Horarios</TabBtn>
+        <TabBtn active={tab === 'history'}   onClick={() => setTab('history')}>Historial de Pagos</TabBtn>
+      </div>
+
+      {/* ── TAB: RESUMEN ── */}
+      {tab === 'summary' && (
+        <div className="space-y-5">
+          {/* KPI cards */}
+          <div className="grid grid-cols-3 gap-4">
+            <div className="stat-card">
+              <p className="stat-label">Por pagar (total)</p>
+              <p className="text-2xl font-bold text-red-500 tabular-nums mt-1">{fmt(totalUnpaid)}</p>
+              <p className="text-xs text-gray-400 mt-0.5">{totalDaysUnpaid} días pendientes</p>
+            </div>
+            <div className="stat-card">
+              <p className="stat-label">Empleadas activas</p>
+              <p className="text-2xl font-bold text-gray-900 tabular-nums mt-1">{summary.length}</p>
+            </div>
+            <div className="stat-card">
+              <p className="stat-label">Pagado histórico</p>
+              <p className="text-2xl font-bold text-green-600 tabular-nums mt-1">{fmt(totalPaidEver)}</p>
+            </div>
+          </div>
+
+          {/* Tabla de empleadas */}
+          <div className="card p-0 overflow-hidden">
+            <div className="px-5 py-4 border-b border-gray-100">
+              <h2>Estado por empleada</h2>
+            </div>
+
+            {/* Header */}
+            <div className="grid px-5 py-2.5 bg-slate-50 border-b border-gray-100 text-[10px] font-semibold text-gray-400 uppercase tracking-widest gap-4"
+              style={{ gridTemplateColumns: '1fr 80px 80px 100px 120px 100px' }}>
+              {['Empleada', 'Días total', 'Esta semana', 'Pendiente días', 'Por pagar', 'Acción'].map(h =>
+                <span key={h}>{h}</span>
+              )}
+            </div>
+
+            <div className="divide-y divide-gray-50">
+              {summary.map(emp => (
+                <div key={emp.user_id}
+                  className="grid px-5 py-4 items-center gap-4"
+                  style={{ gridTemplateColumns: '1fr 80px 80px 100px 120px 100px' }}>
+                  <div>
+                    <p className="text-sm font-semibold text-gray-800">{emp.user_name}</p>
+                    {emp.days_unpaid > 0 && (
+                      <p className="text-xs text-red-500 mt-0.5">{emp.days_unpaid} días sin pagar</p>
+                    )}
+                  </div>
+                  <span className="text-sm tabular-nums text-gray-700">{emp.days_worked_total}</span>
+                  <span className="text-sm tabular-nums text-gray-700">{emp.days_this_week}</span>
+                  <span className={`text-sm tabular-nums font-semibold ${emp.days_unpaid > 0 ? 'text-red-500' : 'text-gray-400'}`}>
+                    {emp.days_unpaid} días
+                  </span>
+                  <span className={`text-sm tabular-nums font-bold ${emp.amount_unpaid > 0 ? 'text-red-500' : 'text-gray-400'}`}>
+                    {fmt(emp.amount_unpaid)}
+                  </span>
+                  <button
+                    disabled={emp.days_unpaid === 0}
+                    onClick={() => setPayModal(emp)}
+                    className={`text-xs font-semibold py-1.5 px-3 rounded-lg transition-all ${
+                      emp.days_unpaid > 0
+                        ? 'bg-green-500 text-white hover:bg-green-600'
+                        : 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                    }`}>
+                    {emp.days_unpaid > 0 ? 'Pagar' : 'Al día'}
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Gráfico — más pagadas */}
+          {summary.length > 0 && (
+            <div className="card p-0 overflow-hidden">
+              <div className="px-5 py-4 border-b border-gray-100">
+                <h2>Pagado acumulado por empleada</h2>
+              </div>
+              <div className="px-5 py-4 space-y-4">
+                {[...summary].sort((a, b) => b.total_paid_ever - a.total_paid_ever).map(emp => (
+                  <div key={emp.user_id}>
+                    <div className="flex items-center justify-between mb-1.5">
+                      <span className="text-sm font-medium text-gray-800">{emp.user_name}</span>
+                      <span className="text-sm font-bold text-gray-900 tabular-nums">{fmt(emp.total_paid_ever)}</span>
+                    </div>
+                    <div className="h-2.5 bg-gray-100 rounded-full overflow-hidden">
+                      <div className="h-full bg-brand-navy rounded-full"
+                        style={{ width: `${(emp.total_paid_ever / maxPaid) * 100}%` }} />
+                    </div>
+                    <p className="text-[10px] text-gray-400 mt-0.5">{emp.days_worked_total} días trabajados</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── TAB: HORARIOS ── */}
+      {tab === 'schedules' && (
+        <div className="card p-0 overflow-hidden">
+          <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+            <div>
+              <h2>Horarios y tarifas</h2>
+              <p className="text-xs text-gray-400 mt-0.5">
+                Define qué días trabaja cada empleada. En días que NO trabaje, su cuenta quedará bloqueada automáticamente.
+              </p>
+            </div>
+          </div>
+
+          {/* Header */}
+          <div className="grid px-5 py-2.5 bg-slate-50 border-b border-gray-100 text-[10px] font-semibold text-gray-400 uppercase tracking-widest gap-4"
+            style={{ gridTemplateColumns: '1fr auto auto auto' }}>
+            <span>Empleada</span>
+            <span>Días que trabaja</span>
+            <span>Total semanal</span>
+            <span>Acción</span>
+          </div>
+
+          <div className="divide-y divide-gray-50">
+            {schedules.map(emp => (
+              <div key={emp.user}
+                className="grid px-5 py-4 items-center gap-4"
+                style={{ gridTemplateColumns: '1fr auto auto auto' }}>
+                <p className="text-sm font-semibold text-gray-800">{emp.user_name}</p>
+                <div className="flex gap-1">
+                  {DAYS.map(({ key, label }) => (
+                    <span key={key}
+                      className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
+                        emp[`works_${key}`]
+                          ? 'bg-brand-navy text-white'
+                          : 'bg-gray-100 text-gray-300'
+                      }`}>
+                      {label}
+                    </span>
+                  ))}
+                </div>
+                <span className="text-sm font-bold text-gray-900 tabular-nums">{fmt(emp.weekly_total)}</span>
+                <button onClick={() => setScheduleModal(emp)}
+                  className="btn-secondary py-1.5 text-xs">
+                  Editar
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* ── TAB: HISTORIAL ── */}
+      {tab === 'history' && (
+        <div className="card p-0 overflow-hidden">
+          <div className="px-5 py-4 border-b border-gray-100">
+            <h2>Historial de pagos</h2>
+          </div>
+
+          <div className="grid px-5 py-2.5 bg-slate-50 border-b border-gray-100 text-[10px] font-semibold text-gray-400 uppercase tracking-widest gap-4"
+            style={{ gridTemplateColumns: '1fr 130px 60px 100px 1fr 110px' }}>
+            {['Empleada', 'Período', 'Días', 'Total', 'Notas', 'Fecha pago'].map(h =>
+              <span key={h}>{h}</span>
+            )}
+          </div>
+
+          <div className="divide-y divide-gray-50">
+            {history.length === 0 ? (
+              <div className="flex items-center justify-center py-12 text-gray-300 text-sm">
+                Sin pagos registrados
+              </div>
+            ) : history.map(p => (
+              <div key={p.id}
+                className="grid px-5 py-3 items-center gap-4 hover:bg-slate-50"
+                style={{ gridTemplateColumns: '1fr 130px 60px 100px 1fr 110px' }}>
+                <span className="text-sm font-medium text-gray-800">{p.user_name}</span>
+                <span className="text-xs text-gray-500 tabular-nums">
+                  {fmtDate(p.week_start)} → {fmtDate(p.week_end)}
+                </span>
+                <span className="text-sm tabular-nums text-gray-700">{p.days_paid}</span>
+                <span className="text-sm font-bold text-green-600 tabular-nums">{fmt(p.total_amount)}</span>
+                <span className="text-xs text-gray-400 truncate">{p.notes || '—'}</span>
+                <span className="text-xs text-gray-500 tabular-nums">
+                  {new Date(p.paid_at).toLocaleDateString('es-CO')}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Modals */}
+      {scheduleModal && (
+        <ScheduleModal
+          employee={scheduleModal}
+          onClose={() => setScheduleModal(null)}
+          onSaved={load}
+        />
+      )}
+      {payModal && (
+        <PayModal
+          employee={payModal}
+          onClose={() => setPayModal(null)}
+          onPaid={load}
+        />
+      )}
+    </div>
+  )
+}

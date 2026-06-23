@@ -14,11 +14,32 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
 
     def validate(self, attrs):
         data = super().validate(attrs)
+
+        # ── Seguridad: bloquear login en días no laborales (solo operativas) ──
+        user = self.user
+        if user.role == 'operative':
+            try:
+                from django.utils import timezone
+                schedule = user.schedule  # OneToOne — lanza excepción si no existe
+                if not schedule.is_work_day():
+                    from django.utils import timezone as tz
+                    today = tz.localdate()
+                    from apps.payroll.models import DAY_LABELS
+                    day_label = DAY_LABELS[today.weekday()]
+                    raise serializers.ValidationError(
+                        f'Tu cuenta no está habilitada los días {day_label}. '
+                        f'Habla con tu administrador si crees que es un error.'
+                    )
+            except serializers.ValidationError:
+                raise
+            except Exception:
+                pass  # Si no tiene horario configurado, se permite el acceso
+
         data['user'] = {
-            'id': self.user.id,
-            'username': self.user.username,
-            'full_name': self.user.full_name,
-            'role': self.user.role,
+            'id': user.id,
+            'username': user.username,
+            'full_name': user.full_name,
+            'role': user.role,
         }
         return data
 
