@@ -124,9 +124,9 @@ export default function Deliveries() {
     return acc
   }, {})
 
-  // Gráfico por domiciliario
+  // Gráfico por domiciliario — usa `filtered` para respetar filtros de fecha y estado
   const domChart = {}
-  deliveries.forEach(d => {
+  filtered.forEach(d => {
     const name = d.delivery_person_name || 'Sin asignar'
     if (!domChart[name]) domChart[name] = { total: 0, delivered: 0, on_way: 0, pending: 0, cancelled: 0 }
     domChart[name].total++
@@ -191,7 +191,7 @@ export default function Deliveries() {
           <div className="flex items-center gap-2 px-5 py-4 border-b border-gray-100">
             <Icon name="reports" className="w-4 h-4 text-brand-purple" />
             <h2>Domicilios por repartidor</h2>
-            <span className="badge-gray ml-auto">{deliveries.length} en total</span>
+            <span className="badge-gray ml-auto">{filtered.length} en total</span>
           </div>
           <div className="px-5 py-4 grid gap-4" style={{ gridTemplateColumns: `repeat(${Math.min(domChartArr.length, 4)}, 1fr)` }}>
             {domChartArr.map(d => (
