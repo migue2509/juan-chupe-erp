@@ -149,6 +149,63 @@ function ScheduleModal({ employee, onClose, onSaved }) {
   )
 }
 
+// ── Payment detail modal ─────────────────────────────────────────────────────
+function PaymentDetailModal({ payment, onClose }) {
+  return (
+    <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-2xl shadow-xl w-[480px] overflow-hidden">
+        <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+          <div>
+            <h2>{payment.user_name}</h2>
+            <p className="text-xs text-gray-400 mt-0.5">
+              Pago #{payment.id} · {fmtDate(payment.week_start)} → {fmtDate(payment.week_end)}
+            </p>
+          </div>
+          <button onClick={onClose}><Icon name="x" className="w-5 h-5 text-gray-400" /></button>
+        </div>
+
+        {/* Días pagados */}
+        <div className="px-6 py-4 space-y-2 max-h-72 overflow-y-auto">
+          <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest mb-3">Días pagados</p>
+          {(payment.work_logs || []).length === 0 ? (
+            <p className="text-sm text-gray-400 text-center py-4">Sin detalle disponible</p>
+          ) : (payment.work_logs || []).map(log => (
+            <div key={log.id} className="flex items-center justify-between p-3 rounded-xl bg-slate-50">
+              <div>
+                <p className="text-sm font-medium text-gray-800">{log.day_label}</p>
+                <p className="text-xs text-gray-400">{fmtDate(log.date)}</p>
+              </div>
+              <span className="text-sm font-bold text-gray-900 tabular-nums">{fmt(log.wage_earned)}</span>
+            </div>
+          ))}
+        </div>
+
+        {/* Footer totales */}
+        <div className="px-6 py-4 border-t border-gray-100">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-sm text-gray-500">Días pagados</span>
+            <span className="text-sm font-semibold text-gray-800">{payment.days_paid}</span>
+          </div>
+          {payment.notes && (
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-sm text-gray-500">Notas</span>
+              <span className="text-sm text-gray-600">{payment.notes}</span>
+            </div>
+          )}
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-sm text-gray-500">Registrado por</span>
+            <span className="text-sm text-gray-600">{payment.paid_by_name || '—'}</span>
+          </div>
+          <div className="flex items-center justify-between pt-2 border-t border-gray-100 mt-2">
+            <span className="text-sm font-semibold text-gray-700">Total pagado</span>
+            <span className="text-lg font-bold text-green-600 tabular-nums">{fmt(payment.total_amount)}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ── Pay modal ────────────────────────────────────────────────────────────────
 function PayModal({ employee, onClose, onPaid }) {
   const [selected, setSelected] = useState(() =>
@@ -227,11 +284,18 @@ function PayModal({ employee, onClose, onPaid }) {
 }
 
 // ── Main page ────────────────────────────────────────────────────────────────
-const todayStr = () => new Date().toISOString().slice(0, 10)
+const localStr = (d = new Date()) => {
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${y}-${m}-${day}`
+}
+const todayStr = () => localStr()
 const mondayStr = () => {
   const d = new Date()
-  d.setDate(d.getDate() - d.getDay() + (d.getDay() === 0 ? -6 : 1))
-  return d.toISOString().slice(0, 10)
+  const diff = d.getDay() === 0 ? -6 : 1 - d.getDay()
+  d.setDate(d.getDate() + diff)
+  return localStr(d)
 }
 
 export default function Payroll() {
@@ -240,8 +304,9 @@ export default function Payroll() {
   const [schedules, setSchedules] = useState([])
   const [history, setHistory]     = useState([])
   const [loading, setLoading]     = useState(true)
-  const [scheduleModal, setScheduleModal] = useState(null)
-  const [payModal, setPayModal]           = useState(null)
+  const [scheduleModal, setScheduleModal]       = useState(null)
+  const [payModal, setPayModal]                 = useState(null)
+  const [paymentDetail, setPaymentDetail]       = useState(null)
 
   // Filtros de fecha para el resumen
   const [dateFrom, setDateFrom] = useState(mondayStr())
@@ -316,7 +381,7 @@ export default function Payroll() {
                 className="btn-secondary py-1.5 text-xs">Esta semana</button>
               <button onClick={() => {
                 const d = new Date()
-                setDateFrom(new Date(d.getFullYear(), d.getMonth(), 1).toISOString().slice(0, 10))
+                setDateFrom(localStr(new Date(d.getFullYear(), d.getMonth(), 1)))
                 setDateTo(todayStr())
               }} className="btn-secondary py-1.5 text-xs">Este mes</button>
               <button onClick={() => { setDateFrom(''); setDateTo('') }}
@@ -481,8 +546,8 @@ export default function Payroll() {
           </div>
 
           <div className="grid px-5 py-2.5 bg-slate-50 border-b border-gray-100 text-[10px] font-semibold text-gray-400 uppercase tracking-widest gap-4"
-            style={{ gridTemplateColumns: '1fr 130px 60px 100px 1fr 110px' }}>
-            {['Empleada', 'Período', 'Días', 'Total', 'Notas', 'Fecha pago'].map(h =>
+            style={{ gridTemplateColumns: '48px 1fr 130px 60px 100px 110px' }}>
+            {['#', 'Empleada', 'Período', 'Días', 'Total', 'Fecha pago'].map(h =>
               <span key={h}>{h}</span>
             )}
           </div>
@@ -494,15 +559,16 @@ export default function Payroll() {
               </div>
             ) : history.map(p => (
               <div key={p.id}
-                className="grid px-5 py-3 items-center gap-4 hover:bg-slate-50"
-                style={{ gridTemplateColumns: '1fr 130px 60px 100px 1fr 110px' }}>
+                onClick={() => setPaymentDetail(p)}
+                className="grid px-5 py-3 items-center gap-4 hover:bg-slate-50 cursor-pointer transition-colors"
+                style={{ gridTemplateColumns: '48px 1fr 130px 60px 100px 110px' }}>
+                <span className="text-xs font-bold text-gray-300 tabular-nums">#{p.id}</span>
                 <span className="text-sm font-medium text-gray-800">{p.user_name}</span>
                 <span className="text-xs text-gray-500 tabular-nums">
                   {fmtDate(p.week_start)} → {fmtDate(p.week_end)}
                 </span>
                 <span className="text-sm tabular-nums text-gray-700">{p.days_paid}</span>
                 <span className="text-sm font-bold text-green-600 tabular-nums">{fmt(p.total_amount)}</span>
-                <span className="text-xs text-gray-400 truncate">{p.notes || '—'}</span>
                 <span className="text-xs text-gray-500 tabular-nums">
                   {new Date(p.paid_at).toLocaleDateString('es-CO')}
                 </span>
@@ -525,6 +591,12 @@ export default function Payroll() {
           employee={payModal}
           onClose={() => setPayModal(null)}
           onPaid={load}
+        />
+      )}
+      {paymentDetail && (
+        <PaymentDetailModal
+          payment={paymentDetail}
+          onClose={() => setPaymentDetail(null)}
         />
       )}
     </div>
