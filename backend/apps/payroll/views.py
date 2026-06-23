@@ -68,7 +68,12 @@ class WorkdayScheduleViewSet(viewsets.ModelViewSet):
 
     @action(detail=False, methods=['post'], url_path='upsert')
     def upsert(self, request):
-        """Crea o actualiza el horario de una empleada."""
+        """
+        Crea o actualiza el horario de una empleada.
+        Si cambia la tarifa de un día, actualiza también los WorkLog
+        sin pagar de ese día de la semana.
+        """
+        from .models import DAY_NAMES
         user_id = request.data.get('user')
         try:
             user = User.objects.get(id=user_id, role='operative')
@@ -79,6 +84,19 @@ class WorkdayScheduleViewSet(viewsets.ModelViewSet):
         serializer = WorkdayScheduleSerializer(schedule, data=request.data, partial=True)
         serializer.is_valid(raise_exception=True)
         serializer.save()
+
+        # Actualizar wage_earned en WorkLogs sin pagar cuando cambia la tarifa.
+        # Django date__week_day: domingo=1, lunes=2, ..., sábado=7
+        # DAY_NAMES:             lunes=0,   ..., sábado=5, domingo=6
+        WEEK_DAY = [2, 3, 4, 5, 6, 7, 1]  # índice DAY_NAMES → week_day de Django
+        for idx, day in enumerate(DAY_NAMES):
+            wage_key = f'{day}_wage'
+            if wage_key in request.data:
+                new_wage = request.data[wage_key]
+                (WorkLog.objects
+                    .filter(user=user, payment__isnull=True, date__week_day=WEEK_DAY[idx])
+                    .update(wage_earned=new_wage))
+
         return Response(serializer.data)
 
 
