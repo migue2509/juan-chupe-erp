@@ -11,7 +11,6 @@ const fmtTime = dt => new Date(dt).toLocaleTimeString('es-CO', { hour: '2-digit'
 const CATEGORIES = [
   { value: 'business',   label: 'Gasto del Negocio' },
   { value: 'personal',   label: 'Gasto Personal' },
-  { value: 'petty_cash', label: 'Caja Menor' },
   { value: 'supply',     label: 'Ingreso de Mercancía' },
 ]
 

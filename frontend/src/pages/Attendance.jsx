@@ -165,7 +165,7 @@ function AdminAttendance() {
             <option value="">Selecciona vendedora...</option>
             {operatives.map(o => <option key={o.id} value={o.id}>{o.full_name}</option>)}
           </select>
-          <button onClick={handleCheckin} className="btn-lime whitespace-nowrap">✅ Registrar</button>
+          <button onClick={handleCheckin} className="btn-lime whitespace-nowrap">Registrar</button>
         </div>
       </div>
 
