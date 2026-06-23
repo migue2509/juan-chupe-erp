@@ -50,6 +50,8 @@ export default function POS() {
   const [deliveryNotes,     setDeliveryNotes]     = useState('')
   const [isCourtesy,        setIsCourtesy]        = useState(false)
   const [courtesyPaid,      setCourtesyPaid]      = useState('')
+  const [courtesyMethod,    setCourtesyMethod]    = useState('cash')  // 'cash' | 'transfer'
+  const [courtesyTransferRef, setCourtesyTransferRef] = useState('')
   const [submitting,        setSubmitting]        = useState(false)
 
   useEffect(() => {
@@ -162,10 +164,10 @@ export default function POS() {
       const saleRes = await createSale({
         seller_id: user?.id,
         promotion_id: singlePromo,
-        payment_method: isCourtesy ? 'cash' : paymentMethod,
-        cash_received: isCourtesy ? courtesyAmount : (Number(cashReceived) || 0),
-        transfer_amount: isCourtesy ? 0 : (Number(transferAmount) || 0),
-        transfer_reference: isCourtesy ? '' : transferRef,
+        payment_method: isCourtesy ? courtesyMethod : paymentMethod,
+        cash_received:    isCourtesy ? (courtesyMethod === 'cash'     ? courtesyAmount : 0) : (Number(cashReceived) || 0),
+        transfer_amount:  isCourtesy ? (courtesyMethod === 'transfer' ? courtesyAmount : 0) : (Number(transferAmount) || 0),
+        transfer_reference: isCourtesy ? (courtesyMethod === 'transfer' ? courtesyTransferRef : '') : transferRef,
         is_delivery: isDelivery,
         is_courtesy: isCourtesy,
         courtesy_paid: courtesyAmount,
@@ -204,6 +206,8 @@ export default function POS() {
       setDeliveryNotes('')
       setIsCourtesy(false)
       setCourtesyPaid('')
+      setCourtesyMethod('cash')
+      setCourtesyTransferRef('')
       setPaymentMethod('cash')
     } catch (err) {
       toast.error(err?.response?.data?.detail || 'Error al registrar la venta', { duration: 6000 })
@@ -560,7 +564,7 @@ export default function POS() {
           {/* Cortesía toggle */}
           <label className="flex items-center gap-2.5 cursor-pointer select-none">
             <input type="checkbox" checked={isCourtesy}
-              onChange={e => { setIsCourtesy(e.target.checked); setCourtesyPaid('') }}
+              onChange={e => { setIsCourtesy(e.target.checked); setCourtesyPaid(''); setCourtesyMethod('cash'); setCourtesyTransferRef('') }}
               className="w-4 h-4 accent-brand-pink" />
             <span className="text-sm text-gray-600 flex items-center gap-1.5">
               <svg className="w-4 h-4 text-gray-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -576,11 +580,36 @@ export default function POS() {
               <p className="text-xs text-pink-600 font-medium">
                 La diferencia entre el total y lo recibido se registrará como gasto automáticamente.
               </p>
+
+              {/* Método de pago cortesía */}
+              <div className="flex gap-2">
+                {[{ k: 'cash', l: 'Efectivo' }, { k: 'transfer', l: 'Transferencia' }].map(m => (
+                  <button key={m.k} type="button"
+                    onClick={() => setCourtesyMethod(m.k)}
+                    className={`flex-1 py-1.5 rounded-xl text-xs font-semibold border transition-all ${
+                      courtesyMethod === m.k
+                        ? 'border-brand-pink bg-brand-pink text-white'
+                        : 'border-pink-200 text-pink-400 hover:border-pink-300 bg-white'
+                    }`}>
+                    {m.l}
+                  </button>
+                ))}
+              </div>
+
               <div>
                 <label className="label">Dinero recibido (0 si es gratis)</label>
                 <input type="number" className="input text-sm" placeholder="0" min="0"
                   value={courtesyPaid} onChange={e => setCourtesyPaid(e.target.value)} />
               </div>
+
+              {courtesyMethod === 'transfer' && (
+                <div>
+                  <label className="label">Referencia transferencia</label>
+                  <input className="input text-sm" placeholder="Nro. de referencia..."
+                    value={courtesyTransferRef} onChange={e => setCourtesyTransferRef(e.target.value)} />
+                </div>
+              )}
+
               {orderTotal > 0 && (
                 <div className="flex justify-between text-xs pt-1">
                   <span className="text-gray-500">Gasto que se generará:</span>

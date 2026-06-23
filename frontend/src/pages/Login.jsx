@@ -57,7 +57,7 @@ export default function Login() {
         </div>
 
         <p className="text-[11px] text-slate-600">
-          ARQEL TECH &copy; {new Date().getFullYear()}
+          OPIA SYSTEMS &copy; {new Date().getFullYear()}
         </p>
       </div>
 

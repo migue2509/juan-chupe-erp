@@ -83,7 +83,7 @@ export default function Sidebar() {
 
       {/* Version footer */}
       <div className="px-5 py-4 border-t border-white/8">
-        <p className="text-[10px] text-slate-500">ARQEL TECH · v1.0</p>
+        <p className="text-[10px] text-slate-500">OPIA SYSTEMS · v1.0</p>
       </div>
     </aside>
   )
