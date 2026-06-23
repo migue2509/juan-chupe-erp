@@ -39,7 +39,7 @@ function TabBtn({ active, onClick, children }) {
 // ── Schedule editor modal ────────────────────────────────────────────────────
 function ScheduleModal({ employee, onClose, onSaved }) {
   const [form, setForm] = useState(() => {
-    const f = { user: employee.user }
+    const f = { user: employee.user, security_enabled: employee.security_enabled ?? false }
     DAYS.forEach(({ key }) => {
       f[`works_${key}`] = employee[`works_${key}`] ?? true
       f[`${key}_wage`]  = employee[`${key}_wage`]  ?? 0
@@ -107,7 +107,32 @@ function ScheduleModal({ employee, onClose, onSaved }) {
           ))}
         </div>
 
-        <div className="px-6 pb-5 flex items-center justify-between">
+        {/* Seguridad de horario */}
+        <div className="px-6 pb-1">
+          <div className={`rounded-xl p-4 border ${form.security_enabled ? 'border-orange-200 bg-orange-50' : 'border-gray-100 bg-slate-50'}`}>
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-semibold text-gray-800">Bloqueo de horario</p>
+                <p className="text-xs text-gray-500 mt-0.5">
+                  {form.security_enabled
+                    ? 'Su cuenta se bloquea automáticamente en días que no trabaja.'
+                    : 'Desactivado — puede ingresar cualquier día de la semana.'}
+                </p>
+              </div>
+              <button
+                onClick={() => setForm(p => ({ ...p, security_enabled: !p.security_enabled }))}
+                className={`w-11 h-6 rounded-full transition-all relative flex-shrink-0 ${
+                  form.security_enabled ? 'bg-orange-500' : 'bg-gray-200'
+                }`}>
+                <span className={`absolute top-1 w-4 h-4 rounded-full bg-white shadow transition-all ${
+                  form.security_enabled ? 'left-6' : 'left-1'
+                }`} />
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div className="px-6 pb-5 flex items-center justify-between mt-4">
           <div>
             <p className="text-xs text-gray-400">Total semanal</p>
             <p className="text-lg font-bold text-brand-navy">{fmt(weeklyTotal)}</p>
@@ -202,6 +227,13 @@ function PayModal({ employee, onClose, onPaid }) {
 }
 
 // ── Main page ────────────────────────────────────────────────────────────────
+const todayStr = () => new Date().toISOString().slice(0, 10)
+const mondayStr = () => {
+  const d = new Date()
+  d.setDate(d.getDate() - d.getDay() + (d.getDay() === 0 ? -6 : 1))
+  return d.toISOString().slice(0, 10)
+}
+
 export default function Payroll() {
   const [tab, setTab]             = useState('summary')
   const [summary, setSummary]     = useState([])
@@ -211,11 +243,18 @@ export default function Payroll() {
   const [scheduleModal, setScheduleModal] = useState(null)
   const [payModal, setPayModal]           = useState(null)
 
+  // Filtros de fecha para el resumen
+  const [dateFrom, setDateFrom] = useState(mondayStr())
+  const [dateTo,   setDateTo]   = useState(todayStr())
+
   const load = async () => {
     setLoading(true)
     try {
+      const params = {}
+      if (dateFrom) params.date_from = dateFrom
+      if (dateTo)   params.date_to   = dateTo
       const [sumRes, schRes, histRes] = await Promise.all([
-        getPayrollSummary(),
+        getPayrollSummary(params),
         getAllSchedules(),
         getPaymentHistory(),
       ])
@@ -226,7 +265,7 @@ export default function Payroll() {
     setLoading(false)
   }
 
-  useEffect(() => { load() }, [])
+  useEffect(() => { load() }, [dateFrom, dateTo])
 
   // Dashboard KPIs
   const totalUnpaid      = summary.reduce((s, e) => s + e.amount_unpaid, 0)
@@ -259,6 +298,32 @@ export default function Payroll() {
       {/* ── TAB: RESUMEN ── */}
       {tab === 'summary' && (
         <div className="space-y-5">
+
+          {/* Filtro de fechas */}
+          <div className="card p-4 flex flex-wrap items-end gap-4">
+            <div>
+              <label className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest block mb-1">Desde</label>
+              <input type="date" className="input py-1.5 text-sm"
+                value={dateFrom} onChange={e => setDateFrom(e.target.value)} />
+            </div>
+            <div>
+              <label className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest block mb-1">Hasta</label>
+              <input type="date" className="input py-1.5 text-sm"
+                value={dateTo} onChange={e => setDateTo(e.target.value)} />
+            </div>
+            <div className="flex gap-2">
+              <button onClick={() => { setDateFrom(mondayStr()); setDateTo(todayStr()) }}
+                className="btn-secondary py-1.5 text-xs">Esta semana</button>
+              <button onClick={() => {
+                const d = new Date()
+                setDateFrom(new Date(d.getFullYear(), d.getMonth(), 1).toISOString().slice(0, 10))
+                setDateTo(todayStr())
+              }} className="btn-secondary py-1.5 text-xs">Este mes</button>
+              <button onClick={() => { setDateFrom(''); setDateTo('') }}
+                className="btn-secondary py-1.5 text-xs">Todo</button>
+            </div>
+          </div>
+
           {/* KPI cards */}
           <div className="grid grid-cols-3 gap-4">
             <div className="stat-card">
@@ -357,16 +422,17 @@ export default function Payroll() {
             <div>
               <h2>Horarios y tarifas</h2>
               <p className="text-xs text-gray-400 mt-0.5">
-                Define qué días trabaja cada empleada. En días que NO trabaje, su cuenta quedará bloqueada automáticamente.
+                Define qué días trabaja cada empleada y activa el bloqueo de horario si lo necesitas.
               </p>
             </div>
           </div>
 
           {/* Header */}
           <div className="grid px-5 py-2.5 bg-slate-50 border-b border-gray-100 text-[10px] font-semibold text-gray-400 uppercase tracking-widest gap-4"
-            style={{ gridTemplateColumns: '1fr auto auto auto' }}>
+            style={{ gridTemplateColumns: '1fr auto auto auto auto' }}>
             <span>Empleada</span>
             <span>Días que trabaja</span>
+            <span>Seguridad</span>
             <span>Total semanal</span>
             <span>Acción</span>
           </div>
@@ -375,7 +441,7 @@ export default function Payroll() {
             {schedules.map(emp => (
               <div key={emp.user}
                 className="grid px-5 py-4 items-center gap-4"
-                style={{ gridTemplateColumns: '1fr auto auto auto' }}>
+                style={{ gridTemplateColumns: '1fr auto auto auto auto' }}>
                 <p className="text-sm font-semibold text-gray-800">{emp.user_name}</p>
                 <div className="flex gap-1">
                   {DAYS.map(({ key, label }) => (
@@ -389,6 +455,13 @@ export default function Payroll() {
                     </span>
                   ))}
                 </div>
+                <span className={`text-[10px] font-bold px-2 py-1 rounded-full ${
+                  emp.security_enabled
+                    ? 'bg-orange-100 text-orange-700'
+                    : 'bg-gray-100 text-gray-400'
+                }`}>
+                  {emp.security_enabled ? '🔒 Activo' : 'Sin bloqueo'}
+                </span>
                 <span className="text-sm font-bold text-gray-900 tabular-nums">{fmt(emp.weekly_total)}</span>
                 <button onClick={() => setScheduleModal(emp)}
                   className="btn-secondary py-1.5 text-xs">

@@ -17,23 +17,46 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
 
         # ── Seguridad: bloquear login en días no laborales (solo operativas) ──
         user = self.user
-        if user.role == 'operative':
+
+        # Admins y staff siempre pasan sin importar horario
+        if user.role == 'admin' or user.is_staff or user.is_superuser:
+            pass
+        elif user.role in ('operative', 'seller'):
             try:
                 from django.utils import timezone
-                schedule = user.schedule  # OneToOne — lanza excepción si no existe
-                if not schedule.is_work_day():
-                    from django.utils import timezone as tz
-                    today = tz.localdate()
-                    from apps.payroll.models import DAY_LABELS
-                    day_label = DAY_LABELS[today.weekday()]
-                    raise serializers.ValidationError(
-                        f'Tu cuenta no está habilitada los días {day_label}. '
-                        f'Habla con tu administrador si crees que es un error.'
-                    )
+                schedule = user.schedule
+                # Solo bloquea si el admin activó la seguridad de horario
+                if schedule.security_enabled:
+                    today = timezone.localdate()
+                    if not schedule.is_work_day(today):
+                        from apps.payroll.models import DAY_LABELS
+                        day_label = DAY_LABELS[today.weekday()]
+                        raise serializers.ValidationError(
+                            f'Tu cuenta no está habilitada los días {day_label}. '
+                            f'Habla con tu administrador si crees que es un error.'
+                        )
             except serializers.ValidationError:
                 raise
             except Exception:
-                pass  # Si no tiene horario configurado, se permite el acceso
+                pass
+
+        # ── Registrar día trabajado al hacer login (operativas y vendedoras) ──
+        if user.role in ('operative', 'seller'):
+            try:
+                from django.utils import timezone
+                from apps.payroll.models import WorkLog
+                today = timezone.localdate()
+                wage = 0
+                try:
+                    wage = user.schedule.wage_for_day(today)
+                except Exception:
+                    pass
+                WorkLog.objects.get_or_create(
+                    user=user, date=today,
+                    defaults={'wage_earned': wage}
+                )
+            except Exception:
+                pass
 
         data['user'] = {
             'id': user.id,

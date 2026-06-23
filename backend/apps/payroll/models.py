@@ -34,6 +34,9 @@ class WorkdaySchedule(models.Model):
     saturday_wage  = models.DecimalField(max_digits=10, decimal_places=0, default=Decimal('0'))
     sunday_wage    = models.DecimalField(max_digits=10, decimal_places=0, default=Decimal('0'))
 
+    # Seguridad: si True, la cuenta se bloquea en días que no trabaja
+    security_enabled = models.BooleanField(default=False)
+
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:

@@ -21,6 +21,7 @@ class WorkdayScheduleSerializer(serializers.ModelSerializer):
             'works_friday', 'works_saturday', 'works_sunday',
             'monday_wage', 'tuesday_wage', 'wednesday_wage', 'thursday_wage',
             'friday_wage', 'saturday_wage', 'sunday_wage',
+            'security_enabled',
             'weekly_total', 'work_days_labels', 'updated_at',
         ]
         read_only_fields = ['id', 'updated_at']

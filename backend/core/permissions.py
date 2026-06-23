@@ -3,24 +3,27 @@ from rest_framework.permissions import BasePermission
 
 class WorkSchedulePermission(BasePermission):
     """
-    Bloquea el acceso a la API si la empleada (operative) intenta usarla
-    en un día que no le corresponde trabajar.
-    Los administradores siempre tienen acceso.
-    Si la empleada no tiene horario configurado, se permite el acceso.
+    Bloquea el acceso a la API si la empleada tiene security_enabled=True
+    y hoy no es un día laboral según su horario configurado.
+    Por defecto (security_enabled=False) nadie queda bloqueado.
     """
     message = 'Tu cuenta no está habilitada hoy. Habla con tu administrador.'
 
     def has_permission(self, request, view):
         user = request.user
         if not user.is_authenticated:
-            return True  # Deja que IsAuthenticated lo rechace
-        if user.role != 'operative':
-            return True  # Admins y otros roles pasan
+            return True
+        if user.role == 'admin' or user.is_staff or user.is_superuser:
+            return True
         try:
+            schedule = user.schedule
+            if not schedule.security_enabled:
+                return True  # Seguridad no activada → siempre puede entrar
             from django.utils import timezone
-            return user.schedule.is_work_day(timezone.localdate())
+            today = timezone.localdate()
+            return schedule.is_work_day(today)
         except Exception:
-            return True  # Sin horario → acceso permitido
+            return True  # Sin horario o error → no bloquear
 
 
 class IsAdmin(BasePermission):

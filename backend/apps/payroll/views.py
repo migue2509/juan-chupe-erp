@@ -41,6 +41,31 @@ class WorkdayScheduleViewSet(viewsets.ModelViewSet):
             result.append(data)
         return Response(result)
 
+    @action(detail=False, methods=['get'], url_path='check')
+    def check(self, request):
+        """Diagnóstico: muestra el horario actual de una empleada y si hoy puede entrar."""
+        from django.utils import timezone
+        user_id = request.query_params.get('user')
+        try:
+            user = User.objects.get(id=user_id)
+        except User.DoesNotExist:
+            return Response({'detail': 'Usuario no encontrado.'}, status=404)
+        today = timezone.localdate()
+        try:
+            schedule = user.schedule
+            from .models import DAY_NAMES, DAY_LABELS
+            day = DAY_NAMES[today.weekday()]
+            return Response({
+                'user': user.full_name,
+                'today': str(today),
+                'weekday': DAY_LABELS[today.weekday()],
+                f'works_{day}': getattr(schedule, f'works_{day}'),
+                'can_login_today': schedule.is_work_day(today),
+                'full_schedule': WorkdayScheduleSerializer(schedule).data,
+            })
+        except Exception as e:
+            return Response({'user': user.full_name, 'schedule': None, 'error': str(e)})
+
     @action(detail=False, methods=['post'], url_path='upsert')
     def upsert(self, request):
         """Crea o actualiza el horario de una empleada."""
@@ -116,21 +141,32 @@ class WagePaymentViewSet(viewsets.ReadOnlyModelViewSet):
     @action(detail=False, methods=['get'], url_path='summary')
     def summary(self, request):
         """
-        Resumen de nómina por empleada:
-        - días trabajados totales, días pendientes de pago, monto pendiente
-        - días trabajados esta semana
+        Resumen de nómina por empleada.
+        Params opcionales: date_from, date_to (YYYY-MM-DD) — filtran los logs del período.
         """
         today = timezone.localdate()
-        # Lunes de esta semana
         week_start = today - datetime.timedelta(days=today.weekday())
+
+        # Filtros de fecha opcionales
+        date_from_str = request.query_params.get('date_from')
+        date_to_str   = request.query_params.get('date_to')
+        date_from = datetime.date.fromisoformat(date_from_str) if date_from_str else None
+        date_to   = datetime.date.fromisoformat(date_to_str)   if date_to_str   else None
 
         operatives = User.objects.filter(role='operative', is_active=True).order_by('full_name')
         result = []
         for user in operatives:
-            logs_all     = WorkLog.objects.filter(user=user)
-            logs_unpaid  = logs_all.filter(payment__isnull=True)
-            logs_week    = logs_all.filter(date__gte=week_start, date__lte=today)
-            logs_unpaid_week = logs_unpaid.filter(date__gte=week_start, date__lte=today)
+            logs_all    = WorkLog.objects.filter(user=user)
+            logs_unpaid = logs_all.filter(payment__isnull=True)
+            logs_week   = logs_all.filter(date__gte=week_start, date__lte=today)
+
+            # Si hay filtro de fecha, restringir los logs del período
+            if date_from:
+                logs_all    = logs_all.filter(date__gte=date_from)
+                logs_unpaid = logs_unpaid.filter(date__gte=date_from)
+            if date_to:
+                logs_all    = logs_all.filter(date__lte=date_to)
+                logs_unpaid = logs_unpaid.filter(date__lte=date_to)
 
             unpaid_amount = sum(l.wage_earned for l in logs_unpaid)
             total_paid    = sum(p.total_amount for p in user.wage_payments.all())
@@ -142,7 +178,6 @@ class WagePaymentViewSet(viewsets.ReadOnlyModelViewSet):
                 'days_unpaid':       logs_unpaid.count(),
                 'amount_unpaid':     float(unpaid_amount),
                 'days_this_week':    logs_week.count(),
-                'unpaid_this_week':  logs_unpaid_week.count(),
                 'total_paid_ever':   float(total_paid),
                 'unpaid_logs':       WorkLogSerializer(
                     logs_unpaid.order_by('date'), many=True

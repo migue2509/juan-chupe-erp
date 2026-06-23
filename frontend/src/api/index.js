@@ -92,7 +92,7 @@ export const changePassword = (id, data) => api.post(`/auth/users/${id}/change-p
 export const toggleUserActive = (id) => api.post(`/auth/users/${id}/toggle-active/`)
 
 // Payroll
-export const getPayrollSummary    = ()         => api.get('/payroll/payments/summary/')
+export const getPayrollSummary    = (params)   => api.get('/payroll/payments/summary/', { params })
 export const getAllSchedules       = ()         => api.get('/payroll/schedules/all-employees/')
 export const upsertSchedule       = (data)     => api.post('/payroll/schedules/upsert/', data)
 export const getWorkLogs          = (params)   => api.get('/payroll/logs/', { params })
