@@ -314,7 +314,7 @@ class SaleViewSet(viewsets.ReadOnlyModelViewSet):
         if not shift:
             return Response({'sales': [], 'total': 0})
         # Incluir todas las ventas (incluyendo anuladas) para mostrar estado en dashboard
-        sales = Sale.objects.filter(shift=shift).select_related('invoice', 'delivery')
+        sales = Sale.objects.filter(shift=shift).select_related('invoice', 'delivery__delivery_person')
         # Solo contar en el total las no anuladas
         active_sales = [s for s in sales if not self._is_voided(s)]
         total = sum(

@@ -124,6 +124,18 @@ export default function Deliveries() {
     return acc
   }, {})
 
+  // Gráfico por domiciliario
+  const domChart = {}
+  deliveries.forEach(d => {
+    const name = d.delivery_person_name || 'Sin asignar'
+    if (!domChart[name]) domChart[name] = { total: 0, delivered: 0, on_way: 0, pending: 0, cancelled: 0 }
+    domChart[name].total++
+    if (d.status) domChart[name][d.status] = (domChart[name][d.status] || 0) + 1
+  })
+  const domChartArr = Object.entries(domChart)
+    .map(([name, v]) => ({ name, ...v }))
+    .sort((a, b) => b.total - a.total)
+
   const activeDomiciliarios = domiciliarios.filter(d => d.is_active)
 
   if (loading) return (
@@ -172,6 +184,40 @@ export default function Deliveries() {
         )}
         <span className="ml-auto text-xs text-gray-400">{filtered.length} de {deliveries.length} domicilios</span>
       </div>
+
+      {/* Gráfico por domiciliario */}
+      {domChartArr.length > 0 && (
+        <div className="card p-0 overflow-hidden">
+          <div className="flex items-center gap-2 px-5 py-4 border-b border-gray-100">
+            <Icon name="reports" className="w-4 h-4 text-brand-purple" />
+            <h2>Domicilios por repartidor</h2>
+            <span className="badge-gray ml-auto">{deliveries.length} en total</span>
+          </div>
+          <div className="px-5 py-4 grid gap-4" style={{ gridTemplateColumns: `repeat(${Math.min(domChartArr.length, 4)}, 1fr)` }}>
+            {domChartArr.map(d => (
+              <div key={d.name} className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-semibold text-gray-800 truncate">{d.name}</span>
+                  <span className="text-lg font-bold text-gray-900 tabular-nums ml-2">{d.total}</span>
+                </div>
+                {/* Barra apilada */}
+                <div className="h-3 bg-gray-100 rounded-full overflow-hidden flex">
+                  {d.delivered > 0 && <div title={`${d.delivered} entregados`} className="h-full bg-green-400" style={{ width: `${(d.delivered/d.total)*100}%` }} />}
+                  {d.on_way > 0    && <div title={`${d.on_way} en camino`}    className="h-full bg-cyan-400"  style={{ width: `${(d.on_way/d.total)*100}%` }} />}
+                  {d.pending > 0   && <div title={`${d.pending} pendientes`}  className="h-full bg-amber-400" style={{ width: `${(d.pending/d.total)*100}%` }} />}
+                  {d.cancelled > 0 && <div title={`${d.cancelled} cancelados`}className="h-full bg-red-400"   style={{ width: `${(d.cancelled/d.total)*100}%` }} />}
+                </div>
+                <div className="flex flex-wrap gap-x-3 gap-y-0.5">
+                  {d.delivered > 0 && <span className="text-[10px] font-medium text-green-600">✓ {d.delivered} entregados</span>}
+                  {d.on_way > 0    && <span className="text-[10px] font-medium text-cyan-600">↗ {d.on_way} en camino</span>}
+                  {d.pending > 0   && <span className="text-[10px] font-medium text-amber-600">◷ {d.pending} pendientes</span>}
+                  {d.cancelled > 0 && <span className="text-[10px] font-medium text-red-500">✕ {d.cancelled} cancelados</span>}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 items-start">
 

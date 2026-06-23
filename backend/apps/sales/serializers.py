@@ -62,7 +62,6 @@ class SaleSerializer(serializers.ModelSerializer):
             return False
 
     def get_delivery_status(self, obj):
-        """Retorna el estado del domicilio si la venta es un domicilio, si no None."""
         if not obj.is_delivery:
             return None
         try:
@@ -70,11 +69,21 @@ class SaleSerializer(serializers.ModelSerializer):
         except Exception:
             return None
 
+    def get_delivery_person_name(self, obj):
+        if not obj.is_delivery:
+            return None
+        try:
+            return obj.delivery.delivery_person.name
+        except Exception:
+            return None
+
+    delivery_person_name = serializers.SerializerMethodField()
+
     class Meta:
         model = Sale
         fields = [
             'id', 'shift', 'seller', 'seller_name', 'promotion', 'promotion_name',
             'payment_method', 'cash_received', 'transfer_amount', 'transfer_reference',
             'total', 'change_given', 'is_delivery', 'is_courtesy', 'courtesy_paid',
-            'notes', 'created_at', 'items', 'is_voided', 'delivery_status'
+            'notes', 'created_at', 'items', 'is_voided', 'delivery_status', 'delivery_person_name'
         ]

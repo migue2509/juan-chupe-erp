@@ -95,6 +95,33 @@ export default function Dashboard() {
     (a, b) => new Date(b.created_at) - new Date(a.created_at)
   )
 
+  // ── Delivery stats (solo cuando filter === 'delivery') ──
+  const deliverySales = allSales.filter(s => s.is_delivery)
+  const deliveryStatusCounts = {
+    pending:   deliverySales.filter(s => s.delivery_status === 'pending').length,
+    on_way:    deliverySales.filter(s => s.delivery_status === 'on_way').length,
+    delivered: deliverySales.filter(s => s.delivery_status === 'delivered').length,
+    cancelled: deliverySales.filter(s => s.delivery_status === 'cancelled').length,
+  }
+  const deliveryStatusConfig = [
+    { key: 'pending',   label: 'Pendiente', cls: 'bg-amber-100 text-amber-700',  bar: 'bg-amber-400' },
+    { key: 'on_way',    label: 'En camino', cls: 'bg-cyan-100 text-cyan-700',    bar: 'bg-cyan-400'  },
+    { key: 'delivered', label: 'Entregado', cls: 'bg-green-100 text-green-700',  bar: 'bg-green-400' },
+    { key: 'cancelled', label: 'Cancelado', cls: 'bg-red-100 text-red-600',      bar: 'bg-red-400'   },
+  ]
+  // Domiciliarios chart data: agrupar por delivery_person_name
+  const domiciliarioMap = {}
+  deliverySales.forEach(s => {
+    const name = s.delivery_person_name || 'Sin asignar'
+    if (!domiciliarioMap[name]) domiciliarioMap[name] = { total: 0, delivered: 0, cancelled: 0, pending: 0, on_way: 0 }
+    domiciliarioMap[name].total++
+    if (s.delivery_status) domiciliarioMap[name][s.delivery_status] = (domiciliarioMap[name][s.delivery_status] || 0) + 1
+  })
+  const domiciliarioChart = Object.entries(domiciliarioMap)
+    .map(([name, d]) => ({ name, ...d }))
+    .sort((a, b) => b.total - a.total)
+  const maxDomTotal = Math.max(...domiciliarioChart.map(d => d.total), 1)
+
   if (loading) return (
     <div className="flex items-center justify-center h-64">
       <div className="w-6 h-6 border-2 border-brand-pink border-t-transparent rounded-full animate-spin" />
@@ -234,6 +261,67 @@ export default function Dashboard() {
           <p className="text-[10px] text-gray-400 mt-0.5">Ventas − Gastos</p>
         </div>
       </div>
+
+      {/* ── Delivery section (solo cuando filter === 'delivery') ── */}
+      {filter === 'delivery' && (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+
+          {/* Cards estado */}
+          <div className="card p-0 overflow-hidden">
+            <div className="flex items-center gap-2 px-5 py-4 border-b border-gray-100">
+              <Icon name="bike" className="w-4 h-4 text-brand-cyan" />
+              <h2>Estado del día</h2>
+              <span className="badge-gray ml-auto">{deliverySales.length} domicilios</span>
+            </div>
+            <div className="grid grid-cols-2 gap-0 divide-x divide-y divide-gray-100">
+              {deliveryStatusConfig.map(({ key, label, cls, bar }) => (
+                <div key={key} className="px-5 py-4">
+                  <p className="text-3xl font-bold text-gray-900 tabular-nums">{deliveryStatusCounts[key]}</p>
+                  <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${cls}`}>{label}</span>
+                  <div className="mt-2 h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                    <div className={`h-full rounded-full ${bar}`}
+                      style={{ width: deliverySales.length ? `${(deliveryStatusCounts[key] / deliverySales.length) * 100}%` : '0%' }} />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Gráfico repartidores */}
+          <div className="card p-0 overflow-hidden">
+            <div className="flex items-center gap-2 px-5 py-4 border-b border-gray-100">
+              <Icon name="reports" className="w-4 h-4 text-brand-purple" />
+              <h2>Domicilios por repartidor</h2>
+            </div>
+            {domiciliarioChart.length === 0 ? (
+              <div className="flex items-center justify-center py-10 text-gray-300 text-sm">Sin datos</div>
+            ) : (
+              <div className="divide-y divide-gray-50 px-5 py-3 space-y-3">
+                {domiciliarioChart.map(d => (
+                  <div key={d.name} className="pt-3 first:pt-0">
+                    <div className="flex items-center justify-between mb-1.5">
+                      <span className="text-sm font-medium text-gray-800">{d.name}</span>
+                      <span className="text-sm font-bold text-gray-900 tabular-nums">{d.total}</span>
+                    </div>
+                    <div className="h-2 bg-gray-100 rounded-full overflow-hidden flex">
+                      {d.delivered > 0 && <div className="h-full bg-green-400" style={{ width: `${(d.delivered/d.total)*100}%` }} />}
+                      {d.on_way > 0    && <div className="h-full bg-cyan-400"  style={{ width: `${(d.on_way/d.total)*100}%` }} />}
+                      {d.pending > 0   && <div className="h-full bg-amber-400" style={{ width: `${(d.pending/d.total)*100}%` }} />}
+                      {d.cancelled > 0 && <div className="h-full bg-red-400"   style={{ width: `${(d.cancelled/d.total)*100}%` }} />}
+                    </div>
+                    <div className="flex gap-3 mt-1">
+                      {d.delivered > 0 && <span className="text-[10px] text-green-600">{d.delivered} entregados</span>}
+                      {d.on_way > 0    && <span className="text-[10px] text-cyan-600">{d.on_way} en camino</span>}
+                      {d.pending > 0   && <span className="text-[10px] text-amber-600">{d.pending} pendientes</span>}
+                      {d.cancelled > 0 && <span className="text-[10px] text-red-500">{d.cancelled} cancelados</span>}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* ── Bottom row ── */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 items-start">
