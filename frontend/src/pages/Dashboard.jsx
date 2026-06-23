@@ -53,20 +53,22 @@ export default function Dashboard() {
   }
 
   // ── Filter sales by category ──
+  // allSales incluye anuladas para mostrar en recientes; activeSales excluye anuladas para totales
   const filteredSales = allSales.filter(s => {
     if (filter === 'delivery') return s.is_delivery === true
     if (filter === 'pos')      return s.is_delivery === false
     return true
   })
+  const activeSales = filteredSales.filter(s => !s.is_voided)
 
-  // ── Stats computed from filtered sales ──
-  const totalDinero    = filteredSales.reduce((sum, s) =>
+  // ── Stats computed from ACTIVE (non-voided) sales ──
+  const totalDinero    = activeSales.reduce((sum, s) =>
     sum + (s.is_courtesy ? Number(s.courtesy_paid || 0) : Number(s.total || 0)), 0)
-  const cantidadVentas = filteredSales.length
+  const cantidadVentas = activeSales.length
 
   // Efectivo = ventas cash (total completo) + porción cash de ventas mixtas
   // Cortesías: solo cuenta lo que realmente pagaron (courtesy_paid)
-  const totalEfectivo = filteredSales.reduce((sum, s) => {
+  const totalEfectivo = activeSales.reduce((sum, s) => {
     if (s.is_courtesy) return sum + Number(s.courtesy_paid || 0)
     const total = Number(s.total || 0)
     const trf   = Number(s.transfer_amount || 0)
@@ -75,8 +77,8 @@ export default function Dashboard() {
     return sum
   }, 0)
 
-  // Transferencias = todas las ventas por transferencia + porción transfer de mixtas
-  const totalTransf = filteredSales.reduce((sum, s) => sum + Number(s.transfer_amount || 0), 0)
+  // Transferencias = todas las ventas activas por transferencia + porción transfer de mixtas
+  const totalTransf = activeSales.reduce((sum, s) => sum + Number(s.transfer_amount || 0), 0)
 
   const filteredExpenses = expenses.filter(e => {
     if (filter === 'pos')      return e.origin === 'pos'
@@ -244,7 +246,8 @@ export default function Dashboard() {
           </div>
 
           {/* Table header */}
-          <div className="grid grid-cols-5 gap-2 px-5 py-2.5 bg-slate-50 border-b border-gray-100">
+          <div className="grid gap-2 px-5 py-2.5 bg-slate-50 border-b border-gray-100"
+            style={{ gridTemplateColumns: '60px 1fr 90px 90px 90px' }}>
             {['Hora', 'Vendedora', 'Canal', 'Total', 'Pago'].map(col => (
               <span key={col} className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest">{col}</span>
             ))}
@@ -258,26 +261,42 @@ export default function Dashboard() {
                 <p className="text-sm">Sin ventas aún</p>
               </div>
             ) : (
-              recentSales.map(sale => (
-                <div key={sale.id} className="grid grid-cols-5 gap-2 px-5 py-3 hover:bg-slate-50 transition-colors items-center">
+              recentSales.map(sale => {
+                const DELIVERY_STATUS = {
+                  pending:   { label: 'Pendiente', cls: 'bg-amber-100 text-amber-700' },
+                  on_way:    { label: 'En camino', cls: 'bg-cyan-100 text-cyan-700' },
+                  delivered: { label: 'Entregado',  cls: 'bg-green-100 text-green-700' },
+                  cancelled: { label: 'Cancelado',  cls: 'bg-red-100 text-red-600' },
+                }
+                const delivSt = sale.is_delivery && sale.delivery_status ? DELIVERY_STATUS[sale.delivery_status] : null
+                const isVoided = sale.is_voided
+                return (
+                <div key={sale.id} className={`grid gap-2 px-5 py-3 hover:bg-slate-50 transition-colors items-start ${isVoided ? 'opacity-50' : ''}`}
+                  style={{ gridTemplateColumns: '60px 1fr 90px 90px 90px' }}>
                   <span className="text-sm font-medium text-gray-700 tabular-nums">
                     {new Date(sale.created_at).toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' })}
                   </span>
                   <span className="text-sm text-gray-600 truncate">
                     {sale.seller_name || <span className="text-gray-300">—</span>}
                   </span>
-                  <span>
+                  <span className="flex flex-col gap-0.5 items-start">
                     <span className={`badge text-[11px] ${
                       sale.is_courtesy ? 'bg-pink-100 text-pink-600' :
                       sale.is_delivery ? 'badge-cyan' : 'badge-pink'}`}>
                       {sale.is_courtesy ? 'Cortesía' : sale.is_delivery ? 'Domicilio' : 'POS'}
                     </span>
+                    {delivSt && (
+                      <span className={`badge text-[10px] ${delivSt.cls}`}>{delivSt.label}</span>
+                    )}
+                    {isVoided && (
+                      <span className="badge text-[10px] bg-red-100 text-red-500">Anulado</span>
+                    )}
                   </span>
                   <span className="tabular-nums">
-                    <span className="text-sm font-semibold text-gray-900">
+                    <span className={`text-sm font-semibold ${isVoided ? 'line-through text-gray-400' : 'text-gray-900'}`}>
                       {fmt(sale.is_courtesy ? (sale.courtesy_paid || 0) : sale.total)}
                     </span>
-                    {sale.is_courtesy && (
+                    {sale.is_courtesy && !isVoided && (
                       <span className="block text-[10px] text-gray-400 leading-none">
                         factura {fmt(sale.total)}
                       </span>
@@ -289,7 +308,8 @@ export default function Dashboard() {
                     </span>
                   </span>
                 </div>
-              ))
+                )
+              })
             )}
           </div>
 

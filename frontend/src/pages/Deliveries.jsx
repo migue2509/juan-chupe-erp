@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { getDeliveries, updateDelivery, getDomiciliarios, createDomiciliario, updateDomiciliario } from '../api'
+import { getDeliveries, updateDelivery, cancelDeliveryReq, getDomiciliarios, createDomiciliario, updateDomiciliario } from '../api'
 import { Icon } from '../components/Icons'
 import toast from 'react-hot-toast'
 
@@ -54,13 +54,24 @@ export default function Deliveries() {
     } catch { toast.error('Error al actualizar estado') }
   }
 
-  const cancelDelivery = async (d) => {
-    if (!confirm('¿Cancelar este domicilio?')) return
+  const changeStatus = async (d, newStatus) => {
+    if (d.status === newStatus) return
     try {
-      await updateDelivery(d.id, { status: 'cancelled' })
-      toast.success('Domicilio cancelado')
+      const patch = { status: newStatus }
+      if (newStatus === 'delivered') patch.delivered_at = new Date().toISOString()
+      await updateDelivery(d.id, patch)
+      toast.success(`Estado → ${STATUS[newStatus].label}`)
       load()
-    } catch { toast.error('Error') }
+    } catch { toast.error('Error al actualizar estado') }
+  }
+
+  const cancelDelivery = async (d) => {
+    if (!confirm('¿Cancelar este domicilio? Se revertirá el inventario y se anulará la factura.')) return
+    try {
+      await cancelDeliveryReq(d.id)
+      toast.success('Domicilio cancelado — inventario revertido')
+      load()
+    } catch { toast.error('Error al cancelar') }
   }
 
   const assignPerson = async (deliveryId, personId) => {
@@ -245,13 +256,22 @@ export default function Deliveries() {
 
                       {d.notes && <p className="text-xs text-gray-500 italic">📝 {d.notes}</p>}
 
-                      <div className="flex gap-2 pt-1">
+                      <div className="flex flex-wrap items-center gap-2 pt-1">
                         {s.next && (
                           <button onClick={() => advanceStatus(d)} className="btn-primary py-1.5 text-xs">
                             {s.nextLabel}
                           </button>
                         )}
-                        {d.status !== 'cancelled' && d.status !== 'delivered' && (
+                        {/* Selector libre de estado */}
+                        <select
+                          className="input py-1.5 text-xs w-36"
+                          value={d.status}
+                          onChange={e => changeStatus(d, e.target.value)}>
+                          {Object.entries(STATUS).map(([k, sv]) => (
+                            <option key={k} value={k}>{sv.label}</option>
+                          ))}
+                        </select>
+                        {d.status !== 'cancelled' && (
                           <button onClick={() => cancelDelivery(d)} className="btn-secondary py-1.5 text-xs text-red-500">
                             Cancelar
                           </button>

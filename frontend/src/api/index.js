@@ -67,6 +67,7 @@ export const createPurchase = (data) => api.post('/purchases/', data)
 export const getDeliveries      = (params) => api.get('/deliveries/', { params })
 export const createDelivery     = (data)   => api.post('/deliveries/', data)
 export const updateDelivery     = (id, data) => api.patch(`/deliveries/${id}/`, data)
+export const cancelDeliveryReq  = (id, reason = 'Domicilio cancelado') => api.post(`/deliveries/${id}/cancel/`, { reason })
 
 // Domiciliarios
 export const getDomiciliarios   = ()       => api.get('/deliveries/domiciliarios/')
