@@ -13,7 +13,7 @@ class WorkSchedulePermission(BasePermission):
         user = request.user
         if not user.is_authenticated:
             return True
-        if user.role == 'admin' or user.is_staff or user.is_superuser:
+        if user.role in ('admin', 'delivery') or user.is_staff or user.is_superuser:
             return True
         try:
             schedule = user.schedule

@@ -21,7 +21,7 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
         # Admins y staff siempre pasan sin importar horario
         if user.role == 'admin' or user.is_staff or user.is_superuser:
             pass
-        elif user.role in ('operative', 'seller'):
+        elif user.role == 'operative':
             try:
                 from django.utils import timezone
                 schedule = user.schedule

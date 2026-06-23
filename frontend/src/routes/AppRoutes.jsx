@@ -31,7 +31,7 @@ export default function AppRoutes() {
     <Routes>
       <Route path="/login" element={user ? <Navigate to="/" /> : <Login />} />
       <Route path="/" element={<PrivateRoute><Layout /></PrivateRoute>}>
-        <Route index element={<Dashboard />} />
+        <Route index element={user?.role === 'operative' ? <Navigate to="/attendance" replace /> : <Dashboard />} />
         <Route path="pos" element={<POS />} />
         <Route path="billing" element={<Billing />} />
         <Route path="deliveries" element={<Deliveries />} />
@@ -43,7 +43,7 @@ export default function AppRoutes() {
         <Route path="cash-audit" element={<PrivateRoute adminOnly><CashAudit /></PrivateRoute>} />
         <Route path="reports" element={<PrivateRoute adminOnly><Reports /></PrivateRoute>} />
         <Route path="users" element={<PrivateRoute adminOnly><Users /></PrivateRoute>} />
-        <Route path="attendance" element={<PrivateRoute adminOnly><Attendance /></PrivateRoute>} />
+        <Route path="attendance" element={<PrivateRoute><Attendance /></PrivateRoute>} />
         <Route path="payroll"    element={<PrivateRoute adminOnly><Payroll /></PrivateRoute>} />
       </Route>
     </Routes>

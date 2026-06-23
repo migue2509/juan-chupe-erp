@@ -10,6 +10,14 @@ const NAV_OPERATIVE = [
   { to: '/expenses',   label: 'Gastos',          icon: 'expenses' },
 ]
 
+const NAV_SELLER = [
+  { to: '/attendance',  label: 'Asistencia',     icon: 'attendance' },
+  { to: '/pos',         label: 'Punto de Venta', icon: 'pos' },
+  { to: '/billing',     label: 'Facturas',       icon: 'billing' },
+  { to: '/deliveries',  label: 'Domicilios',     icon: 'deliveries' },
+  { to: '/expenses',    label: 'Gastos',         icon: 'expenses' },
+]
+
 const NAV_ADMIN = [
   { to: '/shifts',     label: 'Jornadas',       icon: 'shifts' },
   { to: '/products',   label: 'Productos',      icon: 'products' },
@@ -23,7 +31,9 @@ const NAV_ADMIN = [
 ]
 
 export default function Sidebar() {
-  const { isAdmin } = useAuth()
+  const { isAdmin, user } = useAuth()
+  const isSeller = user?.role === 'operative'
+  const navItems = isSeller ? NAV_SELLER : NAV_OPERATIVE
 
   return (
     <aside className="hidden md:flex flex-col w-60 flex-shrink-0" style={{ background: '#0F1035' }}>
@@ -49,7 +59,7 @@ export default function Sidebar() {
 
       {/* Navigation */}
       <nav className="flex-1 px-3 py-4 overflow-y-auto space-y-0.5">
-        {NAV_OPERATIVE.map(({ to, label, icon }) => (
+        {navItems.map(({ to, label, icon }) => (
           <NavLink
             key={to}
             to={to}

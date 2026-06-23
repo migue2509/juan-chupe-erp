@@ -307,6 +307,8 @@ export default function Payroll() {
   const [scheduleModal, setScheduleModal]       = useState(null)
   const [payModal, setPayModal]                 = useState(null)
   const [paymentDetail, setPaymentDetail]       = useState(null)
+  const [histFrom, setHistFrom]                 = useState('')
+  const [histTo,   setHistTo]                   = useState('')
 
   // Filtros de fecha para el resumen
   const [dateFrom, setDateFrom] = useState(mondayStr())
@@ -539,10 +541,44 @@ export default function Payroll() {
       )}
 
       {/* ── TAB: HISTORIAL ── */}
-      {tab === 'history' && (
-        <div className="card p-0 overflow-hidden">
-          <div className="px-5 py-4 border-b border-gray-100">
+      {tab === 'history' && (() => {
+        const filteredHistory = history.filter(p => {
+          const d = p.paid_at.slice(0, 10)
+          if (histFrom && d < histFrom) return false
+          if (histTo   && d > histTo)   return false
+          return true
+        })
+        return (
+        <div className="space-y-4">
+          {/* Filtro */}
+          <div className="card p-4 flex flex-wrap items-end gap-4">
+            <div>
+              <label className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest block mb-1">Desde</label>
+              <input type="date" className="input py-1.5 text-sm"
+                value={histFrom} onChange={e => setHistFrom(e.target.value)} />
+            </div>
+            <div>
+              <label className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest block mb-1">Hasta</label>
+              <input type="date" className="input py-1.5 text-sm"
+                value={histTo} onChange={e => setHistTo(e.target.value)} />
+            </div>
+            <div className="flex gap-2">
+              <button onClick={() => { setHistFrom(mondayStr()); setHistTo(todayStr()) }}
+                className="btn-secondary py-1.5 text-xs">Esta semana</button>
+              <button onClick={() => {
+                const d = new Date()
+                setHistFrom(localStr(new Date(d.getFullYear(), d.getMonth(), 1)))
+                setHistTo(todayStr())
+              }} className="btn-secondary py-1.5 text-xs">Este mes</button>
+              <button onClick={() => { setHistFrom(''); setHistTo('') }}
+                className="btn-secondary py-1.5 text-xs">Todo</button>
+            </div>
+          </div>
+
+          <div className="card p-0 overflow-hidden">
+          <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
             <h2>Historial de pagos</h2>
+            <span className="text-xs text-gray-400">{filteredHistory.length} registros</span>
           </div>
 
           <div className="grid px-5 py-2.5 bg-slate-50 border-b border-gray-100 text-[10px] font-semibold text-gray-400 uppercase tracking-widest gap-4"
@@ -553,11 +589,11 @@ export default function Payroll() {
           </div>
 
           <div className="divide-y divide-gray-50">
-            {history.length === 0 ? (
+            {filteredHistory.length === 0 ? (
               <div className="flex items-center justify-center py-12 text-gray-300 text-sm">
-                Sin pagos registrados
+                Sin pagos en este período
               </div>
-            ) : history.map(p => (
+            ) : filteredHistory.map(p => (
               <div key={p.id}
                 onClick={() => setPaymentDetail(p)}
                 className="grid px-5 py-3 items-center gap-4 hover:bg-slate-50 cursor-pointer transition-colors"
@@ -576,7 +612,9 @@ export default function Payroll() {
             ))}
           </div>
         </div>
-      )}
+        </div>
+        )
+      })()}
 
       {/* Modals */}
       {scheduleModal && (
