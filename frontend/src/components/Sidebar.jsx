@@ -40,16 +40,11 @@ export default function Sidebar() {
       {/* Logo */}
       <div className="px-5 py-5 border-b border-white/8">
         <div className="flex items-center gap-3">
-          <div
-            className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
-            style={{ background: 'linear-gradient(135deg, #FF0099, #7B2FFF)' }}
-          >
-            <svg viewBox="0 0 24 24" fill="none" className="w-4 h-4 text-white" stroke="currentColor" strokeWidth="2">
-              <path d="M12 2L2 7l10 5 10-5-10-5z" />
-              <path d="M2 17l10 5 10-5" />
-              <path d="M2 12l10 5 10-5" />
-            </svg>
-          </div>
+          <img
+            src="/logo-neon.png"
+            alt="Juan Chupe"
+            className="w-9 h-9 object-contain flex-shrink-0"
+          />
           <div>
             <p className="font-bold text-white text-sm leading-tight">Juan Chupe</p>
             <p className="text-[11px] text-slate-400 leading-tight">Granizados ERP</p>

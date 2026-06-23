@@ -79,13 +79,15 @@ export const getCashAuditPrefill = () => api.get('/cash/prefill/')
 export const createCashAudit = (data) => api.post('/cash/', data)
 
 // Attendance
-export const getTodayAttendance  = ()     => api.get('/attendance/today/')
-export const createAttendance    = (data) => api.post('/attendance/', data)
-export const checkoutAttendance  = (id)   => api.post(`/attendance/${id}/checkout/`)
-// Vendedora — solo su propio registro
-export const myAttendanceStatus  = ()     => api.get('/attendance/my-status/')
-export const myCheckin           = ()     => api.post('/attendance/my-checkin/')
-export const myCheckout          = ()     => api.post('/attendance/my-checkout/')
+export const getTodayAttendance   = ()       => api.get('/attendance/today/')
+export const createAttendance     = (data)   => api.post('/attendance/', data)
+export const checkoutAttendance   = (id)     => api.post(`/attendance/${id}/checkout/`)
+export const getAttendanceRecords = (params) => api.get('/attendance/', { params })
+export const getAttendanceMetrics = (params) => api.get('/attendance/metrics/', { params })
+// Operativa — solo su propio registro
+export const myAttendanceStatus   = ()       => api.get('/attendance/my-status/')
+export const myCheckin            = ()       => api.post('/attendance/my-checkin/')
+export const myCheckout           = ()       => api.post('/attendance/my-checkout/')
 
 // Users
 export const getUsers = () => api.get('/auth/users/')

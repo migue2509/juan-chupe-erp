@@ -1,24 +1,57 @@
 import { useEffect, useState } from 'react'
 import {
   getTodayAttendance, createAttendance, checkoutAttendance,
+  getAttendanceMetrics, getAttendanceRecords,
   myAttendanceStatus, myCheckin, myCheckout,
 } from '../api'
 import { getOperatives } from '../api/auth'
 import { useAuth } from '../context/AuthContext'
 import toast from 'react-hot-toast'
 
-// ── Vista admin: lista completa + registrar por cualquier empleada ───────────
+const localStr = (d = new Date()) => {
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${y}-${m}-${day}`
+}
+const mondayStr = () => {
+  const d = new Date()
+  const diff = d.getDay() === 0 ? -6 : 1 - d.getDay()
+  d.setDate(d.getDate() + diff)
+  return localStr(d)
+}
+const fmtTime = dt => new Date(dt).toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' })
+const fmtDate = d => d ? new Date(d + 'T00:00:00').toLocaleDateString('es-CO', { day: '2-digit', month: 'short' }) : '—'
+
+// ── Vista admin: dashboard de métricas + registrar ───────────────────────────
 function AdminAttendance() {
-  const [records, setRecords]     = useState([])
-  const [operatives, setOperatives] = useState([])
+  const [operatives,   setOperatives]   = useState([])
   const [selectedUser, setSelectedUser] = useState('')
+  const [metrics,      setMetrics]      = useState(null)
+  const [records,      setRecords]      = useState([])
+  const [loading,      setLoading]      = useState(true)
+  const [dateFrom,     setDateFrom]     = useState(mondayStr())
+  const [dateTo,       setDateTo]       = useState(localStr())
 
   const load = async () => {
-    const [r, o] = await Promise.all([getTodayAttendance(), getOperatives()])
-    setRecords(r.data)
-    setOperatives(o.data)
+    setLoading(true)
+    const params = {}
+    if (dateFrom) params.date_from = dateFrom
+    if (dateTo)   params.date_to   = dateTo
+    try {
+      const [mRes, rRes, oRes] = await Promise.all([
+        getAttendanceMetrics(params),
+        getAttendanceRecords(params),
+        getOperatives(),
+      ])
+      setMetrics(mRes.data)
+      setRecords(rRes.data?.results ?? rRes.data ?? [])
+      setOperatives(oRes.data)
+    } catch {}
+    setLoading(false)
   }
-  useEffect(() => { load() }, [])
+
+  useEffect(() => { load() }, [dateFrom, dateTo])
 
   const handleCheckin = async () => {
     if (!selectedUser) { toast.error('Selecciona una vendedora'); return }
@@ -30,19 +63,103 @@ function AdminAttendance() {
   }
 
   const handleCheckout = async (id) => {
-    try {
-      await checkoutAttendance(id)
-      toast.success('Salida registrada')
-      load()
-    } catch {}
+    try { await checkoutAttendance(id); toast.success('Salida registrada'); load() } catch {}
   }
 
-  return (
-    <div className="space-y-6">
-      <h1 className="text-brand-navy">Asistencia</h1>
+  const clearFilter = () => { setDateFrom(''); setDateTo('') }
 
+  return (
+    <div className="space-y-5">
+      <h1>Asistencia</h1>
+
+      {/* ── Filtro de fechas ── */}
+      <div className="card p-4 flex flex-wrap items-end gap-4">
+        <div>
+          <label className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest block mb-1">Desde</label>
+          <input type="date" className="input py-1.5 text-sm" value={dateFrom} onChange={e => setDateFrom(e.target.value)} />
+        </div>
+        <div>
+          <label className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest block mb-1">Hasta</label>
+          <input type="date" className="input py-1.5 text-sm" value={dateTo} onChange={e => setDateTo(e.target.value)} />
+        </div>
+        <div className="flex gap-2">
+          <button onClick={() => { setDateFrom(localStr()); setDateTo(localStr()) }}
+            className="btn-secondary py-1.5 text-xs">Hoy</button>
+          <button onClick={() => { setDateFrom(mondayStr()); setDateTo(localStr()) }}
+            className="btn-secondary py-1.5 text-xs">Esta semana</button>
+          <button onClick={() => {
+            const d = new Date()
+            setDateFrom(localStr(new Date(d.getFullYear(), d.getMonth(), 1)))
+            setDateTo(localStr())
+          }} className="btn-secondary py-1.5 text-xs">Este mes</button>
+          <button onClick={clearFilter} className="btn-secondary py-1.5 text-xs text-gray-400">✕ Limpiar</button>
+        </div>
+      </div>
+
+      {/* ── KPI Cards ── */}
+      {metrics && (
+        <div className="grid grid-cols-4 gap-4">
+          <div className="stat-card">
+            <p className="stat-label">Registros</p>
+            <p className="text-2xl font-bold text-gray-900 mt-1 tabular-nums">{metrics.total_records}</p>
+            <p className="text-xs text-gray-400 mt-0.5">en el período</p>
+          </div>
+          <div className="stat-card">
+            <p className="stat-label">Horas totales</p>
+            <p className="text-2xl font-bold text-brand-navy mt-1 tabular-nums">{metrics.total_hours}h</p>
+            <p className="text-xs text-gray-400 mt-0.5">trabajadas</p>
+          </div>
+          <div className="stat-card">
+            <p className="stat-label">Promedio / registro</p>
+            <p className="text-2xl font-bold text-gray-900 mt-1 tabular-nums">{metrics.avg_hours_day}h</p>
+          </div>
+          <div className="stat-card">
+            <p className="stat-label">Presentes hoy</p>
+            <p className="text-2xl font-bold text-green-600 mt-1 tabular-nums">{metrics.today_present?.length ?? 0}</p>
+            <p className="text-xs text-gray-400 mt-0.5">
+              {metrics.today_present?.filter(r => !r.check_out).length ?? 0} activas ahora
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* ── Por empleada ── */}
+      {metrics?.per_employee?.length > 0 && (
+        <div className="card p-0 overflow-hidden">
+          <div className="px-5 py-4 border-b border-gray-100">
+            <h2>Resumen por empleada</h2>
+          </div>
+          <div className="grid px-5 py-2.5 bg-slate-50 border-b border-gray-100 text-[10px] font-semibold text-gray-400 uppercase tracking-widest gap-4"
+            style={{ gridTemplateColumns: '1fr 70px 70px 80px 80px 90px' }}>
+            {['Empleada', 'Días', 'Entradas', 'Horas', 'Prom/día', 'Último día'].map(h => <span key={h}>{h}</span>)}
+          </div>
+          <div className="divide-y divide-gray-50">
+            {metrics.per_employee.map(emp => {
+              const pct = metrics.total_hours > 0 ? (emp.hours / metrics.total_hours) * 100 : 0
+              return (
+                <div key={emp.user_id} className="px-5 py-3 gap-4 grid items-center"
+                  style={{ gridTemplateColumns: '1fr 70px 70px 80px 80px 90px' }}>
+                  <div>
+                    <p className="text-sm font-semibold text-gray-800">{emp.user_name}</p>
+                    <div className="h-1.5 bg-gray-100 rounded-full mt-1.5 overflow-hidden w-32">
+                      <div className="h-full bg-brand-navy rounded-full" style={{ width: `${pct}%` }} />
+                    </div>
+                  </div>
+                  <span className="text-sm tabular-nums text-gray-700">{emp.days}</span>
+                  <span className="text-sm tabular-nums text-gray-700">{emp.records}</span>
+                  <span className="text-sm tabular-nums font-semibold text-gray-800">{emp.hours}h</span>
+                  <span className="text-sm tabular-nums text-gray-500">{emp.avg_hours}h</span>
+                  <span className="text-xs text-gray-400">{fmtDate(emp.last_seen)}</span>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* ── Registrar entrada (admin) ── */}
       <div className="card">
-        <h2 className="mb-3 text-sm">Registrar Entrada</h2>
+        <h2 className="mb-3 text-sm">Registrar Entrada Manual</h2>
         <div className="flex gap-2">
           <select className="input" value={selectedUser} onChange={e => setSelectedUser(e.target.value)}>
             <option value="">Selecciona vendedora...</option>
@@ -52,25 +169,32 @@ function AdminAttendance() {
         </div>
       </div>
 
-      <div className="card">
-        <h2 className="mb-3 text-sm">Registros de Hoy</h2>
-        <div className="divide-y">
-          {records.length === 0 && <p className="text-gray-400 text-sm py-4 text-center">Sin registros hoy</p>}
-          {records.map(r => (
-            <div key={r.id} className="py-3 flex items-center justify-between">
-              <div>
-                <p className="font-medium text-sm">{r.user_name}</p>
-                <p className="text-xs text-gray-400">
-                  Entrada: {new Date(r.check_in).toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' })}
-                  {r.check_out && ` · Salida: ${new Date(r.check_out).toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' })}`}
-                  {r.hours_worked && ` · ${r.hours_worked}h`}
-                </p>
+      {/* ── Registros del período ── */}
+      <div className="card p-0 overflow-hidden">
+        <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+          <h2>Registros</h2>
+          <span className="text-xs text-gray-400">{records.length} en el período</span>
+        </div>
+        <div className="divide-y divide-gray-50">
+          {records.length === 0
+            ? <p className="text-gray-400 text-sm py-6 text-center">Sin registros en este período</p>
+            : records.map(r => (
+              <div key={r.id} className="px-5 py-3 flex items-center justify-between hover:bg-slate-50">
+                <div>
+                  <p className="text-sm font-semibold text-gray-800">{r.user_name}</p>
+                  <p className="text-xs text-gray-400">
+                    {new Date(r.check_in).toLocaleDateString('es-CO', { day: '2-digit', month: 'short' })}
+                    {' · '}Entrada: <span className="font-medium">{fmtTime(r.check_in)}</span>
+                    {r.check_out && <> · Salida: <span className="font-medium">{fmtTime(r.check_out)}</span></>}
+                    {r.hours_worked && <span className="ml-2 text-brand-navy font-semibold">{r.hours_worked}h</span>}
+                  </p>
+                </div>
+                {!r.check_out && (
+                  <button onClick={() => handleCheckout(r.id)} className="btn-primary text-xs py-1">Salida</button>
+                )}
               </div>
-              {!r.check_out && (
-                <button onClick={() => handleCheckout(r.id)} className="btn-primary text-xs py-1">Salida</button>
-              )}
-            </div>
-          ))}
+            ))
+          }
         </div>
       </div>
     </div>

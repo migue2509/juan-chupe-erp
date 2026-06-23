@@ -1,3 +1,4 @@
+import datetime
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
@@ -26,6 +27,16 @@ class AttendanceViewSet(viewsets.ModelViewSet):
         record.checkout()
         return Response(AttendanceSerializer(record).data)
 
+    def get_queryset(self):
+        qs = super().get_queryset()
+        date_from = self.request.query_params.get('date_from')
+        date_to   = self.request.query_params.get('date_to')
+        if date_from:
+            qs = qs.filter(check_in__date__gte=date_from)
+        if date_to:
+            qs = qs.filter(check_in__date__lte=date_to)
+        return qs
+
     @action(detail=False, methods=['get'], url_path='today')
     def today(self, request):
         shift = Shift.get_active()
@@ -33,6 +44,76 @@ class AttendanceViewSet(viewsets.ModelViewSet):
             return Response([])
         records = AttendanceRecord.objects.filter(shift=shift).select_related('user')
         return Response(AttendanceSerializer(records, many=True).data)
+
+    @action(detail=False, methods=['get'], url_path='metrics', permission_classes=[IsAdmin])
+    def metrics(self, request):
+        """
+        Métricas de asistencia por empleada en un rango de fechas.
+        Params: date_from, date_to (YYYY-MM-DD)
+        """
+        from django.db.models import Count, Sum, Avg
+        from django.utils import timezone
+        from apps.users.models import User
+
+        date_from_str = request.query_params.get('date_from')
+        date_to_str   = request.query_params.get('date_to')
+
+        qs = AttendanceRecord.objects.select_related('user').all()
+        if date_from_str:
+            qs = qs.filter(check_in__date__gte=date_from_str)
+        if date_to_str:
+            qs = qs.filter(check_in__date__lte=date_to_str)
+
+        # Totales globales
+        total_records = qs.count()
+        completed     = qs.exclude(check_out__isnull=True)
+        total_hours   = sum(
+            (r.check_out - r.check_in).total_seconds() / 3600
+            for r in completed if r.check_out
+        )
+
+        # Por empleada
+        operatives = User.objects.filter(role='operative', is_active=True).order_by('full_name')
+        per_employee = []
+        for emp in operatives:
+            emp_qs       = qs.filter(user=emp)
+            emp_complete = emp_qs.exclude(check_out__isnull=True)
+            emp_hours    = sum(
+                (r.check_out - r.check_in).total_seconds() / 3600
+                for r in emp_complete if r.check_out
+            )
+            days = emp_qs.values('check_in__date').distinct().count()
+            per_employee.append({
+                'user_id':    emp.id,
+                'user_name':  emp.full_name,
+                'days':       days,
+                'records':    emp_qs.count(),
+                'hours':      round(emp_hours, 2),
+                'avg_hours':  round(emp_hours / days, 2) if days else 0,
+                'last_seen':  emp_qs.order_by('-check_in').values_list('check_in__date', flat=True).first(),
+            })
+
+        # Hoy
+        today = timezone.localdate()
+        today_records = AttendanceRecord.objects.filter(
+            check_in__date=today
+        ).select_related('user')
+
+        return Response({
+            'total_records': total_records,
+            'total_hours':   round(total_hours, 2),
+            'avg_hours_day': round(total_hours / total_records, 2) if total_records else 0,
+            'per_employee':  per_employee,
+            'today_present': [
+                {
+                    'user_name':  r.user.full_name,
+                    'check_in':   r.check_in,
+                    'check_out':  r.check_out,
+                    'hours':      r.hours_worked,
+                }
+                for r in today_records
+            ],
+        })
 
     # ── Endpoints para vendedoras: solo su propio registro ───────────────────
 
