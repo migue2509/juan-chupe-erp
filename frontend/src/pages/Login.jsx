@@ -8,6 +8,7 @@ export default function Login() {
   const navigate = useNavigate()
   const [form, setForm] = useState({ username: '', password: '' })
   const [loading, setLoading] = useState(false)
+  const [showPwd, setShowPwd] = useState(false)
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -24,103 +25,88 @@ export default function Login() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 flex">
-      {/* Left panel */}
-      <div
-        className="hidden lg:flex flex-col justify-between w-96 flex-shrink-0 p-10"
-        style={{ background: '#0F1035' }}
-      >
-        <div className="flex items-center gap-3">
-          <div
-            className="w-9 h-9 rounded-xl flex items-center justify-center"
-            style={{ background: 'linear-gradient(135deg, #FF0099, #7B2FFF)' }}
-          >
-            <svg viewBox="0 0 24 24" fill="none" className="w-5 h-5 text-white" stroke="currentColor" strokeWidth="2">
-              <path d="M12 2L2 7l10 5 10-5-10-5z" />
-              <path d="M2 17l10 5 10-5" />
-              <path d="M2 12l10 5 10-5" />
-            </svg>
-          </div>
-          <div>
-            <p className="font-bold text-white text-sm">Juan Chupe</p>
-            <p className="text-[11px] text-slate-400">Granizados ERP</p>
-          </div>
-        </div>
+    <div className="min-h-screen flex items-center justify-center p-6 relative" style={{ background: '#080B28' }}>
 
-        <div>
-          <h2 className="text-3xl font-bold text-white leading-tight mb-3">
-            Sistema de gestión<br />integral de ventas
-          </h2>
-          <p className="text-slate-400 text-sm leading-relaxed">
-            Control de ventas, inventario, jornadas y reportes en tiempo real para tu negocio de granizados.
-          </p>
-        </div>
+      {/* Decorative blobs */}
+      <div className="absolute -top-32 -left-32 w-96 h-96 rounded-full pointer-events-none"
+        style={{ background: 'radial-gradient(circle, rgba(255,0,153,0.15), transparent)' }} />
+      <div className="absolute -bottom-32 -right-32 w-96 h-96 rounded-full pointer-events-none"
+        style={{ background: 'radial-gradient(circle, rgba(123,47,255,0.12), transparent)' }} />
 
-        <p className="text-[11px] text-slate-600">
-          OPIA SYSTEMS &copy; {new Date().getFullYear()}
-        </p>
-      </div>
+      <div className="w-full max-w-[380px] relative">
 
-      {/* Right panel — form */}
-      <div className="flex-1 flex items-center justify-center p-6">
-        <div className="w-full max-w-sm">
-          {/* Mobile logo */}
-          <div className="flex items-center gap-3 mb-8 lg:hidden">
-            <div
-              className="w-9 h-9 rounded-xl flex items-center justify-center"
-              style={{ background: 'linear-gradient(135deg, #FF0099, #7B2FFF)' }}
-            >
-              <svg viewBox="0 0 24 24" fill="none" className="w-5 h-5 text-white" stroke="currentColor" strokeWidth="2">
-                <path d="M12 2L2 7l10 5 10-5-10-5z" />
-                <path d="M2 17l10 5 10-5" />
-                <path d="M2 12l10 5 10-5" />
-              </svg>
+        {/* Card */}
+        <div className="rounded-2xl p-8 shadow-2xl"
+          style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }}>
+
+          {/* Brand */}
+          <div className="flex flex-col items-center text-center mb-7">
+            <div className="w-16 h-16 rounded-2xl flex items-center justify-center mb-4"
+              style={{ background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.1)' }}>
+              <img src="/logo-neon.png" alt="Juan Chupe" className="w-11 h-11 object-contain" />
             </div>
-            <div>
-              <p className="font-bold text-gray-900 text-sm">Juan Chupe</p>
-              <p className="text-[11px] text-gray-500">Granizados ERP</p>
-            </div>
+            <h1 className="text-xl font-bold text-white leading-snug">Juan Chupe Granizados ERP</h1>
+            <p className="text-xs text-slate-400 mt-1">Sistema de Punto de Venta</p>
+            <div className="w-full h-px mt-6" style={{ background: 'rgba(255,255,255,0.07)' }} />
           </div>
-
-          <h1 className="text-2xl font-bold text-gray-900 mb-1">Iniciar sesión</h1>
-          <p className="text-sm text-gray-500 mb-8">Ingresa tus credenciales para continuar</p>
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label className="label">Usuario</label>
+              <label className="block text-xs font-semibold text-slate-400 uppercase tracking-widest mb-2">
+                Usuario
+              </label>
               <input
-                className="input"
                 type="text"
                 placeholder="tu_usuario"
                 value={form.username}
                 onChange={e => setForm(f => ({ ...f, username: e.target.value }))}
-                required
-                autoFocus
+                required autoFocus
+                className="w-full px-4 py-3 rounded-xl text-sm text-white placeholder-slate-600 outline-none transition-all"
+                style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)' }}
+                onFocus={e => e.target.style.borderColor = 'rgba(255,0,153,0.6)'}
+                onBlur={e => e.target.style.borderColor = 'rgba(255,255,255,0.1)'}
               />
             </div>
+
             <div>
-              <label className="label">Contraseña</label>
-              <input
-                className="input"
-                type="password"
-                placeholder="••••••••"
-                value={form.password}
-                onChange={e => setForm(f => ({ ...f, password: e.target.value }))}
-                required
-              />
+              <label className="block text-xs font-semibold text-slate-400 uppercase tracking-widest mb-2">
+                Contraseña
+              </label>
+              <div className="relative">
+                <input
+                  type={showPwd ? 'text' : 'password'}
+                  placeholder="••••••••"
+                  value={form.password}
+                  onChange={e => setForm(f => ({ ...f, password: e.target.value }))}
+                  required
+                  className="w-full px-4 py-3 rounded-xl text-sm text-white placeholder-slate-600 outline-none transition-all pr-16"
+                  style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)' }}
+                  onFocus={e => e.target.style.borderColor = 'rgba(255,0,153,0.6)'}
+                  onBlur={e => e.target.style.borderColor = 'rgba(255,255,255,0.1)'}
+                />
+                <button type="button" onClick={() => setShowPwd(p => !p)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300 transition-colors text-xs">
+                  {showPwd ? 'Ocultar' : 'Ver'}
+                </button>
+              </div>
             </div>
+
             <button
               type="submit"
               disabled={loading}
-              className="btn-primary w-full justify-center mt-2 py-2.5"
+              className="w-full py-3 rounded-xl text-white font-semibold text-sm mt-2 flex items-center justify-center gap-2 transition-all active:scale-95"
+              style={{ background: 'linear-gradient(135deg, #FF0099, #7B2FFF)', boxShadow: '0 4px 24px rgba(123,47,255,0.35)' }}
             >
-              {loading ? (
-                <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-              ) : null}
+              {loading && <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />}
               {loading ? 'Ingresando...' : 'Entrar'}
             </button>
           </form>
         </div>
+
+        {/* Footer */}
+        <p className="text-center text-[11px] text-slate-700 mt-5 uppercase tracking-wider">
+          OPIA SYSTEMS &copy; 2026
+        </p>
       </div>
     </div>
   )
