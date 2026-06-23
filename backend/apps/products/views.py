@@ -44,6 +44,12 @@ class CupSizeViewSet(viewsets.ModelViewSet):
             defaults={'min_quantity': cup.min_quantity}
         )
 
+    def perform_update(self, serializer):
+        """Sincroniza min_quantity en CupStock al editar el vaso"""
+        from apps.inventory.models import CupStock
+        cup = serializer.save()
+        CupStock.objects.filter(cup_size=cup).update(min_quantity=cup.min_quantity)
+
 
 class ProductViewSet(viewsets.ModelViewSet):
     queryset = Product.objects.all()
@@ -65,3 +71,9 @@ class ToppingViewSet(viewsets.ModelViewSet):
             topping=topping,
             defaults={'min_quantity': topping.min_stock}
         )
+
+    def perform_update(self, serializer):
+        """Sincroniza min_quantity en ToppingStock al editar el topping"""
+        from apps.inventory.models import ToppingStock
+        topping = serializer.save()
+        ToppingStock.objects.filter(topping=topping).update(min_quantity=topping.min_stock)
