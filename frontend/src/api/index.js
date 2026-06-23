@@ -95,4 +95,4 @@ export const getDailyReport    = (shiftId) => api.get('/reports/daily/', { param
 export const getWeeklyReport   = () => api.get('/reports/weekly/')
 export const getMonthlyReport  = () => api.get('/reports/monthly/')
 export const getInventoryStatus= () => api.get('/reports/inventory/')
-export const getRangeReport    = (dateFrom, dateTo) => api.get('/reports/range/', { params: { date_from: dateFrom, date_to: dateTo } })
+export const getRangeReport    = (dateFrom, dateTo, channel = 'all') => api.get('/reports/range/', { params: { date_from: dateFrom, date_to: dateTo, channel } })

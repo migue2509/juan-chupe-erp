@@ -140,22 +140,30 @@ class RangeReportView(APIView):
 
         date_from_str = request.query_params.get('date_from')
         date_to_str   = request.query_params.get('date_to')
+        channel       = request.query_params.get('channel', 'all')  # all | pos | delivery
 
         today_local = timezone.localdate()
         date_from = parse_date(date_from_str) if date_from_str else today_local
         date_to   = parse_date(date_to_str)   if date_to_str   else today_local
 
-        # Convertir a datetimes con TZ de Bogotá para evitar desfase UTC
         start_dt = timezone.make_aware(datetime.datetime.combine(date_from, datetime.time.min))
         end_dt   = timezone.make_aware(datetime.datetime.combine(date_to,   datetime.time.max))
 
-        # Sales en el rango
-        sales = Sale.objects.filter(
-            created_at__gte=start_dt,
-            created_at__lte=end_dt,
-        ).select_related('seller')
+        # ── Base querysets ────────────────────────────────────────────────────
+        sales_qs = Sale.objects.filter(created_at__gte=start_dt, created_at__lte=end_dt)
+        if channel == 'pos':
+            sales_qs = sales_qs.filter(is_delivery=False)
+        elif channel == 'delivery':
+            sales_qs = sales_qs.filter(is_delivery=True)
+        sales = sales_qs.select_related('seller')
 
-        # Ventas por vendedora
+        expenses_qs = Expense.objects.filter(created_at__gte=start_dt, created_at__lte=end_dt)
+        if channel == 'pos':
+            expenses_qs = expenses_qs.filter(origin='pos')
+        elif channel == 'delivery':
+            expenses_qs = expenses_qs.filter(origin='delivery')
+
+        # ── Ventas por vendedora ──────────────────────────────────────────────
         seller_map = {}
         for s in sales:
             name = (s.seller.full_name or s.seller.username) if s.seller else 'Sin asignar'
@@ -166,44 +174,69 @@ class RangeReportView(APIView):
             seller_map[name]['count'] += 1
         sellers = sorted(seller_map.values(), key=lambda x: x['total'], reverse=True)
 
-        # Medio de pago
-        total_cash     = sum(
+        # ── Medio de pago ─────────────────────────────────────────────────────
+        total_cash = sum(
             (float(s.courtesy_paid) if s.is_courtesy else float(s.cash_received))
             for s in sales if s.payment_method in ('cash', 'mixed')
         )
         total_transfer = sum(float(s.transfer_amount) for s in sales if s.payment_method in ('transfer', 'mixed'))
         total_money    = total_cash + total_transfer
-
-        # Ventas por tamaño de vaso
-        cup_items = SaleItem.objects.filter(
-            sale__created_at__gte=start_dt,
-            sale__created_at__lte=end_dt,
-            cup_size__isnull=False,
-        ).values('cup_size__size').annotate(count=Count('id'), total=Sum('subtotal'))
-        cup_sales = [{'size': r['cup_size__size'], 'count': r['count'], 'total': float(r['total'] or 0)} for r in cup_items]
-
-        # Sabores más vendidos
-        flavor_sales_qs = SaleItemFlavor.objects.filter(
-            sale_item__sale__created_at__gte=start_dt,
-            sale_item__sale__created_at__lte=end_dt,
-        ).values('flavor__name').annotate(total_ml=Sum('ml_consumed')).order_by('-total_ml')
-        flavors = [{'name': r['flavor__name'], 'ml': float(r['total_ml'] or 0)} for r in flavor_sales_qs]
-
-        # Totales generales
-        total_sales = sum(
+        total_sales    = sum(
             (float(s.courtesy_paid) if s.is_courtesy else float(s.total))
             for s in sales
         )
-        expenses = Expense.objects.filter(
-            created_at__gte=start_dt,
-            created_at__lte=end_dt,
-            from_daily_cash=True,
+
+        # ── Ventas por tamaño de vaso ─────────────────────────────────────────
+        cup_items = SaleItem.objects.filter(
+            sale__in=sales, cup_size__isnull=False,
+        ).values('cup_size__size').annotate(count=Count('id'), total=Sum('subtotal'))
+        cup_sales = [{'size': r['cup_size__size'], 'count': r['count'], 'total': float(r['total'] or 0)} for r in cup_items]
+
+        # ── Sabores más vendidos ──────────────────────────────────────────────
+        flavor_sales_qs = SaleItemFlavor.objects.filter(
+            sale_item__sale__in=sales,
+        ).values('flavor__name').annotate(total_ml=Sum('ml_consumed')).order_by('-total_ml')
+        flavors = [{'name': r['flavor__name'], 'ml': float(r['total_ml'] or 0)} for r in flavor_sales_qs]
+
+        # ── Gastos ────────────────────────────────────────────────────────────
+        total_expenses = float(expenses_qs.filter(from_daily_cash=True).aggregate(t=Sum('amount'))['t'] or 0)
+
+        CATEGORY_LABELS = {
+            'business': 'Gasto del Negocio',
+            'personal': 'Gasto Personal',
+            'petty_cash': 'Caja Menor',
+            'supply': 'Ingreso de Mercancía',
+        }
+        expense_by_cat = []
+        for cat, label in CATEGORY_LABELS.items():
+            total = float(expenses_qs.filter(category=cat).aggregate(t=Sum('amount'))['t'] or 0)
+            if total > 0:
+                expense_by_cat.append({'category': label, 'total': total})
+        expense_by_cat.sort(key=lambda x: x['total'], reverse=True)
+
+        # ── Domicilios ────────────────────────────────────────────────────────
+        from apps.deliveries.models import Delivery
+        deliveries_qs = Delivery.objects.filter(created_at__gte=start_dt, created_at__lte=end_dt)
+        delivery_sales = Sale.objects.filter(
+            created_at__gte=start_dt, created_at__lte=end_dt, is_delivery=True
         )
-        total_expenses = float(expenses.aggregate(t=Sum('amount'))['t'] or 0)
+        delivery_total = sum(
+            (float(s.courtesy_paid) if s.is_courtesy else float(s.total))
+            for s in delivery_sales
+        )
+        delivery_stats = {
+            'total':     deliveries_qs.count(),
+            'pending':   deliveries_qs.filter(status='pending').count(),
+            'on_way':    deliveries_qs.filter(status='on_way').count(),
+            'delivered': deliveries_qs.filter(status='delivered').count(),
+            'cancelled': deliveries_qs.filter(status='cancelled').count(),
+            'revenue':   delivery_total,
+        }
 
         return Response({
-            'date_from': str(date_from),
-            'date_to':   str(date_to),
+            'date_from':      str(date_from),
+            'date_to':        str(date_to),
+            'channel':        channel,
             'total_sales':    total_sales,
             'total_cash':     total_cash,
             'total_transfer': total_transfer,
@@ -214,8 +247,10 @@ class RangeReportView(APIView):
             'sellers':        sellers,
             'cup_sales':      cup_sales,
             'flavors':        flavors,
+            'expense_by_cat': expense_by_cat,
+            'deliveries':     delivery_stats,
             'payment_pct': {
                 'cash':     round(total_cash     / total_money * 100) if total_money else 0,
                 'transfer': round(total_transfer / total_money * 100) if total_money else 0,
-            }
+            },
         })
