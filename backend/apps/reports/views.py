@@ -1,9 +1,9 @@
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.decorators import api_view, permission_classes
-from django.db.models import Sum, Count
+from django.db.models import Sum, Count, Q
 from django.utils import timezone
-from datetime import timedelta
+from datetime import timedelta, date as date_type
 from decimal import Decimal
 from core.permissions import IsAdmin
 from apps.shifts.models import Shift
@@ -127,4 +127,95 @@ class InventoryStatusView(APIView):
                 }
                 for c in cups
             ],
+        })
+
+
+class RangeReportView(APIView):
+    """Reporte para rango de fechas arbitrario. Params: date_from, date_to (YYYY-MM-DD)"""
+    permission_classes = [IsAdmin]
+
+    def get(self, request):
+        from django.utils.dateparse import parse_date
+        import datetime
+
+        date_from_str = request.query_params.get('date_from')
+        date_to_str   = request.query_params.get('date_to')
+
+        today_local = timezone.localdate()
+        date_from = parse_date(date_from_str) if date_from_str else today_local
+        date_to   = parse_date(date_to_str)   if date_to_str   else today_local
+
+        # Convertir a datetimes con TZ de Bogotá para evitar desfase UTC
+        start_dt = timezone.make_aware(datetime.datetime.combine(date_from, datetime.time.min))
+        end_dt   = timezone.make_aware(datetime.datetime.combine(date_to,   datetime.time.max))
+
+        # Sales en el rango
+        sales = Sale.objects.filter(
+            created_at__gte=start_dt,
+            created_at__lte=end_dt,
+        ).select_related('seller')
+
+        # Ventas por vendedora
+        seller_map = {}
+        for s in sales:
+            name = (s.seller.full_name or s.seller.username) if s.seller else 'Sin asignar'
+            if name not in seller_map:
+                seller_map[name] = {'name': name, 'total': 0, 'count': 0}
+            paid = float(s.courtesy_paid) if s.is_courtesy else float(s.total)
+            seller_map[name]['total'] += paid
+            seller_map[name]['count'] += 1
+        sellers = sorted(seller_map.values(), key=lambda x: x['total'], reverse=True)
+
+        # Medio de pago
+        total_cash     = sum(
+            (float(s.courtesy_paid) if s.is_courtesy else float(s.cash_received))
+            for s in sales if s.payment_method in ('cash', 'mixed')
+        )
+        total_transfer = sum(float(s.transfer_amount) for s in sales if s.payment_method in ('transfer', 'mixed'))
+        total_money    = total_cash + total_transfer
+
+        # Ventas por tamaño de vaso
+        cup_items = SaleItem.objects.filter(
+            sale__created_at__gte=start_dt,
+            sale__created_at__lte=end_dt,
+            cup_size__isnull=False,
+        ).values('cup_size__size').annotate(count=Count('id'), total=Sum('subtotal'))
+        cup_sales = [{'size': r['cup_size__size'], 'count': r['count'], 'total': float(r['total'] or 0)} for r in cup_items]
+
+        # Sabores más vendidos
+        flavor_sales_qs = SaleItemFlavor.objects.filter(
+            sale_item__sale__created_at__gte=start_dt,
+            sale_item__sale__created_at__lte=end_dt,
+        ).values('flavor__name').annotate(total_ml=Sum('ml_consumed')).order_by('-total_ml')
+        flavors = [{'name': r['flavor__name'], 'ml': float(r['total_ml'] or 0)} for r in flavor_sales_qs]
+
+        # Totales generales
+        total_sales = sum(
+            (float(s.courtesy_paid) if s.is_courtesy else float(s.total))
+            for s in sales
+        )
+        expenses = Expense.objects.filter(
+            created_at__gte=start_dt,
+            created_at__lte=end_dt,
+            from_daily_cash=True,
+        )
+        total_expenses = float(expenses.aggregate(t=Sum('amount'))['t'] or 0)
+
+        return Response({
+            'date_from': str(date_from),
+            'date_to':   str(date_to),
+            'total_sales':    total_sales,
+            'total_cash':     total_cash,
+            'total_transfer': total_transfer,
+            'total_money':    total_money,
+            'total_expenses': total_expenses,
+            'net_cash':       total_money - total_expenses,
+            'sales_count':    sales.count(),
+            'sellers':        sellers,
+            'cup_sales':      cup_sales,
+            'flavors':        flavors,
+            'payment_pct': {
+                'cash':     round(total_cash     / total_money * 100) if total_money else 0,
+                'transfer': round(total_transfer / total_money * 100) if total_money else 0,
+            }
         })
