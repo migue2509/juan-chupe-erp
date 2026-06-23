@@ -178,9 +178,19 @@ export default function Billing() {
               <span className="text-sm tabular-nums text-gray-500">{fmtTime(inv.created_at)}</span>
               <span className="text-sm tabular-nums text-gray-400">{fmtDate(inv.created_at)}</span>
               <span className="text-sm text-gray-700">{inv.sale_detail?.seller_name || '—'}</span>
-              <span className="text-sm font-bold text-brand-pink tabular-nums">{fmt(inv.sale_detail?.total || 0)}</span>
-              <span className={`badge text-xs w-fit ${inv.sale_detail?.is_delivery ? 'badge-cyan' : 'badge-pink'}`}>
-                {inv.sale_detail?.is_delivery ? 'Domicilio' : 'POS'}
+              <span className="tabular-nums">
+                <span className="text-sm font-bold text-brand-pink">
+                  {fmt(inv.sale_detail?.is_courtesy ? (inv.sale_detail?.courtesy_paid || 0) : (inv.sale_detail?.total || 0))}
+                </span>
+                {inv.sale_detail?.is_courtesy && (
+                  <span className="block text-[10px] text-gray-400 leading-none">factura {fmt(inv.sale_detail?.total || 0)}</span>
+                )}
+              </span>
+              <span className={`badge text-xs w-fit ${
+                inv.sale_detail?.is_courtesy ? 'bg-pink-100 text-pink-600' :
+                inv.sale_detail?.is_delivery ? 'badge-cyan' : 'badge-pink'}`}>
+                {inv.sale_detail?.is_courtesy ? 'Cortesía' :
+                 inv.sale_detail?.is_delivery ? 'Domicilio' : 'POS'}
               </span>
               <span className={`badge text-xs w-fit ${PAYMENT_BADGE[inv.sale_detail?.payment_method] ?? 'badge-gray'}`}>
                 {PAYMENT_LABELS[inv.sale_detail?.payment_method] ?? inv.sale_detail?.payment_method}
@@ -366,9 +376,30 @@ export default function Billing() {
                       <p className="text-gray-600">{sale.notes}</p>
                     </div>
                   )}
+                  {sale.is_courtesy && (
+                    <div className="col-span-2 p-3 bg-pink-50 border border-pink-100 rounded-xl space-y-1">
+                      <p className="text-xs font-semibold text-pink-600 uppercase tracking-wide">Cortesía</p>
+                      <div className="flex justify-between text-sm">
+                        <span className="text-gray-500">Valor de la factura</span>
+                        <span className="font-medium text-gray-700">{fmt(sale.total)}</span>
+                      </div>
+                      <div className="flex justify-between text-sm">
+                        <span className="text-gray-500">Dinero recibido</span>
+                        <span className="font-medium text-green-600">{fmt(sale.courtesy_paid || 0)}</span>
+                      </div>
+                      <div className="flex justify-between text-sm border-t border-pink-100 pt-1">
+                        <span className="text-gray-500">Gasto generado</span>
+                        <span className="font-bold text-red-500">{fmt(Number(sale.total) - Number(sale.courtesy_paid || 0))}</span>
+                      </div>
+                    </div>
+                  )}
                   <div className="col-span-2 pt-2 border-t border-gray-100 flex justify-between items-center">
-                    <span className="text-sm font-semibold text-gray-500">Total</span>
-                    <span className="text-xl font-bold text-brand-pink">{fmt(sale.total)}</span>
+                    <span className="text-sm font-semibold text-gray-500">
+                      {sale.is_courtesy ? 'Recibido' : 'Total'}
+                    </span>
+                    <span className="text-xl font-bold text-brand-pink">
+                      {fmt(sale.is_courtesy ? (sale.courtesy_paid || 0) : sale.total)}
+                    </span>
                   </div>
                 </div>
               )}

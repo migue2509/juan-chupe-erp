@@ -60,15 +60,18 @@ export default function Dashboard() {
   })
 
   // ── Stats computed from filtered sales ──
-  const totalDinero    = filteredSales.reduce((sum, s) => sum + Number(s.total), 0)
+  const totalDinero    = filteredSales.reduce((sum, s) =>
+    sum + (s.is_courtesy ? Number(s.courtesy_paid || 0) : Number(s.total || 0)), 0)
   const cantidadVentas = filteredSales.length
 
   // Efectivo = ventas cash (total completo) + porción cash de ventas mixtas
+  // Cortesías: solo cuenta lo que realmente pagaron (courtesy_paid)
   const totalEfectivo = filteredSales.reduce((sum, s) => {
+    if (s.is_courtesy) return sum + Number(s.courtesy_paid || 0)
     const total = Number(s.total || 0)
     const trf   = Number(s.transfer_amount || 0)
-    if (s.payment_method === 'cash')     return sum + total
-    if (s.payment_method === 'mixed')    return sum + Math.max(0, total - trf)
+    if (s.payment_method === 'cash')  return sum + total
+    if (s.payment_method === 'mixed') return sum + Math.max(0, total - trf)
     return sum
   }, 0)
 
@@ -264,12 +267,21 @@ export default function Dashboard() {
                     {sale.seller_name || <span className="text-gray-300">—</span>}
                   </span>
                   <span>
-                    <span className={`badge text-[11px] ${sale.is_delivery ? 'badge-cyan' : 'badge-pink'}`}>
-                      {sale.is_delivery ? 'Domicilio' : 'POS'}
+                    <span className={`badge text-[11px] ${
+                      sale.is_courtesy ? 'bg-pink-100 text-pink-600' :
+                      sale.is_delivery ? 'badge-cyan' : 'badge-pink'}`}>
+                      {sale.is_courtesy ? 'Cortesía' : sale.is_delivery ? 'Domicilio' : 'POS'}
                     </span>
                   </span>
-                  <span className="text-sm font-semibold text-gray-900 tabular-nums">
-                    {fmt(sale.total)}
+                  <span className="tabular-nums">
+                    <span className="text-sm font-semibold text-gray-900">
+                      {fmt(sale.is_courtesy ? (sale.courtesy_paid || 0) : sale.total)}
+                    </span>
+                    {sale.is_courtesy && (
+                      <span className="block text-[10px] text-gray-400 leading-none">
+                        factura {fmt(sale.total)}
+                      </span>
+                    )}
                   </span>
                   <span>
                     <span className={`badge text-[11px] ${PAYMENT_BADGE[sale.payment_method] || 'badge-gray'}`}>

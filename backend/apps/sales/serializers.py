@@ -22,7 +22,9 @@ class SaleCreateSerializer(serializers.Serializer):
     cash_received = serializers.DecimalField(max_digits=10, decimal_places=0, default=Decimal('0'))
     transfer_amount = serializers.DecimalField(max_digits=10, decimal_places=0, default=Decimal('0'))
     transfer_reference = serializers.CharField(required=False, allow_blank=True)
-    is_delivery = serializers.BooleanField(default=False)
+    is_delivery   = serializers.BooleanField(default=False)
+    is_courtesy   = serializers.BooleanField(default=False)
+    courtesy_paid = serializers.DecimalField(max_digits=10, decimal_places=0, default=Decimal('0'), required=False)
     notes = serializers.CharField(required=False, allow_blank=True)
     items = SaleItemCreateSerializer(many=True, min_length=1)
 
@@ -56,5 +58,5 @@ class SaleSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'shift', 'seller', 'seller_name', 'promotion', 'promotion_name',
             'payment_method', 'cash_received', 'transfer_amount', 'transfer_reference',
-            'total', 'change_given', 'is_delivery', 'notes', 'created_at', 'items'
+            'total', 'change_given', 'is_delivery', 'is_courtesy', 'courtesy_paid', 'notes', 'created_at', 'items'
         ]

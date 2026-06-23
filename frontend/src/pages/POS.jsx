@@ -44,11 +44,13 @@ export default function POS() {
   const [cashReceived,   setCashReceived]   = useState('')
   const [transferAmount, setTransferAmount] = useState('')
   const [transferRef,    setTransferRef]    = useState('')
-  const [isDelivery,     setIsDelivery]     = useState(false)
+  const [isDelivery,        setIsDelivery]        = useState(false)
   const [deliveryAddress,   setDeliveryAddress]   = useState('')
   const [deliveryFourDigits, setDeliveryFourDigits] = useState('')
   const [deliveryNotes,     setDeliveryNotes]     = useState('')
-  const [submitting,     setSubmitting]     = useState(false)
+  const [isCourtesy,        setIsCourtesy]        = useState(false)
+  const [courtesyPaid,      setCourtesyPaid]      = useState('')
+  const [submitting,        setSubmitting]        = useState(false)
 
   useEffect(() => {
     const get = async (fn, set, label) => {
@@ -141,7 +143,8 @@ export default function POS() {
   const removeItem   = (id) => setItems(prev => prev.filter(i => i.id !== id))
   const itemTotal    = (i) => (i.unit_price + (i.topping_price || 0)) * i.qty
   const orderTotal   = items.reduce((sum, i) => sum + itemTotal(i), 0)
-  const change       = paymentMethod === 'cash' ? Math.max(0, Number(cashReceived) - orderTotal) : 0
+  const change       = paymentMethod === 'cash' && !isCourtesy ? Math.max(0, Number(cashReceived) - orderTotal) : 0
+  const courtesyDiff = isCourtesy ? Math.max(0, orderTotal - Number(courtesyPaid || 0)) : 0
 
   // ─── Submit ───────────────────────────────────────────────────────────────
   const handleSubmit = async () => {
@@ -155,14 +158,17 @@ export default function POS() {
       const promoIds = [...new Set(items.map(i => i.promoId).filter(Boolean))]
       const singlePromo = promoIds.length === 1 && items.every(i => i.promoId) ? promoIds[0] : null
 
+      const courtesyAmount = Number(courtesyPaid) || 0
       const saleRes = await createSale({
         seller_id: user?.id,
         promotion_id: singlePromo,
-        payment_method: paymentMethod,
-        cash_received: Number(cashReceived) || 0,
-        transfer_amount: Number(transferAmount) || 0,
-        transfer_reference: transferRef,
+        payment_method: isCourtesy ? 'cash' : paymentMethod,
+        cash_received: isCourtesy ? courtesyAmount : (Number(cashReceived) || 0),
+        transfer_amount: isCourtesy ? 0 : (Number(transferAmount) || 0),
+        transfer_reference: isCourtesy ? '' : transferRef,
         is_delivery: isDelivery,
+        is_courtesy: isCourtesy,
+        courtesy_paid: courtesyAmount,
         items: items.map(i => ({
           cup_size_id: i.cupSizeId || null,
           flavor_ids:  i.flavorIds || [],
@@ -196,6 +202,8 @@ export default function POS() {
       setDeliveryAddress('')
       setDeliveryFourDigits('')
       setDeliveryNotes('')
+      setIsCourtesy(false)
+      setCourtesyPaid('')
       setPaymentMethod('cash')
     } catch (err) {
       toast.error(err?.response?.data?.detail || 'Error al registrar la venta', { duration: 6000 })
@@ -546,6 +554,39 @@ export default function POS() {
                 <input className="input text-sm" placeholder="Indicaciones adicionales..."
                   value={deliveryNotes} onChange={e => setDeliveryNotes(e.target.value)} />
               </div>
+            </div>
+          )}
+
+          {/* Cortesía toggle */}
+          <label className="flex items-center gap-2.5 cursor-pointer select-none">
+            <input type="checkbox" checked={isCourtesy}
+              onChange={e => { setIsCourtesy(e.target.checked); setCourtesyPaid('') }}
+              className="w-4 h-4 accent-brand-pink" />
+            <span className="text-sm text-gray-600 flex items-center gap-1.5">
+              <svg className="w-4 h-4 text-gray-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
+              </svg>
+              Es cortesía
+            </span>
+          </label>
+
+          {/* Campos cortesía */}
+          {isCourtesy && (
+            <div className="p-3 bg-pink-50 border border-pink-100 rounded-xl space-y-2">
+              <p className="text-xs text-pink-600 font-medium">
+                La diferencia entre el total y lo recibido se registrará como gasto automáticamente.
+              </p>
+              <div>
+                <label className="label">Dinero recibido (0 si es gratis)</label>
+                <input type="number" className="input text-sm" placeholder="0" min="0"
+                  value={courtesyPaid} onChange={e => setCourtesyPaid(e.target.value)} />
+              </div>
+              {orderTotal > 0 && (
+                <div className="flex justify-between text-xs pt-1">
+                  <span className="text-gray-500">Gasto que se generará:</span>
+                  <span className="font-bold text-red-500">{fmt(courtesyDiff)}</span>
+                </div>
+              )}
             </div>
           )}
 

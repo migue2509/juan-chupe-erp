@@ -109,6 +109,9 @@ class SaleViewSet(viewsets.ReadOnlyModelViewSet):
                 except Promotion.DoesNotExist:
                     pass
 
+            is_courtesy   = data.get('is_courtesy', False)
+            courtesy_paid = Decimal(str(data.get('courtesy_paid', 0) or 0))
+
             sale = Sale.objects.create(
                 shift=shift,
                 seller=seller,
@@ -118,6 +121,8 @@ class SaleViewSet(viewsets.ReadOnlyModelViewSet):
                 transfer_amount=data.get('transfer_amount', Decimal('0')),
                 transfer_reference=data.get('transfer_reference', ''),
                 is_delivery=data.get('is_delivery', False),
+                is_courtesy=is_courtesy,
+                courtesy_paid=courtesy_paid,
                 notes=data.get('notes', ''),
             )
 
@@ -162,6 +167,22 @@ class SaleViewSet(viewsets.ReadOnlyModelViewSet):
                 sale_item.apply_inventory()
 
             sale.calculate_total()
+
+            # Auto-gasto por cortesía
+            if is_courtesy:
+                expense_amount = sale.total - courtesy_paid
+                if expense_amount > 0:
+                    from apps.expenses.models import Expense
+                    Expense.objects.create(
+                        shift=shift,
+                        registered_by=request.user,
+                        category='business',
+                        origin='delivery' if data.get('is_delivery') else 'pos',
+                        description=f'Cortesía #{sale.id}',
+                        amount=expense_amount,
+                        from_daily_cash=True,
+                        notes=data.get('notes', ''),
+                    )
 
             # Auto-create invoice
             from apps.billing.models import Invoice

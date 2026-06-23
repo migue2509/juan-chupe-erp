@@ -24,7 +24,12 @@ class Sale(models.Model):
     transfer_reference = models.CharField(max_length=100, blank=True)
     total = models.DecimalField(max_digits=10, decimal_places=0, default=Decimal('0'))
     change_given = models.DecimalField(max_digits=10, decimal_places=0, default=Decimal('0'))
-    is_delivery = models.BooleanField(default=False)
+    is_delivery  = models.BooleanField(default=False)
+    is_courtesy  = models.BooleanField(default=False, help_text='Venta marcada como cortesía')
+    courtesy_paid = models.DecimalField(
+        max_digits=10, decimal_places=0, default=Decimal('0'),
+        help_text='Dinero recibido por la cortesía (0 = completamente gratis)'
+    )
     notes = models.TextField(blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
