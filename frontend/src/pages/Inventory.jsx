@@ -171,7 +171,7 @@ export default function Inventory() {
       )}
 
       {/* Cuerpo principal — Stock + Movimientos */}
-      <div className="grid grid-cols-2 gap-5">
+      <div className="flex flex-col gap-5">
 
         {/* Stock Actual */}
         <div className="card p-0 overflow-hidden">
@@ -241,11 +241,11 @@ export default function Inventory() {
           </div>
 
           <div className="grid px-5 py-2.5 bg-slate-50 border-b border-gray-100 text-[10px] font-semibold text-gray-400 uppercase tracking-widest gap-3"
-            style={{ gridTemplateColumns: '90px 75px 1fr 65px 100px' }}>
-            {['Fecha', 'Tipo', 'Insumo', 'Cant.', 'Valor'].map(h => <span key={h}>{h}</span>)}
+            style={{ gridTemplateColumns: '110px 80px 1fr 80px 90px 100px' }}>
+            {['Fecha', 'Tipo', 'Insumo', 'Cant.', 'Factura', 'Valor'].map(h => <span key={h}>{h}</span>)}
           </div>
 
-          <div className="divide-y divide-gray-50 max-h-96 overflow-y-auto">
+          <div className="divide-y divide-gray-50 max-h-[600px] overflow-y-auto">
             {filteredMovements.length === 0 ? (
               <div className="flex items-center justify-center py-14 text-gray-300 text-sm">
                 Sin movimientos
@@ -253,17 +253,20 @@ export default function Inventory() {
             ) : filteredMovements.map(m => {
               const mv = MOVEMENT_TYPE[m.movement_type] ?? { label: m.movement_type, cls: 'bg-gray-100 text-gray-500' }
               const qty = m.quantity_units != null
-                ? `${m.movement_type === 'out' ? '-' : '+'}${m.quantity_units}`
-                : `${m.movement_type === 'out' ? '-' : '+'}${Math.round(Number(m.quantity_ml || 0)).toLocaleString('es-CO')} ml`
-              const isNeg = m.movement_type === 'out'
+                ? `${['out','sale'].includes(m.movement_type) ? '-' : '+'}${m.quantity_units}`
+                : `${['out','sale'].includes(m.movement_type) ? '-' : '+'}${Math.round(Number(m.quantity_ml || 0)).toLocaleString('es-CO')} ml`
+              const isNeg = ['out','sale'].includes(m.movement_type)
               return (
                 <div key={m.id} className="grid px-5 py-3 items-center gap-3 hover:bg-slate-50 transition-colors"
-                  style={{ gridTemplateColumns: '90px 75px 1fr 65px 100px' }}>
+                  style={{ gridTemplateColumns: '110px 80px 1fr 80px 90px 100px' }}>
                   <span className="text-xs text-gray-500 tabular-nums">{fmtDate(m.created_at)}</span>
                   <span className={`text-xs font-medium px-2 py-0.5 rounded-full w-fit ${mv.cls}`}>{mv.label}</span>
                   <span className="text-sm font-medium text-gray-800 truncate">{m.item_name}</span>
                   <span className={`text-sm font-semibold tabular-nums ${isNeg ? 'text-red-500' : 'text-green-600'}`}>
                     {qty}
+                  </span>
+                  <span className="text-xs tabular-nums text-brand-purple font-medium">
+                    {m.invoice_number ? `#${m.invoice_number}` : '—'}
                   </span>
                   <span className="text-sm tabular-nums text-gray-700 text-right">
                     {m.purchase_amount ? `$${Number(m.purchase_amount).toLocaleString('es-CO')}` : '—'}

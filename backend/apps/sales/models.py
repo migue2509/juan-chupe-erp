@@ -154,6 +154,7 @@ class SaleItem(models.Model):
                     StockMovement.objects.create(
                         movement_type='sale', topping_stock=ts,
                         quantity_units=self.quantity,
+                        sale=self.sale,
                         notes=f'Venta #{self.sale_id} — topping suelto',
                         created_by=self.sale.seller, shift=shift
                     )
@@ -176,6 +177,7 @@ class SaleItem(models.Model):
                 StockMovement.objects.create(
                     movement_type='sale', flavor_bag=bag,
                     quantity_ml=ml_per_flavor,
+                    sale=self.sale,
                     notes=f'Venta #{self.sale_id} — {self.cup_size.size}',
                     created_by=self.sale.seller, shift=shift
                 )
@@ -189,6 +191,7 @@ class SaleItem(models.Model):
             StockMovement.objects.create(
                 movement_type='sale', cup_stock=cup_stock,
                 quantity_units=self.quantity,
+                sale=self.sale,
                 notes=f'Venta #{self.sale_id}',
                 created_by=self.sale.seller, shift=shift
             )
@@ -207,6 +210,7 @@ class SaleItem(models.Model):
                 StockMovement.objects.create(
                     movement_type='sale', topping_stock=auto_ts,
                     quantity_units=self.quantity,
+                    sale=self.sale,
                     notes=f'Venta #{self.sale_id} — bolsa auto {primary_cat}',
                     created_by=self.sale.seller, shift=shift
                 )

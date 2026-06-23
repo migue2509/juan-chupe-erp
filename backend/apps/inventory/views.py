@@ -130,7 +130,10 @@ class ToppingStockViewSet(viewsets.ModelViewSet):
 
 
 class StockMovementViewSet(viewsets.ReadOnlyModelViewSet):
-    queryset = StockMovement.objects.select_related('flavor_bag', 'cup_stock', 'created_by').all()
+    queryset = StockMovement.objects.select_related(
+        'flavor_bag__flavor', 'cup_stock__cup_size', 'topping_stock__topping',
+        'created_by', 'sale__invoice'
+    ).all()
     serializer_class = StockMovementSerializer
     permission_classes = [IsAdmin]
     filterset_fields = ['movement_type', 'shift']

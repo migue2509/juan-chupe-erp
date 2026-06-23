@@ -123,6 +123,10 @@ class StockMovement(models.Model):
     quantity_units = models.IntegerField(null=True, blank=True)
     purchase_amount = models.DecimalField(max_digits=12, decimal_places=0, null=True, blank=True,
         help_text='Valor pagado en compra (solo para vasos y bolsas)')
+    sale = models.ForeignKey(
+        'sales.Sale', on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='inventory_movements', help_text='Venta que originó esta salida'
+    )
     notes = models.CharField(max_length=200, blank=True)
     created_by = models.ForeignKey('users.User', on_delete=models.SET_NULL, null=True)
     created_at = models.DateTimeField(auto_now_add=True)

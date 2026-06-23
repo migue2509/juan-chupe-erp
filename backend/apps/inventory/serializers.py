@@ -26,8 +26,9 @@ class CupStockSerializer(serializers.ModelSerializer):
 
 
 class StockMovementSerializer(serializers.ModelSerializer):
-    created_by_name = serializers.CharField(source='created_by.full_name', read_only=True)
-    item_name = serializers.SerializerMethodField()
+    created_by_name  = serializers.CharField(source='created_by.full_name', read_only=True)
+    item_name        = serializers.SerializerMethodField()
+    invoice_number   = serializers.SerializerMethodField()
 
     def get_item_name(self, obj):
         if obj.flavor_bag_id:
@@ -41,11 +42,18 @@ class StockMovementSerializer(serializers.ModelSerializer):
             except: pass
         return '—'
 
+    def get_invoice_number(self, obj):
+        if obj.sale_id:
+            try: return obj.sale.invoice.invoice_number
+            except: pass
+        return None
+
     class Meta:
         model = StockMovement
         fields = [
             'id', 'movement_type', 'flavor_bag', 'cup_stock', 'topping_stock',
             'quantity_ml', 'quantity_units', 'purchase_amount', 'notes',
+            'sale', 'invoice_number',
             'created_by', 'created_by_name', 'item_name', 'created_at', 'shift'
         ]
         read_only_fields = ['id', 'created_at', 'created_by']
