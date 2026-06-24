@@ -54,6 +54,7 @@ export default function POS() {
   const [courtesyTransferRef, setCourtesyTransferRef] = useState('')
   const [submitting,        setSubmitting]        = useState(false)
   const [transferMethods,   setTransferMethods]   = useState([])
+  const [qrZoom,            setQrZoom]            = useState(null) // { url, name }
 
   useEffect(() => {
     const get = async (fn, set, label) => {
@@ -222,6 +223,7 @@ export default function POS() {
   const promoAllFilled = promoConfig?.cups.every(c => c.flavorIds.length > 0) ?? false
 
   return (
+    <>
     <div className="flex flex-col lg:flex-row gap-5 h-full max-h-full">
 
       {/* ── Left panel ── */}
@@ -533,23 +535,51 @@ export default function POS() {
                   <p className="text-xs font-semibold text-cyan-700 uppercase tracking-wide">
                     Métodos de transferencia
                   </p>
-                  {transferMethods.filter(m => m.is_active).map(m => (
-                    <div key={m.id} className="flex gap-3 items-center bg-white rounded-lg p-2.5 border border-cyan-100">
-                      {m.qr_image_url && (
-                        <img
-                          src={m.qr_image_url}
-                          alt={`QR ${m.display_name}`}
-                          className="w-16 h-16 object-contain rounded border border-gray-100 shrink-0"
-                        />
-                      )}
-                      <div className="min-w-0">
-                        <p className="font-semibold text-gray-800 text-sm truncate">{m.display_name}</p>
-                        {m.account_number && (
-                          <p className="text-sm font-mono text-cyan-700 mt-0.5">{m.account_number}</p>
+                  {transferMethods.filter(m => m.is_active).map(m => {
+                    const providerColors = {
+                      bancolombia: 'bg-yellow-100 text-yellow-800',
+                      nequi:       'bg-purple-100 text-purple-800',
+                      daviplata:   'bg-red-100 text-red-700',
+                      other:       'bg-gray-100 text-gray-600',
+                    }
+                    const badgeCls = providerColors[m.provider] || providerColors.other
+                    return (
+                      <div key={m.id} className="flex gap-3 items-center bg-white rounded-lg p-2.5 border border-cyan-100">
+                        {m.qr_image_url ? (
+                          <button
+                            type="button"
+                            onClick={() => setQrZoom({ url: m.qr_image_url, name: m.display_name })}
+                            className="shrink-0 group relative"
+                            title="Ampliar QR"
+                          >
+                            <img
+                              src={m.qr_image_url}
+                              alt={`QR ${m.display_name}`}
+                              className="w-16 h-16 object-contain rounded border border-gray-100 group-hover:opacity-80 transition-opacity"
+                            />
+                            <span className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                              <span className="bg-black/50 rounded-full p-1">
+                                <Icon name="qr" className="w-4 h-4 text-white" />
+                              </span>
+                            </span>
+                          </button>
+                        ) : (
+                          <div className="w-16 h-16 rounded border border-dashed border-gray-200 flex items-center justify-center shrink-0">
+                            <Icon name="qr" className="w-6 h-6 text-gray-300" />
+                          </div>
                         )}
+                        <div className="min-w-0 flex-1">
+                          <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${badgeCls}`}>
+                            {m.provider_label}
+                          </span>
+                          <p className="font-semibold text-gray-800 text-sm mt-1 truncate">{m.display_name}</p>
+                          {m.account_number && (
+                            <p className="text-sm font-mono text-cyan-700">{m.account_number}</p>
+                          )}
+                        </div>
                       </div>
-                    </div>
-                  ))}
+                    )
+                  })}
                 </div>
               )}
             </div>
@@ -665,5 +695,26 @@ export default function POS() {
         </div>
       </div>
     </div>
+
+      {/* Modal QR fullscreen */}
+      {qrZoom && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-6"
+          onClick={() => setQrZoom(null)}
+        >
+          <div
+            className="bg-white rounded-2xl p-6 flex flex-col items-center gap-4 max-w-sm w-full shadow-2xl"
+            onClick={e => e.stopPropagation()}
+          >
+            <p className="font-bold text-gray-800 text-lg">{qrZoom.name}</p>
+            <img src={qrZoom.url} alt={qrZoom.name} className="w-full object-contain rounded-xl" />
+            <p className="text-xs text-gray-400">Apunta la cámara al código para transferir</p>
+            <button onClick={() => setQrZoom(null)} className="btn-ghost w-full justify-center">
+              Cerrar
+            </button>
+          </div>
+        </div>
+      )}
+    </>
   )
 }
