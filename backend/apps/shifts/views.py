@@ -57,6 +57,10 @@ class ShiftViewSet(viewsets.ReadOnlyModelViewSet):
             sales_qs = sales_qs.filter(is_delivery=True)
 
         expenses_qs = shift.expenses.all().order_by('-created_at')
+        if channel == 'pos':
+            expenses_qs = expenses_qs.filter(origin='pos')
+        elif channel == 'delivery':
+            expenses_qs = expenses_qs.filter(origin='delivery')
 
         # ── Totales del filtro activo ──
         # Nota: cash_received incluye vuelto, así que efectivo real = total - transfer_amount

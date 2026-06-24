@@ -76,10 +76,14 @@ export default function Expenses() {
   const [eForm,     setEForm]     = useState({})
   const [eSaving,   setESaving]   = useState(false)
 
-  const load = () =>
-    getExpenses().then(r => setExpenses(r.data?.results ?? r.data ?? []))
+  const load = (origin = filterOrigin) => {
+    const params = { page_size: 500 }
+    if (origin !== 'all') params.origin = origin
+    getExpenses(params).then(r => setExpenses(r.data?.results ?? r.data ?? []))
+  }
 
   useEffect(() => { load() }, [])
+  useEffect(() => { load(filterOrigin) }, [filterOrigin])
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -109,8 +113,8 @@ export default function Expenses() {
     return true
   })
 
-  const hasFilters   = descSearch || dateFrom || dateTo
-  const clearFilters = () => { setDescSearch(''); setDateFrom(''); setDateTo('') }
+  const hasFilters   = descSearch || dateFrom || dateTo || filterOrigin !== 'all'
+  const clearFilters = () => { setDescSearch(''); setDateFrom(''); setDateTo(''); setFilterOrigin('all'); load('all') }
 
   const openEdit = (e) => {
     setEditing(e)

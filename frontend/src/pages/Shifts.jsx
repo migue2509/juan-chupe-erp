@@ -559,17 +559,62 @@ function ShiftDetail({ shift, onBack, onShiftUpdate }) {
                 <h2>Gastos de la jornada</h2>
                 <span className="text-xs text-gray-400">{detail.expenses.length} registros</span>
               </div>
-              <div className="divide-y divide-gray-50">
-                {detail.expenses.map(e => (
-                  <div key={e.id} className="px-5 py-3 flex items-center justify-between hover:bg-gray-50">
-                    <div>
-                      <p className="text-sm font-medium text-gray-800">{e.description}</p>
-                      <p className="text-xs text-gray-400">{CAT_LABELS[e.category] || e.category}</p>
-                    </div>
-                    <span className="text-sm font-bold text-red-500">- {fmt(e.amount)}</span>
-                  </div>
+
+              {/* Header — mismo estilo que Expenses.jsx */}
+              <div className="grid px-5 py-2.5 bg-slate-50 border-b border-gray-100 text-[10px] font-semibold text-gray-400 uppercase tracking-widest gap-3"
+                style={{ gridTemplateColumns: '60px 130px 80px 1fr 90px 90px 80px' }}>
+                {['Hora', 'Categoría', 'Canal', 'Descripción', 'Caja', 'Método', 'Monto'].map(h => (
+                  <span key={h}>{h}</span>
                 ))}
               </div>
+
+              <div className="divide-y divide-gray-50">
+                {detail.expenses.map(e => {
+                  const CAT_BADGE = {
+                    business:   'bg-blue-50 text-blue-700',
+                    personal:   'bg-purple-50 text-purple-700',
+                    petty_cash: 'bg-amber-50 text-amber-700',
+                    supply:     'bg-green-50 text-green-700',
+                  }
+                  const ORIGIN_BADGE = { pos: 'badge-pink', delivery: 'badge-cyan' }
+                  const CAT_LABEL = {
+                    business: 'Negocio', personal: 'Personal',
+                    petty_cash: 'Caja Menor', supply: 'Mercancía',
+                  }
+                  return (
+                    <div key={e.id}
+                      className="grid px-5 py-3 items-center gap-3 hover:bg-slate-50 transition-colors"
+                      style={{ gridTemplateColumns: '60px 130px 80px 1fr 90px 90px 80px' }}>
+                      <span className="text-sm tabular-nums text-gray-500">{fmtHr(e.created_at)}</span>
+                      <span className={`text-xs font-medium px-2 py-0.5 rounded-full w-fit ${CAT_BADGE[e.category] ?? 'bg-gray-100 text-gray-600'}`}>
+                        {CAT_LABEL[e.category] ?? e.category}
+                      </span>
+                      <span className={`badge text-xs w-fit ${ORIGIN_BADGE[e.origin] ?? 'badge-gray'}`}>
+                        {e.origin === 'delivery' ? 'Domicilios' : 'POS'}
+                      </span>
+                      <div>
+                        <p className="text-sm font-medium text-gray-800 truncate">{e.description}</p>
+                      </div>
+                      <span className={`text-xs font-semibold px-2 py-0.5 rounded-full w-fit ${e.from_daily_cash ? 'bg-green-50 text-green-700' : 'bg-gray-100 text-gray-400'}`}>
+                        {e.from_daily_cash ? 'Sí' : 'No'}
+                      </span>
+                      {e.from_daily_cash ? (
+                        <span className={`text-xs font-semibold px-2 py-0.5 rounded-full w-fit ${
+                          e.payment_method === 'transfer' ? 'bg-cyan-50 text-cyan-700' : 'bg-gray-100 text-gray-700'
+                        }`}>
+                          {e.payment_method === 'transfer' ? 'Transf.' : 'Efectivo'}
+                        </span>
+                      ) : (
+                        <span className="text-xs text-gray-300">—</span>
+                      )}
+                      <span className={`text-sm font-bold tabular-nums ${e.from_daily_cash ? 'text-red-500' : 'text-gray-400'}`}>
+                        {fmt(e.amount)}
+                      </span>
+                    </div>
+                  )
+                })}
+              </div>
+
               <div className="px-5 py-3 bg-red-50 border-t border-red-100 flex justify-between text-sm font-semibold">
                 <span className="text-red-700">Total gastos</span>
                 <span className="text-red-600">- {fmt(detail.summary.total_expenses)}</span>
