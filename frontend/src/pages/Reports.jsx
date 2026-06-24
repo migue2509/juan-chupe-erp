@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useRef } from 'react'
 import { getRangeReport } from '../api'
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid,
@@ -38,12 +38,90 @@ const STATUS_META  = {
 }
 
 export default function Reports() {
-  const [period,   setPeriod]   = useState('daily')
-  const [channel,  setChannel]  = useState('all')
-  const [dateFrom, setDateFrom] = useState(localDate())
-  const [dateTo,   setDateTo]   = useState(localDate())
-  const [data,     setData]     = useState(null)
-  const [loading,  setLoading]  = useState(true)
+  const [period,      setPeriod]      = useState('daily')
+  const [channel,     setChannel]     = useState('all')
+  const [dateFrom,    setDateFrom]    = useState(localDate())
+  const [dateTo,      setDateTo]      = useState(localDate())
+  const [data,        setData]        = useState(null)
+  const [loading,     setLoading]     = useState(true)
+  const [downloading, setDownloading] = useState(false)
+  const reportRef = useRef(null)
+
+  const downloadPDF = async () => {
+    if (!reportRef.current) return
+    setDownloading(true)
+    try {
+      const [{ default: jsPDF }, { default: html2canvas }] = await Promise.all([
+        import('jspdf'),
+        import('html2canvas'),
+      ])
+
+      const el = reportRef.current
+
+      // ── Guardar estilos originales ──
+      const saved = []
+      const patch = (node, styles) => {
+        const orig = {}
+        Object.keys(styles).forEach(k => { orig[k] = node.style[k]; node.style[k] = styles[k] })
+        saved.push({ node, orig })
+      }
+
+      // 1. Expandir contenedor principal
+      patch(el, { width: '1200px', minWidth: '1200px', maxWidth: '1200px' })
+
+      // 2. Quitar altura máxima en listas recortadas
+      el.querySelectorAll('[class*="max-h"]').forEach(n =>
+        patch(n, { maxHeight: 'none', overflow: 'visible' })
+      )
+
+      // 3. Fondo blanco en SVGs / Recharts (evita negro)
+      el.querySelectorAll('svg, .recharts-wrapper').forEach(n =>
+        patch(n, { background: 'white' })
+      )
+
+      // 4. Forzar min-width:0 en celdas de grids para que truncate funcione
+      el.querySelectorAll('[style*="gridTemplateColumns"] > *').forEach(n =>
+        patch(n, { minWidth: '0', overflow: 'hidden' })
+      )
+
+      // Repintar antes de capturar
+      await new Promise(r => setTimeout(r, 150))
+
+      const canvas = await html2canvas(el, {
+        scale: 2,
+        useCORS: true,
+        backgroundColor: '#f8fafc',
+        windowWidth: 1200,
+        width: 1200,
+      })
+
+      // ── Restaurar todos los estilos ──
+      saved.reverse().forEach(({ node, orig }) =>
+        Object.keys(orig).forEach(k => { node.style[k] = orig[k] })
+      )
+
+      const imgData = canvas.toDataURL('image/png')
+      const pdf     = new jsPDF('l', 'mm', 'a4')   // landscape A4 = 297×210mm
+      const pdfW    = pdf.internal.pageSize.getWidth()
+      const pdfH    = pdf.internal.pageSize.getHeight()
+      const imgH    = (canvas.height * pdfW) / canvas.width
+
+      let posY = 0
+      while (posY < imgH) {
+        pdf.addImage(imgData, 'PNG', 0, -posY, pdfW, imgH)
+        posY += pdfH
+        if (posY < imgH) pdf.addPage()
+      }
+
+      const from  = data?.date_from ?? dateFrom
+      const to    = data?.date_to   ?? dateTo
+      const label = from === to ? from : `${from}_${to}`
+      pdf.save(`reporte-juan-chupe-${label}.pdf`)
+    } catch (e) {
+      console.error(e)
+    }
+    setDownloading(false)
+  }
 
   const getRange = useCallback(() => {
     if (period === 'daily')   return [today(), today()]
@@ -77,9 +155,25 @@ export default function Reports() {
     <div className="space-y-5">
 
       {/* Header */}
-      <div>
-        <h1>Reportes</h1>
-        <p className="text-sm text-gray-400 mt-0.5">Análisis de ventas, domicilios y gastos por período</p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1>Reportes</h1>
+          <p className="text-sm text-gray-400 mt-0.5">Análisis de ventas, domicilios y gastos por período</p>
+        </div>
+        {data && !loading && (
+          <button onClick={downloadPDF} disabled={downloading}
+            className="btn-secondary flex items-center gap-2">
+            {downloading
+              ? <span className="w-4 h-4 border-2 border-gray-400 border-t-transparent rounded-full animate-spin" />
+              : <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                  <polyline points="7 10 12 15 17 10"/>
+                  <line x1="12" y1="15" x2="12" y2="3"/>
+                </svg>
+            }
+            {downloading ? 'Generando PDF...' : 'Descargar PDF'}
+          </button>
+        )}
       </div>
 
       {/* Controles: período + canal */}
@@ -140,7 +234,36 @@ export default function Reports() {
       ) : !data ? (
         <div className="flex justify-center py-20 text-gray-300 text-sm">Sin datos para este período</div>
       ) : (
-        <div className="space-y-5">
+        <div className="space-y-5" ref={reportRef}>
+
+          {/* ── Encabezado PDF ── */}
+          <div className="card flex items-center justify-between py-4 px-6 border-l-4 border-brand-pink">
+            <div className="flex items-center gap-4">
+              <img src="/logo-neon.png" alt="Juan Chupe" className="h-10 w-auto object-contain"
+                onError={e => { e.target.style.display = 'none' }} />
+              <div>
+                <p className="text-lg font-bold text-gray-900">Juan Chupe ERP</p>
+                <p className="text-xs text-gray-400">Sistema de gestión operativa</p>
+              </div>
+            </div>
+            <div className="text-right">
+              <p className="text-xs text-gray-400 mb-1">Powered by <span className="font-semibold text-gray-500">Opia Systems</span></p>
+              <p className="text-sm font-semibold text-gray-700">
+                {(() => {
+                  const from = data.date_from
+                  const to   = data.date_to
+                  const d1   = new Date(from + 'T12:00:00')
+                  const d2   = new Date(to   + 'T12:00:00')
+                  return from === to
+                    ? d1.toLocaleDateString('es-CO', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
+                    : `${d1.toLocaleDateString('es-CO', { day: 'numeric', month: 'short' })} — ${d2.toLocaleDateString('es-CO', { day: 'numeric', month: 'short', year: 'numeric' })}`
+                })()}
+              </p>
+              <p className="text-xs text-gray-400 mt-0.5 capitalize">
+                Canal: {CHANNELS.find(c => c.key === channel)?.label} · {data.sales_count} venta{data.sales_count !== 1 ? 's' : ''}
+              </p>
+            </div>
+          </div>
 
           {/* ── Stats resumen ── */}
           <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
@@ -322,7 +445,7 @@ export default function Reports() {
                 <>
                   {/* Header tabla */}
                   <div className="grid px-5 py-2 bg-slate-50 border-b border-gray-100 text-[10px] font-semibold text-gray-400 uppercase tracking-widest"
-                    style={{ gridTemplateColumns: '1fr 90px 110px 90px 100px' }}>
+                    style={{ gridTemplateColumns: '2fr 1fr 1fr 1fr 1fr' }}>
                     <span>Categoría</span>
                     <span>Efectivo</span>
                     <span>Transferencia</span>
@@ -339,7 +462,7 @@ export default function Reports() {
                         return (
                           <div key={key} className="px-5 py-3 space-y-1.5">
                             <div className="grid items-center text-sm"
-                              style={{ gridTemplateColumns: '1fr 90px 110px 90px 100px' }}>
+                              style={{ gridTemplateColumns: '2fr 1fr 1fr 1fr 1fr' }}>
                               <span className="text-gray-700 font-medium truncate">{label}</span>
                               <span className="tabular-nums text-gray-700">
                                 {cash > 0 ? fmt(cash) : <span className="text-gray-300">—</span>}
