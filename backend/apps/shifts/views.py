@@ -35,3 +35,110 @@ class ShiftViewSet(viewsets.ReadOnlyModelViewSet):
         if not shift:
             return Response({'detail': 'No hay jornada activa.', 'shift': None})
         return Response({'shift': ShiftSerializer(shift).data})
+
+    @action(detail=True, methods=['get'], permission_classes=[IsAdmin], url_path='detail')
+    def shift_detail(self, request, pk=None):
+        """
+        Resumen completo de una jornada: ventas, gastos, totales.
+        Query param: channel = all | pos | delivery
+        """
+        from apps.sales.models import Sale
+        from apps.expenses.models import Expense
+
+        shift   = self.get_object()
+        channel = request.query_params.get('channel', 'all')
+
+        sales_qs = Sale.objects.filter(shift=shift).prefetch_related('items__cup_size')
+        if channel == 'pos':
+            sales_qs = sales_qs.filter(is_delivery=False)
+        elif channel == 'delivery':
+            sales_qs = sales_qs.filter(is_delivery=True)
+
+        expenses_qs = shift.expenses.all().order_by('-created_at')
+
+        # ── Totales del filtro activo ──
+        # Nota: cash_received incluye vuelto, así que efectivo real = total - transfer_amount
+        total_sales    = sum(s.total for s in sales_qs)
+        total_transfer = sum(s.transfer_amount for s in sales_qs)
+        total_cash     = total_sales - total_transfer
+        total_expenses = sum(e.amount for e in expenses_qs)
+
+        # ── Desglose completo por canal (siempre, independiente del filtro) ──
+        all_sales  = Sale.objects.filter(shift=shift)
+        pos_sales  = list(all_sales.filter(is_delivery=False))
+        dom_sales  = list(all_sales.filter(is_delivery=True))
+
+        # efectivo real = total de la venta - lo que fue por transferencia
+        def _transfer(lst): return sum(s.transfer_amount for s in lst)
+        def _cash(lst):     return _total(lst) - _transfer(lst)
+        def _total(lst):    return sum(s.total for s in lst)
+
+        pos_total       = _total(pos_sales)
+        pos_cash        = _cash(pos_sales)
+        pos_transfer    = _transfer(pos_sales)
+        dom_total       = _total(dom_sales)
+        dom_cash        = _cash(dom_sales)
+        dom_transfer    = _transfer(dom_sales)
+        all_total       = pos_total + dom_total
+
+        expenses_pos = sum(e.amount for e in expenses_qs if not getattr(e, 'is_delivery_expense', False))
+        expenses_dom = 0  # modelo actual no distingue canal en gastos
+
+        # ── Ventas serializadas ligeramente ──
+        sales_data = []
+        for s in sales_qs.order_by('-created_at'):
+            sales_data.append({
+                'id':             s.id,
+                'total':          int(s.total),
+                'payment_method': s.payment_method,
+                'cash_received':  int(s.cash_received),
+                'transfer_amount':int(s.transfer_amount),
+                'is_delivery':    s.is_delivery,
+                'is_courtesy':    s.is_courtesy,
+                'created_at':     s.created_at,
+                'seller':         s.seller.full_name if s.seller else '—',
+                'items_count':    s.items.count(),
+            })
+
+        expenses_data = []
+        for e in expenses_qs:
+            expenses_data.append({
+                'id':          e.id,
+                'description': e.description,
+                'amount':      int(e.amount),
+                'category':    e.category,
+                'created_at':  e.created_at,
+            })
+
+        # ── Arqueo existente ──
+        arqueo = None
+        try:
+            arqueo = {'id': shift.cash_audit.id}
+        except Exception:
+            pass
+
+        return Response({
+            'shift': ShiftSerializer(shift).data,
+            'summary': {
+                # filtro activo
+                'total_sales':    int(total_sales),
+                'total_cash':     int(total_cash),
+                'total_transfer': int(total_transfer),
+                'total_expenses': int(total_expenses),
+                'net_cash':       int(total_cash - total_expenses),
+                'sales_count':    sales_qs.count(),
+                # desglose completo (independiente del filtro)
+                'all_total':      int(all_total),
+                'pos_total':      int(pos_total),
+                'pos_cash':       int(pos_cash),
+                'pos_transfer':   int(pos_transfer),
+                'pos_expenses':   int(total_expenses),   # todos los gastos son del shift
+                'dom_total':      int(dom_total),
+                'dom_cash':       int(dom_cash),
+                'dom_transfer':   int(dom_transfer),
+                'dom_expenses':   0,
+            },
+            'sales':    sales_data,
+            'expenses': expenses_data,
+            'arqueo':   arqueo,
+        })

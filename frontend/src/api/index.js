@@ -75,8 +75,9 @@ export const createDomiciliario = (data)   => api.post('/deliveries/domiciliario
 export const updateDomiciliario = (id, data) => api.patch(`/deliveries/domiciliarios/${id}/`, data)
 
 // Cash audit
-export const getCashAuditPrefill = () => api.get('/cash/prefill/')
-export const createCashAudit = (data) => api.post('/cash/', data)
+export const getCashAuditPrefill   = (params) => api.get('/cash/prefill/', { params })
+export const createCashAudit       = (data)   => api.post('/cash/', data)
+export const getShiftDetail        = (id, channel = 'all') => api.get(`/shifts/${id}/detail/`, { params: { channel } })
 
 // Attendance
 export const getTodayAttendance   = ()       => api.get('/attendance/today/')

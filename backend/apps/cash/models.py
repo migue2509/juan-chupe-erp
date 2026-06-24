@@ -45,3 +45,38 @@ class CashAudit(models.Model):
         )
         self.cash_difference = self.actual_cash - (self.expected_cash - total_expenses)
         self.save()
+
+
+class ShiftAuditItem(models.Model):
+    """Fila del arqueo físico de inventario por jornada"""
+    PRODUCT_TYPE_CHOICES = [
+        ('cup',     'Vaso'),
+        ('topping', 'Topping'),
+        ('other',   'Otro'),
+    ]
+
+    audit        = models.ForeignKey(CashAudit, on_delete=models.CASCADE, related_name='items')
+    product_name = models.CharField(max_length=100)
+    product_type = models.CharField(max_length=20, choices=PRODUCT_TYPE_CHOICES, default='cup')
+    unit_price   = models.DecimalField(max_digits=10, decimal_places=0, default=0)
+
+    # Columnas del arqueo físico
+    opening_stock = models.IntegerField(default=0, help_text='Stock al iniciar la jornada')
+    entries       = models.IntegerField(default=0, help_text='Entradas durante la jornada')
+    closing_stock = models.IntegerField(default=0, help_text='Stock al cerrar la jornada')
+
+    @property
+    def available(self):
+        return self.opening_stock + self.entries
+
+    @property
+    def sold(self):
+        return max(0, self.available - self.closing_stock)
+
+    class Meta:
+        verbose_name = 'Item de Arqueo'
+        verbose_name_plural = 'Items de Arqueo'
+        ordering = ['product_type', 'product_name']
+
+    def __str__(self):
+        return f'{self.product_name} — vendido: {self.sold}'
