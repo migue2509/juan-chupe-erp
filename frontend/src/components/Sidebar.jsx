@@ -28,6 +28,7 @@ const NAV_ADMIN = [
   { to: '/users',      label: 'Usuarios',       icon: 'users' },
   { to: '/attendance', label: 'Asistencia',     icon: 'attendance' },
   { to: '/payroll',    label: 'Nómina',         icon: 'cash' },
+  { to: '/config-pos', label: 'Config Pagos',   icon: 'config' },
 ]
 
 export default function Sidebar() {

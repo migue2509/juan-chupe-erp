@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { getFlavors, getCupSizes, getToppings, getActivePromotions, createSale, createDelivery } from '../api/index'
+import { getFlavors, getCupSizes, getToppings, getActivePromotions, createSale, createDelivery, getTransferMethods } from '../api/index'
 import { Icon } from '../components/Icons'
 import { useAuth } from '../context/AuthContext'
 import toast from 'react-hot-toast'
@@ -53,6 +53,7 @@ export default function POS() {
   const [courtesyMethod,    setCourtesyMethod]    = useState('cash')  // 'cash' | 'transfer'
   const [courtesyTransferRef, setCourtesyTransferRef] = useState('')
   const [submitting,        setSubmitting]        = useState(false)
+  const [transferMethods,   setTransferMethods]   = useState([])
 
   useEffect(() => {
     const get = async (fn, set, label) => {
@@ -63,6 +64,7 @@ export default function POS() {
     get(getCupSizes,         setCupSizes,   'vasos')
     get(getToppings,         setToppings,   'toppings')
     get(getActivePromotions, setPromotions, 'promos')
+    get(getTransferMethods,  setTransferMethods, 'transfer-methods')
   }, [])
 
   // ─── Item regular ─────────────────────────────────────────────────────────
@@ -524,6 +526,32 @@ export default function POS() {
                 <input type="text" className="input" placeholder="# comprobante" value={transferRef}
                   onChange={e => setTransferRef(e.target.value)} />
               </div>
+
+              {/* Panel de métodos de transferencia */}
+              {transferMethods.filter(m => m.is_active).length > 0 && (
+                <div className="rounded-xl border border-cyan-100 bg-cyan-50 p-3 space-y-3">
+                  <p className="text-xs font-semibold text-cyan-700 uppercase tracking-wide">
+                    Métodos de transferencia
+                  </p>
+                  {transferMethods.filter(m => m.is_active).map(m => (
+                    <div key={m.id} className="flex gap-3 items-center bg-white rounded-lg p-2.5 border border-cyan-100">
+                      {m.qr_image_url && (
+                        <img
+                          src={m.qr_image_url}
+                          alt={`QR ${m.display_name}`}
+                          className="w-16 h-16 object-contain rounded border border-gray-100 shrink-0"
+                        />
+                      )}
+                      <div className="min-w-0">
+                        <p className="font-semibold text-gray-800 text-sm truncate">{m.display_name}</p>
+                        {m.account_number && (
+                          <p className="text-sm font-mono text-cyan-700 mt-0.5">{m.account_number}</p>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           )}
 

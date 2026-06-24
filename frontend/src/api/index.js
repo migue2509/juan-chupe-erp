@@ -114,3 +114,9 @@ export const getWeeklyReport   = () => api.get('/reports/weekly/')
 export const getMonthlyReport  = () => api.get('/reports/monthly/')
 export const getInventoryStatus= () => api.get('/reports/inventory/')
 export const getRangeReport    = (dateFrom, dateTo, channel = 'all') => api.get('/reports/range/', { params: { date_from: dateFrom, date_to: dateTo, channel } })
+
+// ── Config POS ──────────────────────────────────────────────────────────────
+export const getTransferMethods    = ()       => api.get('/store-config/transfer-methods/')
+export const createTransferMethod  = (data)   => api.post('/store-config/transfer-methods/', data)
+export const updateTransferMethod  = (id, data) => api.patch(`/store-config/transfer-methods/${id}/`, data)
+export const deleteTransferMethod  = (id)     => api.delete(`/store-config/transfer-methods/${id}/`)
