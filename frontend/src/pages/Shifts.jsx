@@ -275,6 +275,7 @@ function ShiftDetail({ shift, onBack, onShiftUpdate }) {
   const [detail, setDetail]     = useState(null)
   const [loading, setLoading]   = useState(true)
   const [showArqueo, setShowArqueo] = useState(false)
+  const [expandedSale, setExpandedSale] = useState(null)
 
   const load = async (ch = channel) => {
     setLoading(true)
@@ -427,23 +428,109 @@ function ShiftDetail({ shift, onBack, onShiftUpdate }) {
               ? <p className="text-center text-gray-400 text-sm py-8">Sin ventas en este canal</p>
               : (
                 <div className="divide-y divide-gray-50">
-                  {detail.sales.map(s => (
-                    <div key={s.id} className="px-5 py-3 flex items-center justify-between hover:bg-gray-50">
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <span className="text-sm font-semibold text-gray-800">#{s.id}</span>
-                          {s.is_delivery && <span className="badge-cyan text-[10px]">Domicilio</span>}
-                          {s.is_courtesy && <span className="badge-amber text-[10px]">Cortesía</span>}
-                          <span className="text-xs text-gray-400">{s.seller}</span>
-                        </div>
-                        <p className="text-xs text-gray-400 mt-0.5">
-                          {fmtHr(s.created_at)} · {PAYMENT_LABELS[s.payment_method] || s.payment_method}
-                          {s.transfer_amount > 0 && ` · Transfer: ${fmt(s.transfer_amount)}`}
-                        </p>
+                  {detail.sales.map(s => {
+                    const isOpen = expandedSale === s.id
+                    return (
+                      <div key={s.id}>
+                        {/* Fila principal — clickeable */}
+                        <button
+                          type="button"
+                          onClick={() => setExpandedSale(isOpen ? null : s.id)}
+                          className="w-full px-5 py-3 flex items-center justify-between hover:bg-gray-50 text-left transition-colors"
+                        >
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="text-sm font-semibold text-gray-800">#{s.id}</span>
+                              {s.is_delivery && <span className="badge-cyan text-[10px]">Domicilio</span>}
+                              {s.is_courtesy && <span className="badge-amber text-[10px]">Cortesía</span>}
+                              <span className="text-xs text-gray-400">{s.seller}</span>
+                            </div>
+                            <p className="text-xs text-gray-400 mt-0.5">
+                              {fmtHr(s.created_at)} · {PAYMENT_LABELS[s.payment_method] || s.payment_method}
+                              {s.transfer_amount > 0 && ` · Transfer: ${fmt(s.transfer_amount)}`}
+                            </p>
+                          </div>
+                          <div className="flex items-center gap-3 shrink-0">
+                            <span className="text-sm font-bold text-gray-900">{fmt(s.total)}</span>
+                            <svg
+                              className={`w-4 h-4 text-gray-400 transition-transform ${isOpen ? 'rotate-180' : ''}`}
+                              fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"
+                            >
+                              <polyline points="6 9 12 15 18 9" />
+                            </svg>
+                          </div>
+                        </button>
+
+                        {/* Detalle expandible */}
+                        {isOpen && (
+                          <div className="bg-gray-50 border-t border-gray-100 px-5 py-3 space-y-2">
+                            {/* Items */}
+                            {(s.items || []).length > 0 && (
+                              <div className="space-y-1.5">
+                                {s.items.map((item, idx) => (
+                                  <div key={idx} className="flex items-start justify-between gap-2">
+                                    <div className="text-xs text-gray-700 flex-1">
+                                      <span className="font-semibold">
+                                        {item.cup_size ? `Vaso ${item.cup_size}` : item.topping || 'Ítem'}
+                                        {item.qty > 1 && ` ×${item.qty}`}
+                                      </span>
+                                      {item.flavors?.length > 0 && (
+                                        <span className="text-gray-400"> · {item.flavors.join(' + ')}</span>
+                                      )}
+                                      {item.topping && item.cup_size && (
+                                        <span className="text-gray-400"> · {item.topping}</span>
+                                      )}
+                                    </div>
+                                    <span className="text-xs font-semibold text-gray-700 shrink-0">{fmt(item.subtotal)}</span>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+
+                            {/* Pago */}
+                            <div className="border-t border-gray-200 pt-2 flex flex-col gap-0.5 text-xs text-gray-500">
+                              {s.payment_method === 'cash' || s.payment_method === 'mixed' ? (
+                                <div className="flex justify-between">
+                                  <span>Efectivo recibido</span>
+                                  <span>{fmt(s.cash_received)}</span>
+                                </div>
+                              ) : null}
+                              {s.change_given > 0 && (
+                                <div className="flex justify-between">
+                                  <span>Cambio</span>
+                                  <span>{fmt(s.change_given)}</span>
+                                </div>
+                              )}
+                              {s.transfer_amount > 0 && (
+                                <div className="flex justify-between">
+                                  <span>Transferencia</span>
+                                  <span>{fmt(s.transfer_amount)}</span>
+                                </div>
+                              )}
+                              {s.transfer_reference && (
+                                <div className="flex justify-between">
+                                  <span>Referencia</span>
+                                  <span className="font-mono">{s.transfer_reference}</span>
+                                </div>
+                              )}
+                              {s.is_courtesy && s.courtesy_paid > 0 && (
+                                <div className="flex justify-between">
+                                  <span>Pagado (cortesía)</span>
+                                  <span>{fmt(s.courtesy_paid)}</span>
+                                </div>
+                              )}
+                              {s.notes && (
+                                <div className="flex justify-between gap-4">
+                                  <span>Notas</span>
+                                  <span className="text-right text-gray-600">{s.notes}</span>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        )}
                       </div>
-                      <span className="text-sm font-bold text-gray-900">{fmt(s.total)}</span>
-                    </div>
-                  ))}
+                    )
+                  })}
                 </div>
               )
             }

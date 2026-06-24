@@ -48,7 +48,9 @@ class ShiftViewSet(viewsets.ReadOnlyModelViewSet):
         shift   = self.get_object()
         channel = request.query_params.get('channel', 'all')
 
-        sales_qs = Sale.objects.filter(shift=shift).prefetch_related('items__cup_size')
+        sales_qs = Sale.objects.filter(shift=shift).prefetch_related(
+            'items__cup_size', 'items__topping', 'items__saleitems_flavors__flavor'
+        )
         if channel == 'pos':
             sales_qs = sales_qs.filter(is_delivery=False)
         elif channel == 'delivery':
@@ -92,17 +94,33 @@ class ShiftViewSet(viewsets.ReadOnlyModelViewSet):
         # ── Ventas serializadas ligeramente ──
         sales_data = []
         for s in sales_qs.order_by('-created_at'):
+            items_detail = []
+            for item in s.items.all():
+                flavor_names = [sf.flavor.name for sf in item.saleitems_flavors.all()]
+                items_detail.append({
+                    'cup_size':     item.cup_size.size if item.cup_size else None,
+                    'flavors':      flavor_names,
+                    'topping':      item.topping.name if item.topping else None,
+                    'qty':          item.quantity,
+                    'unit_price':   int(item.unit_price),
+                    'topping_price':int(item.topping_price),
+                    'subtotal':     int(item.subtotal),
+                })
             sales_data.append({
                 'id':             s.id,
                 'total':          int(s.total),
                 'payment_method': s.payment_method,
                 'cash_received':  int(s.cash_received),
                 'transfer_amount':int(s.transfer_amount),
+                'transfer_reference': s.transfer_reference,
                 'is_delivery':    s.is_delivery,
                 'is_courtesy':    s.is_courtesy,
+                'courtesy_paid':  int(s.courtesy_paid),
+                'change_given':   int(s.change_given),
+                'notes':          s.notes,
                 'created_at':     s.created_at,
                 'seller':         s.seller.full_name if s.seller else '—',
-                'items_count':    s.items.count(),
+                'items':          items_detail,
             })
 
         expenses_data = []
