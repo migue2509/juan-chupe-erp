@@ -143,7 +143,7 @@ export default function Reports() {
         <div className="space-y-5">
 
           {/* ── Stats resumen ── */}
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
             <div className="stat-card">
               <span className="stat-label">Total recibido</span>
               <span className="stat-value text-brand-pink">{fmt(data.total_sales)}</span>
@@ -153,14 +153,22 @@ export default function Reports() {
               <span className="stat-value text-brand-cyan">{fmt(data.total_cash)}</span>
             </div>
             <div className="stat-card">
+              <span className="stat-label">Neto efectivo</span>
+              <span className={`stat-value ${(data.net_efectivo ?? 0) < 0 ? 'text-red-500' : 'text-green-600'}`}>
+                {fmt(data.net_efectivo ?? 0)}
+              </span>
+              <p className="text-[10px] text-gray-400 mt-0.5">Efectivo − gastos efectivo</p>
+            </div>
+            <div className="stat-card">
               <span className="stat-label">Transferencias</span>
               <span className="stat-value text-brand-purple">{fmt(data.total_transfer)}</span>
             </div>
             <div className="stat-card">
-              <span className="stat-label">Neto en caja</span>
-              <span className={`stat-value ${data.net_cash < 0 ? 'text-red-500' : 'text-green-600'}`}>
-                {fmt(data.net_cash)}
+              <span className="stat-label">Neto transferencias</span>
+              <span className={`stat-value ${(data.net_transfer ?? 0) < 0 ? 'text-red-500' : 'text-green-600'}`}>
+                {fmt(data.net_transfer ?? 0)}
               </span>
+              <p className="text-[10px] text-gray-400 mt-0.5">Transf. − gastos transf.</p>
             </div>
           </div>
 
@@ -314,39 +322,77 @@ export default function Reports() {
                 <>
                   {/* Header tabla */}
                   <div className="grid px-5 py-2 bg-slate-50 border-b border-gray-100 text-[10px] font-semibold text-gray-400 uppercase tracking-widest"
-                    style={{ gridTemplateColumns: '1fr 100px 110px 100px' }}>
+                    style={{ gridTemplateColumns: '1fr 90px 110px 90px 100px' }}>
                     <span>Categoría</span>
                     <span>Efectivo</span>
                     <span>Transferencia</span>
+                    <span>Afecta caja</span>
                     <span className="text-right">Total</span>
                   </div>
                   <div className="divide-y divide-gray-50">
-                    {data.expense_by_cat.map(e => {
+                    {data.expense_by_cat.flatMap(e => {
                       const maxTotal = data.expense_by_cat[0]?.total || 1
-                      const pct = Math.round((e.total / maxTotal) * 100)
-                      return (
-                        <div key={e.category} className="px-5 py-3 space-y-1.5">
-                          <div className="grid items-center text-sm"
-                            style={{ gridTemplateColumns: '1fr 100px 110px 100px' }}>
-                            <span className="text-gray-700 font-medium truncate">{e.category}</span>
-                            <span className="tabular-nums text-gray-700">
-                              {e.cash > 0 ? fmt(e.cash) : <span className="text-gray-300">—</span>}
-                            </span>
-                            <span className="tabular-nums text-cyan-700">
-                              {e.transfer > 0 ? fmt(e.transfer) : <span className="text-gray-300">—</span>}
-                            </span>
-                            <span className="font-bold text-red-500 tabular-nums text-right">{fmt(e.total)}</span>
+                      const hasMix = e.afecta_caja > 0 && e.no_afecta > 0
+
+                      const Row = ({ label, amount, cash, transfer, afectaCaja, key }) => {
+                        const pct = Math.round((amount / maxTotal) * 100)
+                        return (
+                          <div key={key} className="px-5 py-3 space-y-1.5">
+                            <div className="grid items-center text-sm"
+                              style={{ gridTemplateColumns: '1fr 90px 110px 90px 100px' }}>
+                              <span className="text-gray-700 font-medium truncate">{label}</span>
+                              <span className="tabular-nums text-gray-700">
+                                {cash > 0 ? fmt(cash) : <span className="text-gray-300">—</span>}
+                              </span>
+                              <span className="tabular-nums text-cyan-700">
+                                {transfer > 0 ? fmt(transfer) : <span className="text-gray-300">—</span>}
+                              </span>
+                              <span>
+                                {afectaCaja
+                                  ? <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-green-50 text-green-700">Sí</span>
+                                  : <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-gray-100 text-gray-400">No</span>
+                                }
+                              </span>
+                              <span className="font-bold text-red-500 tabular-nums text-right">{fmt(amount)}</span>
+                            </div>
+                            <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden flex">
+                              {cash > 0     && <div className="h-full bg-gray-400" style={{ width: `${Math.round((cash / amount) * pct)}%` }} />}
+                              {transfer > 0 && <div className="h-full bg-cyan-400"  style={{ width: `${Math.round((transfer / amount) * pct)}%` }} />}
+                            </div>
                           </div>
-                          <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden flex">
-                            {e.cash > 0 && (
-                              <div className="h-full bg-gray-400" style={{ width: `${Math.round((e.cash / e.total) * pct)}%` }} />
-                            )}
-                            {e.transfer > 0 && (
-                              <div className="h-full bg-cyan-400" style={{ width: `${Math.round((e.transfer / e.total) * pct)}%` }} />
-                            )}
-                          </div>
-                        </div>
-                      )
+                        )
+                      }
+
+                      if (!hasMix) {
+                        return [<Row
+                          key={e.category}
+                          label={e.category}
+                          amount={e.total}
+                          cash={e.cash}
+                          transfer={e.transfer}
+                          afectaCaja={e.afecta_caja > 0}
+                        />]
+                      }
+
+                      // Split en dos filas cuando hay mezcla
+                      return [
+                        <Row
+                          key={`${e.category}-caja`}
+                          label={`${e.category} · afecta caja`}
+                          amount={e.afecta_caja}
+                          cash={e.cash}
+                          transfer={e.transfer}
+                          afectaCaja={true}
+                        />,
+                        <Row
+                          key={`${e.category}-nocaja`}
+                          label={`${e.category} · no afecta caja`}
+                          amount={e.no_afecta}
+                          cash={0}
+                          transfer={0}
+                          afectaCaja={false}
+                        />,
+                      ]
                     })}
                   </div>
                 </>

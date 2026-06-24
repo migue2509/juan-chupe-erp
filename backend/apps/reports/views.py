@@ -218,13 +218,19 @@ class RangeReportView(APIView):
             qs_cat = expenses_qs.filter(category=cat)
             total    = float(qs_cat.aggregate(t=Sum('amount'))['t'] or 0)
             if total > 0:
-                cash_amt     = float(qs_cat.filter(payment_method='cash').aggregate(t=Sum('amount'))['t'] or 0)
-                transfer_amt = float(qs_cat.filter(payment_method='transfer').aggregate(t=Sum('amount'))['t'] or 0)
+                qs_box     = qs_cat.filter(from_daily_cash=True)
+                qs_no_box  = qs_cat.filter(from_daily_cash=False)
+                cash_amt     = float(qs_box.filter(payment_method='cash').aggregate(t=Sum('amount'))['t'] or 0)
+                transfer_amt = float(qs_box.filter(payment_method='transfer').aggregate(t=Sum('amount'))['t'] or 0)
+                afecta_caja  = float(qs_box.aggregate(t=Sum('amount'))['t'] or 0)
+                no_afecta    = float(qs_no_box.aggregate(t=Sum('amount'))['t'] or 0)
                 expense_by_cat.append({
-                    'category': label,
-                    'total':    total,
-                    'cash':     cash_amt,
-                    'transfer': transfer_amt,
+                    'category':    label,
+                    'total':       total,
+                    'cash':        cash_amt,
+                    'transfer':    transfer_amt,
+                    'afecta_caja': afecta_caja,
+                    'no_afecta':   no_afecta,
                 })
         expense_by_cat.sort(key=lambda x: x['total'], reverse=True)
 
@@ -260,6 +266,7 @@ class RangeReportView(APIView):
             'total_expenses_transfer': total_expenses_transfer,
             'net_cash':                total_money - total_expenses,
             'net_efectivo':            total_cash - total_expenses_cash,
+            'net_transfer':            total_transfer - total_expenses_transfer,
             'sales_count':    sales.count(),
             'sellers':        sellers,
             'cup_sales':      cup_sales,
