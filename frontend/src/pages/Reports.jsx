@@ -311,29 +311,61 @@ export default function Reports() {
               {data.expense_by_cat.length === 0 ? (
                 <div className="flex items-center justify-center py-10 text-gray-300 text-sm">Sin gastos</div>
               ) : (
-                <div className="divide-y divide-gray-50">
-                  {data.expense_by_cat.map(e => {
-                    const maxTotal = data.expense_by_cat[0]?.total || 1
-                    const pct = Math.round((e.total / maxTotal) * 100)
-                    return (
-                      <div key={e.category} className="px-5 py-3 space-y-1.5">
-                        <div className="flex justify-between text-sm">
-                          <span className="text-gray-700 font-medium">{e.category}</span>
-                          <span className="font-bold text-red-500 tabular-nums">{fmt(e.total)}</span>
+                <>
+                  {/* Header tabla */}
+                  <div className="grid px-5 py-2 bg-slate-50 border-b border-gray-100 text-[10px] font-semibold text-gray-400 uppercase tracking-widest"
+                    style={{ gridTemplateColumns: '1fr 100px 110px 100px' }}>
+                    <span>Categoría</span>
+                    <span>Efectivo</span>
+                    <span>Transferencia</span>
+                    <span className="text-right">Total</span>
+                  </div>
+                  <div className="divide-y divide-gray-50">
+                    {data.expense_by_cat.map(e => {
+                      const maxTotal = data.expense_by_cat[0]?.total || 1
+                      const pct = Math.round((e.total / maxTotal) * 100)
+                      return (
+                        <div key={e.category} className="px-5 py-3 space-y-1.5">
+                          <div className="grid items-center text-sm"
+                            style={{ gridTemplateColumns: '1fr 100px 110px 100px' }}>
+                            <span className="text-gray-700 font-medium truncate">{e.category}</span>
+                            <span className="tabular-nums text-gray-700">
+                              {e.cash > 0 ? fmt(e.cash) : <span className="text-gray-300">—</span>}
+                            </span>
+                            <span className="tabular-nums text-cyan-700">
+                              {e.transfer > 0 ? fmt(e.transfer) : <span className="text-gray-300">—</span>}
+                            </span>
+                            <span className="font-bold text-red-500 tabular-nums text-right">{fmt(e.total)}</span>
+                          </div>
+                          <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden flex">
+                            {e.cash > 0 && (
+                              <div className="h-full bg-gray-400" style={{ width: `${Math.round((e.cash / e.total) * pct)}%` }} />
+                            )}
+                            {e.transfer > 0 && (
+                              <div className="h-full bg-cyan-400" style={{ width: `${Math.round((e.transfer / e.total) * pct)}%` }} />
+                            )}
+                          </div>
                         </div>
-                        <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
-                          <div className="h-full rounded-full bg-red-400" style={{ width: `${pct}%` }} />
-                        </div>
-                      </div>
-                    )
-                  })}
-                </div>
+                      )
+                    })}
+                  </div>
+                </>
               )}
-              <div className="px-5 py-3 border-t border-gray-100 flex justify-between items-center bg-slate-50">
-                <span className="text-xs text-gray-400 font-semibold uppercase tracking-wide">Neto en caja</span>
-                <span className={`text-lg font-bold ${data.net_cash < 0 ? 'text-red-500' : 'text-green-600'}`}>
-                  {fmt(data.net_cash)}
-                </span>
+              <div className="px-5 py-3 border-t border-gray-100 bg-slate-50 space-y-1">
+                <div className="flex justify-between items-center">
+                  <span className="text-xs text-gray-400 font-semibold uppercase tracking-wide">Gastos efectivo</span>
+                  <span className="text-sm font-bold text-gray-700">{fmt(data.total_expenses_cash ?? 0)}</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-xs text-gray-400 font-semibold uppercase tracking-wide">Gastos transferencia</span>
+                  <span className="text-sm font-bold text-cyan-700">{fmt(data.total_expenses_transfer ?? 0)}</span>
+                </div>
+                <div className="flex justify-between items-center pt-1 border-t border-gray-100">
+                  <span className="text-xs text-gray-400 font-semibold uppercase tracking-wide">Neto efectivo en caja</span>
+                  <span className={`text-base font-bold ${(data.net_efectivo ?? data.net_cash) < 0 ? 'text-red-500' : 'text-green-600'}`}>
+                    {fmt(data.net_efectivo ?? data.net_cash)}
+                  </span>
+                </div>
               </div>
             </div>
 

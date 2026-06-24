@@ -29,13 +29,15 @@ class DailySummaryView(APIView):
             return Response({'detail': 'No hay jornadas.'}, status=404)
 
         sales = Sale.objects.filter(shift=shift)
-        total_sales = sales.aggregate(total=Sum('total'))['total'] or Decimal('0')
-        total_cash = sum(s.cash_received for s in sales if s.payment_method in ('cash', 'mixed'))
-        total_transfer = sum(s.transfer_amount for s in sales if s.payment_method in ('transfer', 'mixed'))
+        total_sales    = sales.aggregate(total=Sum('total'))['total'] or Decimal('0')
+        total_transfer = sum(s.transfer_amount for s in sales)
+        total_cash     = total_sales - total_transfer
 
         expenses = Expense.objects.filter(shift=shift)
         total_expenses = expenses.aggregate(total=Sum('amount'))['total'] or Decimal('0')
-        expenses_from_cash = expenses.filter(from_daily_cash=True).aggregate(total=Sum('amount'))['total'] or Decimal('0')
+        daily_expenses = expenses.filter(from_daily_cash=True)
+        expenses_from_cash = daily_expenses.filter(payment_method='cash').aggregate(total=Sum('amount'))['total'] or Decimal('0')
+        expenses_from_transfer = daily_expenses.filter(payment_method='transfer').aggregate(total=Sum('amount'))['total'] or Decimal('0')
 
         # Sales by flavor
         flavor_sales = []
@@ -59,6 +61,7 @@ class DailySummaryView(APIView):
             'deliveries_count': deliveries_count,
             'total_expenses': float(total_expenses),
             'expenses_from_cash': float(expenses_from_cash),
+            'expenses_from_transfer': float(expenses_from_transfer),
             'net_cash': float(total_cash - expenses_from_cash),
             'flavor_sales': flavor_sales,
             'cup_sales': list(cup_sales),
@@ -150,7 +153,9 @@ class RangeReportView(APIView):
         end_dt   = timezone.make_aware(datetime.datetime.combine(date_to,   datetime.time.max))
 
         # ── Base querysets ────────────────────────────────────────────────────
-        sales_qs = Sale.objects.filter(created_at__gte=start_dt, created_at__lte=end_dt)
+        sales_qs = Sale.objects.filter(
+            created_at__gte=start_dt, created_at__lte=end_dt,
+        )
         if channel == 'pos':
             sales_qs = sales_qs.filter(is_delivery=False)
         elif channel == 'delivery':
@@ -175,16 +180,14 @@ class RangeReportView(APIView):
         sellers = sorted(seller_map.values(), key=lambda x: x['total'], reverse=True)
 
         # ── Medio de pago ─────────────────────────────────────────────────────
-        total_cash = sum(
-            (float(s.courtesy_paid) if s.is_courtesy else float(s.cash_received))
-            for s in sales if s.payment_method in ('cash', 'mixed')
-        )
-        total_transfer = sum(float(s.transfer_amount) for s in sales if s.payment_method in ('transfer', 'mixed'))
-        total_money    = total_cash + total_transfer
+        # efectivo real = total - transfer_amount (cash_received incluye vuelto)
+        total_transfer = sum(float(s.transfer_amount) for s in sales)
         total_sales    = sum(
-            (float(s.courtesy_paid) if s.is_courtesy else float(s.total))
+            float(s.courtesy_paid) if s.is_courtesy else float(s.total)
             for s in sales
         )
+        total_cash  = total_sales - total_transfer
+        total_money = total_sales
 
         # ── Ventas por tamaño de vaso ─────────────────────────────────────────
         cup_items = SaleItem.objects.filter(
@@ -199,7 +202,10 @@ class RangeReportView(APIView):
         flavors = [{'name': r['flavor__name'], 'ml': float(r['total_ml'] or 0)} for r in flavor_sales_qs]
 
         # ── Gastos ────────────────────────────────────────────────────────────
-        total_expenses = float(expenses_qs.filter(from_daily_cash=True).aggregate(t=Sum('amount'))['t'] or 0)
+        daily_exp_qs = expenses_qs.filter(from_daily_cash=True)
+        total_expenses          = float(daily_exp_qs.aggregate(t=Sum('amount'))['t'] or 0)
+        total_expenses_cash     = float(daily_exp_qs.filter(payment_method='cash').aggregate(t=Sum('amount'))['t'] or 0)
+        total_expenses_transfer = float(daily_exp_qs.filter(payment_method='transfer').aggregate(t=Sum('amount'))['t'] or 0)
 
         CATEGORY_LABELS = {
             'business': 'Gasto del Negocio',
@@ -209,9 +215,17 @@ class RangeReportView(APIView):
         }
         expense_by_cat = []
         for cat, label in CATEGORY_LABELS.items():
-            total = float(expenses_qs.filter(category=cat).aggregate(t=Sum('amount'))['t'] or 0)
+            qs_cat = expenses_qs.filter(category=cat)
+            total    = float(qs_cat.aggregate(t=Sum('amount'))['t'] or 0)
             if total > 0:
-                expense_by_cat.append({'category': label, 'total': total})
+                cash_amt     = float(qs_cat.filter(payment_method='cash').aggregate(t=Sum('amount'))['t'] or 0)
+                transfer_amt = float(qs_cat.filter(payment_method='transfer').aggregate(t=Sum('amount'))['t'] or 0)
+                expense_by_cat.append({
+                    'category': label,
+                    'total':    total,
+                    'cash':     cash_amt,
+                    'transfer': transfer_amt,
+                })
         expense_by_cat.sort(key=lambda x: x['total'], reverse=True)
 
         # ── Domicilios ────────────────────────────────────────────────────────
@@ -241,8 +255,11 @@ class RangeReportView(APIView):
             'total_cash':     total_cash,
             'total_transfer': total_transfer,
             'total_money':    total_money,
-            'total_expenses': total_expenses,
-            'net_cash':       total_money - total_expenses,
+            'total_expenses':          total_expenses,
+            'total_expenses_cash':     total_expenses_cash,
+            'total_expenses_transfer': total_expenses_transfer,
+            'net_cash':                total_money - total_expenses,
+            'net_efectivo':            total_cash - total_expenses_cash,
             'sales_count':    sales.count(),
             'sellers':        sellers,
             'cup_sales':      cup_sales,

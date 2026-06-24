@@ -51,7 +51,7 @@ class CashAuditViewSet(viewsets.ModelViewSet):
         delivery_total  = sum(s.total for s in delivery_sales)
 
         expenses_from_cash = sum(
-            e.amount for e in shift.expenses.filter(from_daily_cash=True)
+            e.amount for e in shift.expenses.filter(from_daily_cash=True, payment_method='cash')
         )
 
         # ── Catálogo para tabla de inventario ──

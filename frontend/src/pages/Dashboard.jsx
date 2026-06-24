@@ -85,11 +85,16 @@ export default function Dashboard() {
     if (filter === 'delivery') return e.origin === 'delivery'
     return true
   })
-  // Solo los que afectan caja impactan el total del dashboard
+  // Gastos que afectan caja: solo los marcados como from_daily_cash
   const totalGastos = filteredExpenses
     .filter(e => e.from_daily_cash)
     .reduce((sum, e) => sum + Number(e.amount || 0), 0)
-  const netoEnCaja  = totalDinero - totalGastos
+  // Gastos pagados en efectivo (reducen el efectivo físico disponible)
+  const gastosEfectivo = filteredExpenses
+    .filter(e => e.from_daily_cash && e.payment_method === 'cash')
+    .reduce((sum, e) => sum + Number(e.amount || 0), 0)
+  // Neto en caja = efectivo de ventas - gastos pagados en efectivo
+  const netoEnCaja = totalEfectivo - gastosEfectivo
 
   const recentSales = [...filteredSales].sort(
     (a, b) => new Date(b.created_at) - new Date(a.created_at)

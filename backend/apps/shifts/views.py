@@ -81,8 +81,13 @@ class ShiftViewSet(viewsets.ReadOnlyModelViewSet):
         dom_transfer    = _transfer(dom_sales)
         all_total       = pos_total + dom_total
 
-        expenses_pos = sum(e.amount for e in expenses_qs if not getattr(e, 'is_delivery_expense', False))
-        expenses_dom = 0  # modelo actual no distingue canal en gastos
+        expenses_list         = list(expenses_qs)
+        expenses_pos          = sum(e.amount for e in expenses_list if e.origin == 'pos')
+        expenses_dom          = sum(e.amount for e in expenses_list if e.origin == 'delivery')
+        expenses_pos_cash     = sum(e.amount for e in expenses_list if e.origin == 'pos'      and e.payment_method == 'cash')
+        expenses_pos_transfer = sum(e.amount for e in expenses_list if e.origin == 'pos'      and e.payment_method == 'transfer')
+        expenses_dom_cash     = sum(e.amount for e in expenses_list if e.origin == 'delivery' and e.payment_method == 'cash')
+        expenses_dom_transfer = sum(e.amount for e in expenses_list if e.origin == 'delivery' and e.payment_method == 'transfer')
 
         # ── Ventas serializadas ligeramente ──
         sales_data = []
@@ -101,13 +106,16 @@ class ShiftViewSet(viewsets.ReadOnlyModelViewSet):
             })
 
         expenses_data = []
-        for e in expenses_qs:
+        for e in expenses_list:
             expenses_data.append({
-                'id':          e.id,
-                'description': e.description,
-                'amount':      int(e.amount),
-                'category':    e.category,
-                'created_at':  e.created_at,
+                'id':             e.id,
+                'description':    e.description,
+                'amount':         int(e.amount),
+                'category':       e.category,
+                'origin':         e.origin,
+                'from_daily_cash':e.from_daily_cash,
+                'payment_method': e.payment_method,
+                'created_at':     e.created_at,
             })
 
         # ── Arqueo existente ──
@@ -132,11 +140,18 @@ class ShiftViewSet(viewsets.ReadOnlyModelViewSet):
                 'pos_total':      int(pos_total),
                 'pos_cash':       int(pos_cash),
                 'pos_transfer':   int(pos_transfer),
-                'pos_expenses':   int(total_expenses),   # todos los gastos son del shift
-                'dom_total':      int(dom_total),
-                'dom_cash':       int(dom_cash),
-                'dom_transfer':   int(dom_transfer),
-                'dom_expenses':   0,
+                'pos_expenses':          int(expenses_pos),
+                'pos_expenses_cash':     int(expenses_pos_cash),
+                'pos_expenses_transfer': int(expenses_pos_transfer),
+                'dom_total':             int(dom_total),
+                'dom_cash':              int(dom_cash),
+                'dom_transfer':          int(dom_transfer),
+                'dom_expenses':          int(expenses_dom),
+                'dom_expenses_cash':     int(expenses_dom_cash),
+                'dom_expenses_transfer': int(expenses_dom_transfer),
+                # neto real en efectivo (no descuenta gastos por transferencia)
+                'pos_net_cash':          int(pos_cash - expenses_pos_cash),
+                'dom_net_cash':          int(dom_cash - expenses_dom_cash),
             },
             'sales':    sales_data,
             'expenses': expenses_data,

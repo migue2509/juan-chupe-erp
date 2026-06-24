@@ -33,7 +33,31 @@ const ORIGIN_BADGE = {
 
 const EMPTY_FORM = {
   category: 'business', origin: 'pos',
-  description: '', amount: '', notes: '', from_daily_cash: true,
+  description: '', amount: '', notes: '',
+  from_daily_cash: true, payment_method: 'cash',
+}
+
+/* Selector Efectivo / Transferencia */
+function PayMethodToggle({ value, onChange }) {
+  return (
+    <div className="flex gap-2 mt-1">
+      {[{ v: 'cash', l: 'Efectivo' }, { v: 'transfer', l: 'Transferencia' }].map(o => (
+        <button
+          key={o.v} type="button"
+          onClick={() => onChange(o.v)}
+          className={`flex-1 py-2 rounded-xl text-sm font-medium border transition-all ${
+            value === o.v
+              ? o.v === 'cash'
+                ? 'border-green-500 bg-green-50 text-green-700'
+                : 'border-cyan-500 bg-cyan-50 text-cyan-700'
+              : 'border-gray-200 text-gray-400 hover:border-gray-300'
+          }`}
+        >
+          {o.l}
+        </button>
+      ))}
+    </div>
+  )
 }
 
 export default function Expenses() {
@@ -48,7 +72,7 @@ export default function Expenses() {
   const [dateTo,       setDateTo]       = useState('')
 
   // Edición
-  const [editing,   setEditing]   = useState(null)   // expense siendo editado
+  const [editing,   setEditing]   = useState(null)
   const [eForm,     setEForm]     = useState({})
   const [eSaving,   setESaving]   = useState(false)
 
@@ -96,6 +120,7 @@ export default function Expenses() {
       description:     e.description,
       amount:          e.amount,
       from_daily_cash: e.from_daily_cash,
+      payment_method:  e.payment_method || 'cash',
       notes:           e.notes || '',
     })
   }
@@ -205,13 +230,23 @@ export default function Expenses() {
                   value={form.amount} onChange={e => setForm(f => ({ ...f, amount: e.target.value }))} />
               </div>
 
-              <div className="flex items-end pb-1">
-                <label className="flex items-center gap-2 text-sm cursor-pointer select-none">
+              {/* Afecta caja + método de pago */}
+              <div className="flex flex-col justify-start gap-2">
+                <label className="flex items-center gap-2 text-sm cursor-pointer select-none mt-1">
                   <input type="checkbox" checked={form.from_daily_cash}
                     onChange={e => setForm(f => ({ ...f, from_daily_cash: e.target.checked }))}
                     className="accent-brand-pink w-4 h-4 rounded" />
-                  <span className="text-gray-600">Afecta caja del día</span>
+                  <span className="text-gray-600 font-medium">Afecta caja del día</span>
                 </label>
+                {form.from_daily_cash && (
+                  <div>
+                    <label className="label">Medio de pago</label>
+                    <PayMethodToggle
+                      value={form.payment_method}
+                      onChange={v => setForm(f => ({ ...f, payment_method: v }))}
+                    />
+                  </div>
+                )}
               </div>
 
               <div className="col-span-2">
@@ -221,7 +256,6 @@ export default function Expenses() {
               </div>
             </div>
 
-            {/* Who registers */}
             {user && (
               <p className="text-xs text-gray-400">
                 Registrado por: <span className="font-medium text-gray-600">{user.full_name || user.username}</span>
@@ -239,7 +273,7 @@ export default function Expenses() {
         </div>
       )}
 
-      {/* Filtros búsqueda / fecha */}
+      {/* Filtros */}
       <div className="card py-3 px-4 flex flex-wrap items-center gap-3">
         <div className="flex items-center gap-2 flex-1 min-w-[180px]">
           <Icon name="search" className="w-4 h-4 text-gray-400 shrink-0" />
@@ -267,7 +301,7 @@ export default function Expenses() {
         )}
       </div>
 
-      {/* Filter + Table */}
+      {/* Tabla */}
       <div className="card p-0 overflow-hidden">
         <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
           <h2>Historial <span className="text-sm font-normal text-gray-400">({filtered.length})</span></h2>
@@ -285,8 +319,8 @@ export default function Expenses() {
 
         {/* Table header */}
         <div className="grid px-5 py-2.5 bg-slate-50 border-b border-gray-100 text-[10px] font-semibold text-gray-400 uppercase tracking-widest gap-3"
-          style={{ gridTemplateColumns: '60px 80px 130px 80px 1fr 120px 80px 80px 64px' }}>
-          {['Hora', 'Fecha', 'Categoría', 'Canal', 'Descripción', 'Registrado por', 'Caja', 'Monto', ''].map(h => (
+          style={{ gridTemplateColumns: '60px 80px 130px 80px 1fr 120px 90px 90px 80px 64px' }}>
+          {['Hora', 'Fecha', 'Categoría', 'Canal', 'Descripción', 'Registrado por', 'Caja', 'Método', 'Monto', ''].map(h => (
             <span key={h}>{h}</span>
           ))}
         </div>
@@ -300,7 +334,7 @@ export default function Expenses() {
           ) : filtered.map(e => (
             <div key={e.id}
               className="grid px-5 py-3 items-center gap-3 hover:bg-slate-50 transition-colors"
-              style={{ gridTemplateColumns: '60px 80px 130px 80px 1fr 120px 80px 80px 64px' }}>
+              style={{ gridTemplateColumns: '60px 80px 130px 80px 1fr 120px 90px 90px 80px 64px' }}>
               <span className="text-sm tabular-nums text-gray-500">{fmtTime(e.created_at)}</span>
               <span className="text-sm tabular-nums text-gray-500">{fmtDate(e.created_at)}</span>
               <span className={`text-xs font-medium px-2 py-0.5 rounded-full w-fit ${CAT_BADGE[e.category] ?? 'bg-gray-100 text-gray-600'}`}>
@@ -320,10 +354,25 @@ export default function Expenses() {
                 </div>
                 <span className="text-xs text-gray-700 font-medium truncate">{e.registered_by_name}</span>
               </div>
+              {/* Columna Caja */}
               <span className={`text-xs font-semibold px-2 py-0.5 rounded-full w-fit ${e.from_daily_cash ? 'bg-green-50 text-green-700' : 'bg-gray-100 text-gray-400'}`}>
                 {e.from_daily_cash ? 'Sí' : 'No'}
               </span>
-              <span className={`text-sm font-bold tabular-nums ${e.from_daily_cash ? 'text-red-500' : 'text-gray-400'}`}>{fmt(e.amount)}</span>
+              {/* Columna Método */}
+              {e.from_daily_cash ? (
+                <span className={`text-xs font-semibold px-2 py-0.5 rounded-full w-fit ${
+                  e.payment_method === 'transfer'
+                    ? 'bg-cyan-50 text-cyan-700'
+                    : 'bg-gray-100 text-gray-700'
+                }`}>
+                  {e.payment_method === 'transfer' ? 'Transf.' : 'Efectivo'}
+                </span>
+              ) : (
+                <span className="text-xs text-gray-300">—</span>
+              )}
+              <span className={`text-sm font-bold tabular-nums ${e.from_daily_cash ? 'text-red-500' : 'text-gray-400'}`}>
+                {fmt(e.amount)}
+              </span>
               <div className="flex gap-1">
                 <button onClick={() => openEdit(e)}
                   className="w-7 h-7 rounded-lg flex items-center justify-center text-gray-400 hover:bg-gray-100 hover:text-gray-700 transition-colors">
@@ -401,13 +450,22 @@ export default function Expenses() {
                   <input type="number" className="input" required min="1" value={eForm.amount}
                     onChange={e => setEForm(f => ({ ...f, amount: e.target.value }))} />
                 </div>
-                <div className="flex items-end pb-1">
-                  <label className="flex items-center gap-2 text-sm cursor-pointer select-none">
+                <div className="flex flex-col gap-2">
+                  <label className="flex items-center gap-2 text-sm cursor-pointer select-none mt-1">
                     <input type="checkbox" checked={eForm.from_daily_cash}
                       onChange={e => setEForm(f => ({ ...f, from_daily_cash: e.target.checked }))}
                       className="accent-brand-pink w-4 h-4 rounded" />
-                    <span className="text-gray-600">Afecta caja del día</span>
+                    <span className="text-gray-600 font-medium">Afecta caja del día</span>
                   </label>
+                  {eForm.from_daily_cash && (
+                    <div>
+                      <label className="label">Medio de pago</label>
+                      <PayMethodToggle
+                        value={eForm.payment_method || 'cash'}
+                        onChange={v => setEForm(f => ({ ...f, payment_method: v }))}
+                      />
+                    </div>
+                  )}
                 </div>
                 <div className="col-span-2">
                   <label className="label">Notas (opcional)</label>
