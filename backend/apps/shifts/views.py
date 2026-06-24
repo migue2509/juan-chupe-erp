@@ -50,7 +50,7 @@ class ShiftViewSet(viewsets.ReadOnlyModelViewSet):
 
         sales_qs = Sale.objects.filter(shift=shift).prefetch_related(
             'items__cup_size', 'items__topping', 'items__saleitems_flavors__flavor'
-        )
+        ).select_related('invoice')
         if channel == 'pos':
             sales_qs = sales_qs.filter(is_delivery=False)
         elif channel == 'delivery':
@@ -106,8 +106,13 @@ class ShiftViewSet(viewsets.ReadOnlyModelViewSet):
                     'topping_price':int(item.topping_price),
                     'subtotal':     int(item.subtotal),
                 })
+            try:
+                invoice_number = s.invoice.invoice_number
+            except Exception:
+                invoice_number = None
             sales_data.append({
                 'id':             s.id,
+                'invoice_number': invoice_number,
                 'total':          int(s.total),
                 'payment_method': s.payment_method,
                 'cash_received':  int(s.cash_received),

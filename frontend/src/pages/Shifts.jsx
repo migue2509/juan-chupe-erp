@@ -295,6 +295,7 @@ function ShiftDetail({ shift, onBack, onShiftUpdate }) {
   ]
 
   const PAYMENT_LABELS = { cash: 'Efectivo', transfer: 'Transferencia', mixed: 'Mixto' }
+  const PAYMENT_BADGE  = { cash: 'badge-gray', transfer: 'badge-cyan', mixed: 'badge-lime' }
   const CAT_LABELS = {
     business: 'Negocio', personal: 'Personal', supply: 'Mercancía', petty_cash: 'Caja Menor',
   }
@@ -424,41 +425,50 @@ function ShiftDetail({ shift, onBack, onShiftUpdate }) {
               <h2>Ventas</h2>
               <span className="text-xs text-gray-400">{detail.sales.length} registros</span>
             </div>
+            {/* Header tabla — mismo estilo que Billing */}
+            {detail.sales.length > 0 && (
+              <div className="grid px-5 py-3 bg-slate-50 border-b border-gray-100 text-[10px] font-semibold text-gray-400 uppercase tracking-widest gap-3"
+                style={{ gridTemplateColumns: '40px 130px 60px 1fr 100px 90px 90px 24px' }}>
+                {['#', 'Factura', 'Hora', 'Vendedora', 'Total', 'Canal', 'Pago', ''].map(h => <span key={h}>{h}</span>)}
+              </div>
+            )}
             {detail.sales.length === 0
               ? <p className="text-center text-gray-400 text-sm py-8">Sin ventas en este canal</p>
               : (
                 <div className="divide-y divide-gray-50">
-                  {detail.sales.map(s => {
+                  {detail.sales.map((s, idx) => {
+                    const saleNum = detail.sales.length - idx
                     const isOpen = expandedSale === s.id
                     return (
                       <div key={s.id}>
-                        {/* Fila principal — clickeable */}
+                        {/* Fila principal — mismo grid que Billing */}
                         <button
                           type="button"
                           onClick={() => setExpandedSale(isOpen ? null : s.id)}
-                          className="w-full px-5 py-3 flex items-center justify-between hover:bg-gray-50 text-left transition-colors"
+                          className="w-full grid px-5 py-3.5 items-center gap-3 hover:bg-slate-50 text-left transition-colors"
+                          style={{ gridTemplateColumns: '40px 130px 60px 1fr 100px 90px 90px 24px' }}
                         >
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2 flex-wrap">
-                              <span className="text-sm font-semibold text-gray-800">#{s.id}</span>
-                              {s.is_delivery && <span className="badge-cyan text-[10px]">Domicilio</span>}
-                              {s.is_courtesy && <span className="badge-amber text-[10px]">Cortesía</span>}
-                              <span className="text-xs text-gray-400">{s.seller}</span>
-                            </div>
-                            <p className="text-xs text-gray-400 mt-0.5">
-                              {fmtHr(s.created_at)} · {PAYMENT_LABELS[s.payment_method] || s.payment_method}
-                              {s.transfer_amount > 0 && ` · Transfer: ${fmt(s.transfer_amount)}`}
-                            </p>
-                          </div>
-                          <div className="flex items-center gap-3 shrink-0">
-                            <span className="text-sm font-bold text-gray-900">{fmt(s.total)}</span>
-                            <svg
-                              className={`w-4 h-4 text-gray-400 transition-transform ${isOpen ? 'rotate-180' : ''}`}
-                              fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"
-                            >
-                              <polyline points="6 9 12 15 18 9" />
-                            </svg>
-                          </div>
+                          <span className="text-sm font-semibold text-gray-500">#{saleNum}</span>
+                          <span className="font-mono font-semibold text-brand-navy text-sm">
+                            {s.invoice_number || '—'}
+                          </span>
+                          <span className="text-sm tabular-nums text-gray-500">{fmtHr(s.created_at)}</span>
+                          <span className="text-sm text-gray-700 truncate">{s.seller}</span>
+                          <span className="text-sm font-bold text-brand-pink tabular-nums">{fmt(s.total)}</span>
+                          <span className={`badge text-xs w-fit ${
+                            s.is_courtesy ? 'bg-pink-100 text-pink-600' :
+                            s.is_delivery ? 'badge-cyan' : 'badge-pink'}`}>
+                            {s.is_courtesy ? 'Cortesía' : s.is_delivery ? 'Domicilio' : 'POS'}
+                          </span>
+                          <span className={`badge text-xs w-fit ${PAYMENT_BADGE[s.payment_method] ?? 'badge-gray'}`}>
+                            {PAYMENT_LABELS[s.payment_method] ?? s.payment_method}
+                          </span>
+                          <svg
+                            className={`w-4 h-4 text-gray-400 transition-transform ${isOpen ? 'rotate-180' : ''}`}
+                            fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"
+                          >
+                            <polyline points="6 9 12 15 18 9" />
+                          </svg>
                         </button>
 
                         {/* Detalle expandible */}
