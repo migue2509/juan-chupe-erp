@@ -6,8 +6,281 @@ const fmt    = n => `$${Number(n || 0).toLocaleString('es-CO')}`
 const fmtDt  = s => new Date(s).toLocaleString('es-CO', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })
 const fmtHr  = s => new Date(s).toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' })
 
+const fmtDtShort = s => new Date(s).toLocaleString('es-CO', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })
+
 // ─────────────────────────────────────────────────────────────────────────────
-// Modal Arqueo
+// Hook compartido: carga prefill de la jornada
+// ─────────────────────────────────────────────────────────────────────────────
+function usePrefill(shiftId) {
+  const [data, setData]       = useState(null)
+  const [loading, setLoading] = useState(true)
+  const reload = () => {
+    setLoading(true)
+    getCashAuditPrefill({ shift_id: shiftId })
+      .then(r => setData(r.data))
+      .finally(() => setLoading(false))
+  }
+  useEffect(reload, [shiftId])
+  return { data, loading, reload }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Resumen POS — inventario + liquidación
+// ─────────────────────────────────────────────────────────────────────────────
+function POSResumenModal({ shiftId, onClose }) {
+  const { data: p, loading, reload } = usePrefill(shiftId)
+  const [saving, setSaving] = useState(false)
+
+  if (loading) return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+      <div className="bg-white rounded-2xl p-10 flex items-center gap-3">
+        <div className="w-6 h-6 border-4 border-blue-500 border-t-transparent rounded-full animate-spin" />
+        <span className="text-sm text-gray-500">Cargando...</span>
+      </div>
+    </div>
+  )
+  if (!p) return null
+
+  const cups     = (p.catalog || []).filter(r => r.product_type === 'cup')
+  const toppings = (p.catalog || []).filter(r => r.product_type === 'topping')
+  const totalLiq = (p.catalog || []).reduce((s, r) => s + (r.sales_revenue || 0), 0)
+  const COL = '2fr 90px 90px 110px'
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center bg-black/40 p-4">
+      <div className="bg-white rounded-2xl w-full max-w-3xl max-h-[92vh] flex flex-col shadow-2xl">
+        <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between flex-shrink-0">
+          <div>
+            <h2 className="font-bold text-gray-900">Resumen POS — Jornada #{shiftId}</h2>
+            <p className="text-xs text-gray-400 mt-0.5">Liquidación de ventas en punto de venta</p>
+          </div>
+          <button onClick={onClose} className="btn-ghost px-2 py-1 text-gray-400">✕</button>
+        </div>
+
+        <div className="flex-1 overflow-y-auto p-6 space-y-6">
+          {/* Cards POS */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <div className="card p-4 text-center">
+              <p className="text-xs text-gray-400 uppercase tracking-wide mb-1">Ventas POS</p>
+              <p className="text-xl font-bold text-blue-700">{fmt(p.pos_total)}</p>
+            </div>
+            <div className="card p-4 text-center">
+              <p className="text-xs text-gray-400 uppercase tracking-wide mb-1">Efectivo</p>
+              <p className="text-xl font-bold text-gray-800">{fmt(p.pos_cash)}</p>
+            </div>
+            <div className="card p-4 text-center">
+              <p className="text-xs text-gray-400 uppercase tracking-wide mb-1">Gastos caja</p>
+              <p className="text-xl font-bold text-red-500">- {fmt(p.expenses_from_cash)}</p>
+            </div>
+            <div className="card p-4 text-center border-2 border-blue-200">
+              <p className="text-xs text-gray-400 uppercase tracking-wide mb-1">Neto a entregar</p>
+              <p className="text-xl font-bold text-blue-700">{fmt(p.net_expected_cash)}</p>
+            </div>
+          </div>
+
+          {/* Tabla liquidación */}
+          {(cups.length > 0 || toppings.length > 0) && (
+            <div className="card p-0 overflow-hidden">
+              <div className="px-5 py-3 border-b border-gray-100">
+                <h3 className="text-sm font-semibold text-gray-700">Liquidación por producto</h3>
+              </div>
+              <div className="grid text-[10px] font-semibold text-gray-400 uppercase tracking-widest px-4 py-2 bg-gray-50 border-b border-gray-100"
+                style={{ gridTemplateColumns: COL }}>
+                <span>Producto</span>
+                <span className="text-center">Precio regular</span>
+                <span className="text-center">Uds vendidas</span>
+                <span className="text-center text-emerald-600">Liquidación</span>
+              </div>
+
+              {cups.length > 0 && (
+                <>
+                  <div className="px-4 py-1.5 bg-blue-50 border-b border-blue-100">
+                    <span className="text-[10px] font-bold text-blue-600 uppercase tracking-widest">Vasos</span>
+                  </div>
+                  {cups.map(row => (
+                    <div key={row.product_name} className="grid items-center px-4 py-3 border-b border-gray-50"
+                      style={{ gridTemplateColumns: COL }}>
+                      <p className="text-sm font-medium text-gray-800">{row.product_name}</p>
+                      <span className="text-center text-sm text-gray-500">{fmt(row.unit_price)}</span>
+                      <span className="text-center text-sm font-semibold text-gray-700">{row.sales_qty}</span>
+                      <span className={`text-center text-sm font-bold ${row.sales_revenue > 0 ? 'text-emerald-700' : 'text-gray-300'}`}>
+                        {fmt(row.sales_revenue)}
+                      </span>
+                    </div>
+                  ))}
+                </>
+              )}
+
+              {toppings.some(t => t.sales_qty > 0) && (
+                <>
+                  <div className="px-4 py-1.5 bg-purple-50 border-b border-purple-100">
+                    <span className="text-[10px] font-bold text-purple-600 uppercase tracking-widest">Toppings sueltos</span>
+                  </div>
+                  {toppings.filter(t => t.sales_qty > 0).map(row => (
+                    <div key={row.product_name} className="grid items-center px-4 py-3 border-b border-gray-50"
+                      style={{ gridTemplateColumns: COL }}>
+                      <p className="text-sm font-medium text-gray-800">{row.product_name}</p>
+                      <span className="text-center text-sm text-gray-500">{fmt(row.unit_price)}</span>
+                      <span className="text-center text-sm font-semibold text-gray-700">{row.sales_qty}</span>
+                      <span className="text-center text-sm font-bold text-emerald-700">{fmt(row.sales_revenue)}</span>
+                    </div>
+                  ))}
+                </>
+              )}
+
+              <div className="grid px-4 py-3 bg-emerald-50 border-t-2 border-emerald-200 font-bold text-emerald-800"
+                style={{ gridTemplateColumns: COL }}>
+                <span className="text-sm">TOTAL LIQUIDACIÓN POS</span>
+                <span /><span />
+                <span className="text-center text-base">{fmt(totalLiq)}</span>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Footer: estado del arqueo POS */}
+        <div className="px-6 py-4 border-t border-gray-100 flex items-center justify-between gap-3 flex-shrink-0">
+          {p?.arqueos?.pos ? (
+            <div className="flex items-center gap-2 text-sm text-green-700 bg-green-50 border border-green-200 rounded-xl px-4 py-2">
+              <span className="font-semibold">POS entregado</span>
+              <span className="text-gray-400">·</span>
+              <span>{p.arqueos.pos.audited_by}</span>
+              <span className="text-gray-400">·</span>
+              <span>{fmtDtShort(p.arqueos.pos.created_at)}</span>
+            </div>
+          ) : (
+            <button
+              disabled={saving}
+              onClick={async () => {
+                setSaving(true)
+                try {
+                  await createCashAudit({
+                    shift:             shiftId,
+                    channel:           'pos',
+                    expected_cash:     p.net_expected_cash,
+                    expected_transfer: p.pos_transfer,
+                    actual_cash:       p.net_expected_cash,
+                    actual_transfer:   0,
+                  })
+                  toast.success('POS marcado como entregado')
+                  reload()
+                } catch (e) {
+                  toast.error(e?.response?.data?.detail || 'Error')
+                }
+                setSaving(false)
+              }}
+              className="btn-primary"
+            >
+              {saving ? 'Guardando...' : 'Marcar como entregado'}
+            </button>
+          )}
+          <button onClick={onClose} className="btn-secondary">Cerrar</button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Resumen Domicilios — solo dinero
+// ─────────────────────────────────────────────────────────────────────────────
+function DomiciliosResumenModal({ shiftId, onClose }) {
+  const { data: p, loading, reload } = usePrefill(shiftId)
+  const [saving, setSaving] = useState(false)
+
+  if (loading) return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+      <div className="bg-white rounded-2xl p-10 flex items-center gap-3">
+        <div className="w-6 h-6 border-4 border-orange-400 border-t-transparent rounded-full animate-spin" />
+        <span className="text-sm text-gray-500">Cargando...</span>
+      </div>
+    </div>
+  )
+  if (!p) return null
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center bg-black/40 p-4">
+      <div className="bg-white rounded-2xl w-full max-w-2xl flex flex-col shadow-2xl">
+        <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between flex-shrink-0">
+          <div>
+            <h2 className="font-bold text-gray-900">Resumen Domicilios — Jornada #{shiftId}</h2>
+            <p className="text-xs text-gray-400 mt-0.5">Dinero recibido por canal de domicilios</p>
+          </div>
+          <button onClick={onClose} className="btn-ghost px-2 py-1 text-gray-400">✕</button>
+        </div>
+
+        <div className="p-6">
+          {p.delivery_total > 0 ? (
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              <div className="card p-4 text-center">
+                <p className="text-xs text-gray-400 uppercase tracking-wide mb-1">Total domicilios</p>
+                <p className="text-xl font-bold text-orange-600">{fmt(p.delivery_total)}</p>
+              </div>
+              <div className="card p-4 text-center">
+                <p className="text-xs text-gray-400 uppercase tracking-wide mb-1">Efectivo</p>
+                <p className="text-xl font-bold text-gray-800">{fmt(p.delivery_cash)}</p>
+              </div>
+              <div className="card p-4 text-center">
+                <p className="text-xs text-gray-400 uppercase tracking-wide mb-1">Gastos caja</p>
+                <p className="text-xl font-bold text-red-500">- {fmt(p.delivery_expenses_cash)}</p>
+              </div>
+              <div className="card p-4 text-center border-2 border-orange-200">
+                <p className="text-xs text-gray-400 uppercase tracking-wide mb-1">Neto a entregar</p>
+                <p className="text-xl font-bold text-orange-600">{fmt(p.delivery_net_cash)}</p>
+              </div>
+            </div>
+          ) : (
+            <div className="text-center py-10 text-gray-400">
+              <p className="text-sm">Esta jornada no tuvo ventas de domicilios.</p>
+            </div>
+          )}
+        </div>
+
+        {/* Footer: estado arqueo Domicilios */}
+        <div className="px-6 py-4 border-t border-gray-100 flex items-center justify-between gap-3 flex-shrink-0">
+          {p?.arqueos?.delivery ? (
+            <div className="flex items-center gap-2 text-sm text-green-700 bg-green-50 border border-green-200 rounded-xl px-4 py-2">
+              <span className="font-semibold">Domicilios entregado</span>
+              <span className="text-gray-400">·</span>
+              <span>{p.arqueos.delivery.audited_by}</span>
+              <span className="text-gray-400">·</span>
+              <span>{fmtDtShort(p.arqueos.delivery.created_at)}</span>
+            </div>
+          ) : p.delivery_total > 0 ? (
+            <button
+              disabled={saving}
+              onClick={async () => {
+                setSaving(true)
+                try {
+                  await createCashAudit({
+                    shift:             shiftId,
+                    channel:           'delivery',
+                    expected_cash:     p.delivery_net_cash,
+                    expected_transfer: p.delivery_transfer,
+                    actual_cash:       p.delivery_net_cash,
+                    actual_transfer:   0,
+                  })
+                  toast.success('Domicilios marcado como entregado')
+                  reload()
+                } catch (e) {
+                  toast.error(e?.response?.data?.detail || 'Error')
+                }
+                setSaving(false)
+              }}
+              className="btn-primary"
+            >
+              {saving ? 'Guardando...' : 'Marcar como entregado'}
+            </button>
+          ) : <span />}
+          <button onClick={onClose} className="btn-secondary">Cerrar</button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// [LEGACY — no usado] Modal Arqueo con formulario
 // ─────────────────────────────────────────────────────────────────────────────
 function ArqueoModal({ shiftId, onClose, onSaved }) {
   const [prefill, setPrefill]   = useState(null)
@@ -20,12 +293,13 @@ function ArqueoModal({ shiftId, onClose, onSaved }) {
   useEffect(() => {
     getCashAuditPrefill({ shift_id: shiftId }).then(({ data }) => {
       setPrefill(data)
-      // Inicializar filas del catálogo con closing_stock sugerido = current_stock
       setRows((data.catalog || []).map(item => ({
         ...item,
-        opening_stock: 0,
+        // opening_stock = vasos que quedaron de la jornada anterior (cierre previo)
+        opening_stock: item.prev_closing ?? 0,
         entries: 0,
-        closing_stock: item.current_stock ?? 0,
+        // closing_stock = conteo físico de lo que QUEDA al cerrar (empieza vacío para que el admin cuente)
+        closing_stock: 0,
       })))
       setActualCash(String(data.net_expected_cash || ''))
       setLoading(false)
@@ -99,22 +373,56 @@ function ArqueoModal({ shiftId, onClose, onSaved }) {
         {/* Body scrollable */}
         <div className="flex-1 overflow-y-auto p-6 space-y-6">
 
-          {/* KPI del sistema */}
+          {/* ── POS ── */}
           {prefill && (
-            <div className="grid grid-cols-3 gap-3">
-              <div className="card p-4 text-center">
-                <p className="text-xs text-gray-400 uppercase tracking-wide mb-1">Ventas POS</p>
-                <p className="text-xl font-bold text-blue-700">{fmt(prefill.pos_total)}</p>
+            <>
+              <div>
+                <p className="text-[10px] font-bold text-blue-500 uppercase tracking-widest mb-2">POS — Caja física</p>
+                <div className="grid grid-cols-4 gap-3">
+                  <div className="card p-4 text-center">
+                    <p className="text-xs text-gray-400 uppercase tracking-wide mb-1">Ventas POS</p>
+                    <p className="text-xl font-bold text-blue-700">{fmt(prefill.pos_total)}</p>
+                  </div>
+                  <div className="card p-4 text-center">
+                    <p className="text-xs text-gray-400 uppercase tracking-wide mb-1">Efectivo POS</p>
+                    <p className="text-xl font-bold text-gray-800">{fmt(prefill.pos_cash)}</p>
+                  </div>
+                  <div className="card p-4 text-center">
+                    <p className="text-xs text-gray-400 uppercase tracking-wide mb-1">Gastos en caja</p>
+                    <p className="text-xl font-bold text-red-500">- {fmt(prefill.expenses_from_cash)}</p>
+                  </div>
+                  <div className="card p-4 text-center border-2 border-blue-200">
+                    <p className="text-xs text-gray-400 uppercase tracking-wide mb-1">Neto a entregar</p>
+                    <p className="text-xl font-bold text-blue-700">{fmt(prefill.net_expected_cash)}</p>
+                  </div>
+                </div>
               </div>
-              <div className="card p-4 text-center">
-                <p className="text-xs text-gray-400 uppercase tracking-wide mb-1">Gastos del día</p>
-                <p className="text-xl font-bold text-red-500">- {fmt(prefill.expenses_from_cash)}</p>
-              </div>
-              <div className="card p-4 text-center">
-                <p className="text-xs text-gray-400 uppercase tracking-wide mb-1">Neto a entregar</p>
-                <p className="text-xl font-bold text-gray-900">{fmt(prefill.net_expected_cash)}</p>
-              </div>
-            </div>
+
+              {/* ── Domicilios ── */}
+              {prefill.delivery_total > 0 && (
+                <div>
+                  <p className="text-[10px] font-bold text-orange-500 uppercase tracking-widest mb-2">Domicilios — Dinero</p>
+                  <div className="grid grid-cols-4 gap-3">
+                    <div className="card p-4 text-center">
+                      <p className="text-xs text-gray-400 uppercase tracking-wide mb-1">Total domicilios</p>
+                      <p className="text-xl font-bold text-orange-600">{fmt(prefill.delivery_total)}</p>
+                    </div>
+                    <div className="card p-4 text-center">
+                      <p className="text-xs text-gray-400 uppercase tracking-wide mb-1">Efectivo</p>
+                      <p className="text-xl font-bold text-gray-800">{fmt(prefill.delivery_cash)}</p>
+                    </div>
+                    <div className="card p-4 text-center">
+                      <p className="text-xs text-gray-400 uppercase tracking-wide mb-1">Gastos en caja</p>
+                      <p className="text-xl font-bold text-red-500">- {fmt(prefill.delivery_expenses_cash)}</p>
+                    </div>
+                    <div className="card p-4 text-center border-2 border-orange-200">
+                      <p className="text-xs text-gray-400 uppercase tracking-wide mb-1">Neto a entregar</p>
+                      <p className="text-xl font-bold text-orange-600">{fmt(prefill.delivery_net_cash)}</p>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </>
           )}
 
           {/* Tabla de inventario */}
@@ -126,13 +434,14 @@ function ArqueoModal({ shiftId, onClose, onSaved }) {
 
               {/* Headers */}
               <div className="grid text-[10px] font-semibold text-gray-400 uppercase tracking-widest px-4 py-2 bg-gray-50 border-b border-gray-100"
-                style={{ gridTemplateColumns: '2fr 90px 90px 90px 90px 90px' }}>
+                style={{ gridTemplateColumns: '2fr 80px 80px 80px 80px 80px 110px' }}>
                 <span>Producto</span>
                 <span className="text-center">Anterior</span>
-                <span className="text-center">Entradas</span>
+                <span className="text-center">Entrada</span>
                 <span className="text-center">Disponible</span>
                 <span className="text-center">Cierre</span>
                 <span className="text-center text-blue-600">Vendidos</span>
+                <span className="text-center text-emerald-600">Liquidación</span>
               </div>
 
               {/* Cups section */}
@@ -147,32 +456,49 @@ function ArqueoModal({ shiftId, onClose, onSaved }) {
                     const sold  = getSold(row)
                     return (
                       <div key={idx} className="grid items-center px-4 py-2.5 border-b border-gray-50 hover:bg-gray-50"
-                        style={{ gridTemplateColumns: '2fr 90px 90px 90px 90px 90px' }}>
+                        style={{ gridTemplateColumns: '2fr 80px 80px 80px 80px 80px 110px' }}>
                         <div>
                           <p className="text-sm font-medium text-gray-800">{row.product_name}</p>
-                          {row.unit_price > 0 && <p className="text-[11px] text-gray-400">{fmt(row.unit_price)} c/u</p>}
+                          {row.unit_price > 0 && <p className="text-[11px] text-gray-400">{fmt(row.unit_price)} c/u regular</p>}
                         </div>
+                        {/* Anterior: vasos que quedaron de la jornada anterior */}
                         <input type="number" min="0" value={row.opening_stock}
                           onChange={e => updateRow(realIdx, 'opening_stock', e.target.value)}
                           className="input text-center py-1.5 text-sm" />
+                        {/* Entrada: vasos ingresados durante esta jornada */}
                         <input type="number" min="0" value={row.entries}
                           onChange={e => updateRow(realIdx, 'entries', e.target.value)}
                           className="input text-center py-1.5 text-sm" />
+                        {/* Disponible = Anterior + Entrada */}
                         <span className="text-center text-sm font-semibold text-gray-700">{avail}</span>
+                        {/* Cierre: conteo físico de los que QUEDARON al cerrar */}
                         <input type="number" min="0" value={row.closing_stock}
                           onChange={e => updateRow(realIdx, 'closing_stock', e.target.value)}
                           className="input text-center py-1.5 text-sm" />
+                        {/* Vendidos = Disponible - Cierre */}
                         <span className={`text-center text-sm font-bold ${sold > 0 ? 'text-blue-700' : 'text-gray-400'}`}>
                           {sold}
                         </span>
+                        {/* Liquidación: revenue real de ventas (incluye precio promo) */}
+                        <div className="text-center">
+                          <span className={`text-sm font-bold ${row.sales_revenue > 0 ? 'text-emerald-700' : 'text-gray-400'}`}>
+                            {fmt(row.sales_revenue || 0)}
+                          </span>
+                          {row.sales_qty > 0 && (
+                            <p className="text-[10px] text-gray-400">{row.sales_qty} uds</p>
+                          )}
+                        </div>
                       </div>
                     )
                   })}
                   <div className="grid px-4 py-2 bg-blue-50 border-b border-blue-100 text-sm font-semibold text-blue-700"
-                    style={{ gridTemplateColumns: '2fr 90px 90px 90px 90px 90px' }}>
+                    style={{ gridTemplateColumns: '2fr 80px 80px 80px 80px 80px 110px' }}>
                     <span>Total vasos vendidos</span>
                     <span /><span /><span /><span />
                     <span className="text-center text-base">{totalByType('cup')}</span>
+                    <span className="text-center text-base text-emerald-700">
+                      {fmt(cups.reduce((s, r) => s + (r.sales_revenue || 0), 0))}
+                    </span>
                   </div>
                 </>
               )}
@@ -189,7 +515,7 @@ function ArqueoModal({ shiftId, onClose, onSaved }) {
                     const sold  = getSold(row)
                     return (
                       <div key={idx} className="grid items-center px-4 py-2.5 border-b border-gray-50 hover:bg-gray-50"
-                        style={{ gridTemplateColumns: '2fr 90px 90px 90px 90px 90px' }}>
+                        style={{ gridTemplateColumns: '2fr 80px 80px 80px 80px 80px 110px' }}>
                         <p className="text-sm font-medium text-gray-800">{row.product_name}</p>
                         <input type="number" min="0" value={row.opening_stock}
                           onChange={e => updateRow(realIdx, 'opening_stock', e.target.value)}
@@ -204,11 +530,35 @@ function ArqueoModal({ shiftId, onClose, onSaved }) {
                         <span className={`text-center text-sm font-bold ${sold > 0 ? 'text-purple-700' : 'text-gray-400'}`}>
                           {sold}
                         </span>
+                        {/* Revenue de toppings sueltos vendidos */}
+                        <div className="text-center">
+                          {row.sales_revenue > 0 ? (
+                            <>
+                              <span className="text-sm font-bold text-emerald-700">{fmt(row.sales_revenue)}</span>
+                              <p className="text-[10px] text-gray-400">{row.sales_qty} uds</p>
+                            </>
+                          ) : (
+                            <span className="text-gray-300 text-xs">—</span>
+                          )}
+                        </div>
                       </div>
                     )
                   })}
                 </>
               )}
+
+              {/* Total general liquidación */}
+              {rows.length > 0 && (() => {
+                const totalLiq = rows.reduce((s, r) => s + (r.sales_revenue || 0), 0)
+                return totalLiq > 0 ? (
+                  <div className="grid px-4 py-3 bg-emerald-50 border-t-2 border-emerald-200 text-sm font-bold text-emerald-800"
+                    style={{ gridTemplateColumns: '2fr 80px 80px 80px 80px 80px 110px' }}>
+                    <span>TOTAL LIQUIDACIÓN JORNADA</span>
+                    <span /><span /><span /><span /><span />
+                    <span className="text-center text-base">{fmt(totalLiq)}</span>
+                  </div>
+                ) : null
+              })()}
             </div>
           )}
 
@@ -268,13 +618,256 @@ function ArqueoModal({ shiftId, onClose, onSaved }) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Modal Ver Arqueo guardado
+// ─────────────────────────────────────────────────────────────────────────────
+function ViewArqueoModal({ arqueoId, shiftId, onClose }) {
+  const [audit, setAudit]     = useState(null)
+  const [prefill, setPrefill] = useState(null)
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    Promise.all([
+      getCashAudit(arqueoId),
+      getCashAuditPrefill({ shift_id: shiftId }),
+    ]).then(([a, p]) => {
+      setAudit(a.data)
+      setPrefill(p.data)
+      setLoading(false)
+    }).catch(() => setLoading(false))
+  }, [arqueoId, shiftId])
+
+  if (loading) return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+      <div className="bg-white rounded-2xl p-10 flex items-center gap-3">
+        <div className="w-6 h-6 border-4 border-blue-500 border-t-transparent rounded-full animate-spin" />
+        <span className="text-sm text-gray-500">Cargando arqueo...</span>
+      </div>
+    </div>
+  )
+
+  if (!audit) return null
+
+  const cups     = audit.items?.filter(r => r.product_type === 'cup') || []
+  const toppings = audit.items?.filter(r => r.product_type === 'topping') || []
+
+  // Merge sales_revenue del prefill en los items del arqueo guardado
+  const prefillMap = {}
+  ;(prefill?.catalog || []).forEach(c => { prefillMap[c.product_name] = c })
+
+  const totalLiq = (prefill?.catalog || []).reduce((s, c) => s + (c.sales_revenue || 0), 0)
+  const diff = Number(audit.actual_cash) - Number(audit.expected_cash)
+
+  const COL = '2fr 80px 80px 80px 80px 80px 110px'
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center bg-black/40 p-4">
+      <div className="bg-white rounded-2xl w-full max-w-4xl max-h-[92vh] flex flex-col shadow-2xl">
+        {/* Header */}
+        <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between flex-shrink-0">
+          <div>
+            <h2 className="font-bold text-gray-900">Arqueo #{audit.id} — Jornada #{audit.shift}</h2>
+            <p className="text-xs text-gray-400 mt-0.5">
+              Registrado por {audit.audited_by_name || '—'} · {new Date(audit.created_at).toLocaleString('es-CO')}
+            </p>
+          </div>
+          <button onClick={onClose} className="btn-ghost px-2 py-1 text-gray-400">✕</button>
+        </div>
+
+        <div className="flex-1 overflow-y-auto p-6 space-y-6">
+          {/* POS */}
+          {prefill && (
+            <div>
+              <p className="text-[10px] font-bold text-blue-500 uppercase tracking-widest mb-2">POS — Caja física</p>
+              <div className="grid grid-cols-4 gap-3">
+                <div className="card p-4 text-center">
+                  <p className="text-xs text-gray-400 uppercase tracking-wide mb-1">Ventas POS</p>
+                  <p className="text-xl font-bold text-blue-700">{fmt(prefill.pos_total)}</p>
+                </div>
+                <div className="card p-4 text-center">
+                  <p className="text-xs text-gray-400 uppercase tracking-wide mb-1">Efectivo POS</p>
+                  <p className="text-xl font-bold text-gray-800">{fmt(prefill.pos_cash)}</p>
+                </div>
+                <div className="card p-4 text-center">
+                  <p className="text-xs text-gray-400 uppercase tracking-wide mb-1">Gastos en caja</p>
+                  <p className="text-xl font-bold text-red-500">- {fmt(prefill.expenses_from_cash)}</p>
+                </div>
+                <div className="card p-4 text-center border-2 border-blue-200">
+                  <p className="text-xs text-gray-400 uppercase tracking-wide mb-1">Neto a entregar</p>
+                  <p className="text-xl font-bold text-blue-700">{fmt(prefill.net_expected_cash)}</p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Domicilios */}
+          {prefill && prefill.delivery_total > 0 && (
+            <div>
+              <p className="text-[10px] font-bold text-orange-500 uppercase tracking-widest mb-2">Domicilios — Dinero</p>
+              <div className="grid grid-cols-4 gap-3">
+                <div className="card p-4 text-center">
+                  <p className="text-xs text-gray-400 uppercase tracking-wide mb-1">Total domicilios</p>
+                  <p className="text-xl font-bold text-orange-600">{fmt(prefill.delivery_total)}</p>
+                </div>
+                <div className="card p-4 text-center">
+                  <p className="text-xs text-gray-400 uppercase tracking-wide mb-1">Efectivo</p>
+                  <p className="text-xl font-bold text-gray-800">{fmt(prefill.delivery_cash)}</p>
+                </div>
+                <div className="card p-4 text-center">
+                  <p className="text-xs text-gray-400 uppercase tracking-wide mb-1">Gastos en caja</p>
+                  <p className="text-xl font-bold text-red-500">- {fmt(prefill.delivery_expenses_cash)}</p>
+                </div>
+                <div className="card p-4 text-center border-2 border-orange-200">
+                  <p className="text-xs text-gray-400 uppercase tracking-wide mb-1">Neto a entregar</p>
+                  <p className="text-xl font-bold text-orange-600">{fmt(prefill.delivery_net_cash)}</p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Diferencia caja POS */}
+          {audit && (
+            <div className={`rounded-xl px-4 py-3 flex items-center justify-between ${
+              diff === 0 ? 'bg-green-50 border border-green-200' :
+              diff > 0   ? 'bg-blue-50 border border-blue-200' :
+                           'bg-red-50 border border-red-200'
+            }`}>
+              <span className="text-sm font-semibold text-gray-700">
+                Entregado por encargada: {fmt(audit.actual_cash)}
+              </span>
+              <span className={`text-lg font-bold ${diff === 0 ? 'text-green-700' : diff > 0 ? 'text-blue-700' : 'text-red-600'}`}>
+                {diff === 0 ? 'Cuadre perfecto' : diff > 0 ? `Sobrante ${fmt(diff)}` : `Faltante ${fmt(Math.abs(diff))}`}
+              </span>
+            </div>
+          )}
+
+          {/* Tabla inventario */}
+          {audit.items?.length > 0 && (
+            <div className="card p-0 overflow-hidden">
+              <div className="px-5 py-3 border-b border-gray-100">
+                <h3 className="text-sm font-semibold text-gray-700">Inventario Físico</h3>
+              </div>
+              {/* Headers */}
+              <div className="grid text-[10px] font-semibold text-gray-400 uppercase tracking-widest px-4 py-2 bg-gray-50 border-b border-gray-100"
+                style={{ gridTemplateColumns: COL }}>
+                <span>Producto</span>
+                <span className="text-center">Anterior</span>
+                <span className="text-center">Entrada</span>
+                <span className="text-center">Disponible</span>
+                <span className="text-center">Cierre</span>
+                <span className="text-center text-blue-600">Vendidos</span>
+                <span className="text-center text-emerald-600">Liquidación</span>
+              </div>
+
+              {/* Vasos */}
+              {cups.length > 0 && (
+                <>
+                  <div className="px-4 py-1.5 bg-blue-50 border-b border-blue-100">
+                    <span className="text-[10px] font-bold text-blue-600 uppercase tracking-widest">Vasos</span>
+                  </div>
+                  {cups.map(row => {
+                    const p = prefillMap[row.product_name] || {}
+                    return (
+                      <div key={row.id} className="grid items-center px-4 py-2.5 border-b border-gray-50"
+                        style={{ gridTemplateColumns: COL }}>
+                        <div>
+                          <p className="text-sm font-medium text-gray-800">{row.product_name}</p>
+                          {row.unit_price > 0 && <p className="text-[11px] text-gray-400">{fmt(row.unit_price)} c/u</p>}
+                        </div>
+                        <span className="text-center text-sm text-gray-700">{row.opening_stock}</span>
+                        <span className="text-center text-sm text-gray-700">{row.entries}</span>
+                        <span className="text-center text-sm font-semibold text-gray-700">{row.available}</span>
+                        <span className="text-center text-sm text-gray-700">{row.closing_stock}</span>
+                        <span className={`text-center text-sm font-bold ${row.sold > 0 ? 'text-blue-700' : 'text-gray-400'}`}>{row.sold}</span>
+                        <div className="text-center">
+                          {p.sales_revenue > 0 ? (
+                            <>
+                              <span className="text-sm font-bold text-emerald-700">{fmt(p.sales_revenue)}</span>
+                              <p className="text-[10px] text-gray-400">{p.sales_qty} uds</p>
+                            </>
+                          ) : <span className="text-gray-300 text-xs">—</span>}
+                        </div>
+                      </div>
+                    )
+                  })}
+                  <div className="grid px-4 py-2 bg-blue-50 border-b border-blue-100 text-sm font-semibold text-blue-700"
+                    style={{ gridTemplateColumns: COL }}>
+                    <span>Total vasos vendidos</span>
+                    <span /><span /><span /><span />
+                    <span className="text-center">{cups.reduce((s, r) => s + r.sold, 0)}</span>
+                    <span className="text-center text-emerald-700">{fmt(cups.reduce((s, r) => s + (prefillMap[r.product_name]?.sales_revenue || 0), 0))}</span>
+                  </div>
+                </>
+              )}
+
+              {/* Toppings */}
+              {toppings.length > 0 && (
+                <>
+                  <div className="px-4 py-1.5 bg-purple-50 border-b border-purple-100">
+                    <span className="text-[10px] font-bold text-purple-600 uppercase tracking-widest">Toppings</span>
+                  </div>
+                  {toppings.map(row => {
+                    const p = prefillMap[row.product_name] || {}
+                    return (
+                      <div key={row.id} className="grid items-center px-4 py-2.5 border-b border-gray-50"
+                        style={{ gridTemplateColumns: COL }}>
+                        <p className="text-sm font-medium text-gray-800">{row.product_name}</p>
+                        <span className="text-center text-sm text-gray-700">{row.opening_stock}</span>
+                        <span className="text-center text-sm text-gray-700">{row.entries}</span>
+                        <span className="text-center text-sm font-semibold text-gray-700">{row.available}</span>
+                        <span className="text-center text-sm text-gray-700">{row.closing_stock}</span>
+                        <span className={`text-center text-sm font-bold ${row.sold > 0 ? 'text-purple-700' : 'text-gray-400'}`}>{row.sold}</span>
+                        <div className="text-center">
+                          {p.sales_revenue > 0 ? (
+                            <>
+                              <span className="text-sm font-bold text-emerald-700">{fmt(p.sales_revenue)}</span>
+                              <p className="text-[10px] text-gray-400">{p.sales_qty} uds</p>
+                            </>
+                          ) : <span className="text-gray-300 text-xs">—</span>}
+                        </div>
+                      </div>
+                    )
+                  })}
+                </>
+              )}
+
+              {/* Total general */}
+              {totalLiq > 0 && (
+                <div className="grid px-4 py-3 bg-emerald-50 border-t-2 border-emerald-200 text-sm font-bold text-emerald-800"
+                  style={{ gridTemplateColumns: COL }}>
+                  <span>TOTAL LIQUIDACIÓN JORNADA</span>
+                  <span /><span /><span /><span /><span />
+                  <span className="text-center text-base">{fmt(totalLiq)}</span>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Notas */}
+          {audit.notes && (
+            <div className="card p-4">
+              <p className="text-xs text-gray-400 uppercase tracking-wide mb-1">Notas</p>
+              <p className="text-sm text-gray-700">{audit.notes}</p>
+            </div>
+          )}
+        </div>
+
+        <div className="px-6 py-4 border-t border-gray-100 flex justify-end">
+          <button onClick={onClose} className="btn-secondary">Cerrar</button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Panel de detalle de jornada
 // ─────────────────────────────────────────────────────────────────────────────
 function ShiftDetail({ shift, onBack, onShiftUpdate }) {
   const [channel, setChannel]   = useState('all')
   const [detail, setDetail]     = useState(null)
   const [loading, setLoading]   = useState(true)
-  const [showArqueo, setShowArqueo] = useState(false)
+  const [showPOS, setShowPOS]           = useState(false)
+  const [showDom, setShowDom]           = useState(false)
   const [expandedSale, setExpandedSale] = useState(null)
 
   const load = async (ch = channel) => {
@@ -316,11 +909,16 @@ function ShiftDetail({ shift, onBack, onShiftUpdate }) {
           {shift.status === 'open' ? 'Abierta' : 'Cerrada'}
         </span>
         {shift.status === 'closed' && (
-          detail?.arqueo
-            ? <span className="badge-cyan text-xs">Arqueo #{detail.arqueo.id}</span>
-            : <button onClick={() => setShowArqueo(true)} className="btn-primary text-xs py-1.5 px-3">
-                + Crear Arqueo
-              </button>
+          <div className="flex gap-2">
+            <button onClick={() => setShowPOS(true)}
+              className={`text-xs py-1.5 px-3 ${detail?.arqueos?.pos ? 'badge-lime cursor-pointer' : 'btn-secondary'}`}>
+              {detail?.arqueos?.pos ? 'POS entregado' : 'Resumen POS'}
+            </button>
+            <button onClick={() => setShowDom(true)}
+              className={`text-xs py-1.5 px-3 ${detail?.arqueos?.delivery ? 'badge-lime cursor-pointer' : 'btn-secondary'}`}>
+              {detail?.arqueos?.delivery ? 'Domicilios entregado' : 'Resumen Domicilios'}
+            </button>
+          </div>
         )}
       </div>
 
@@ -624,12 +1222,12 @@ function ShiftDetail({ shift, onBack, onShiftUpdate }) {
         </>
       )}
 
-      {showArqueo && (
-        <ArqueoModal
-          shiftId={shift.id}
-          onClose={() => setShowArqueo(false)}
-          onSaved={() => { load(); onShiftUpdate && onShiftUpdate() }}
-        />
+      {showPOS && (
+        <POSResumenModal shiftId={shift.id} onClose={() => setShowPOS(false)} />
+      )}
+
+      {showDom && (
+        <DomiciliosResumenModal shiftId={shift.id} onClose={() => setShowDom(false)} />
       )}
     </div>
   )

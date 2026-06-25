@@ -145,12 +145,15 @@ class ShiftViewSet(viewsets.ReadOnlyModelViewSet):
                 'created_at':     e.created_at,
             })
 
-        # ── Arqueo existente ──
-        arqueo = None
-        try:
-            arqueo = {'id': shift.cash_audit.id}
-        except Exception:
-            pass
+        # ── Arqueos existentes por canal ──
+        from apps.cash.models import CashAudit
+        arqueos = {}
+        for a in CashAudit.objects.filter(shift=shift).select_related('audited_by'):
+            arqueos[a.channel] = {
+                'id':         a.id,
+                'audited_by': a.audited_by.full_name if a.audited_by else '—',
+                'created_at': a.created_at,
+            }
 
         return Response({
             'shift': ShiftSerializer(shift).data,
@@ -182,5 +185,5 @@ class ShiftViewSet(viewsets.ReadOnlyModelViewSet):
             },
             'sales':    sales_data,
             'expenses': expenses_data,
-            'arqueo':   arqueo,
+            'arqueos':  arqueos,
         })

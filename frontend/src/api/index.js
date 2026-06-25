@@ -77,6 +77,7 @@ export const updateDomiciliario = (id, data) => api.patch(`/deliveries/domicilia
 // Cash audit
 export const getCashAuditPrefill   = (params) => api.get('/cash/prefill/', { params })
 export const createCashAudit       = (data)   => api.post('/cash/', data)
+export const getCashAudit          = (id)     => api.get(`/cash/${id}/`)
 export const getShiftDetail        = (id, channel = 'all') => api.get(`/shifts/${id}/detail/`, { params: { channel } })
 
 // Attendance
