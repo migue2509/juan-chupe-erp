@@ -44,7 +44,7 @@ function POSResumenModal({ shiftId, onClose }) {
   const cups     = (p.catalog || []).filter(r => r.product_type === 'cup')
   const toppings = (p.catalog || []).filter(r => r.product_type === 'topping')
   const totalLiq = (p.catalog || []).reduce((s, r) => s + (r.sales_revenue || 0), 0)
-  const COL = '2fr 90px 90px 110px'
+  const COL = '2fr 110px 70px 110px'
 
   return (
     <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center bg-black/40 p-4">
@@ -86,10 +86,10 @@ function POSResumenModal({ shiftId, onClose }) {
               </div>
               <div className="grid text-[10px] font-semibold text-gray-400 uppercase tracking-widest px-4 py-2 bg-gray-50 border-b border-gray-100"
                 style={{ gridTemplateColumns: COL }}>
-                <span>Producto</span>
-                <span className="text-center">Precio regular</span>
-                <span className="text-center">Uds vendidas</span>
-                <span className="text-center text-emerald-600">Liquidación</span>
+                <span>Producto / Tipo</span>
+                <span className="text-center">Precio unit.</span>
+                <span className="text-center">Uds</span>
+                <span className="text-center text-emerald-600">Total</span>
               </div>
 
               {cups.length > 0 && (
@@ -97,17 +97,49 @@ function POSResumenModal({ shiftId, onClose }) {
                   <div className="px-4 py-1.5 bg-blue-50 border-b border-blue-100">
                     <span className="text-[10px] font-bold text-blue-600 uppercase tracking-widest">Vasos</span>
                   </div>
-                  {cups.map(row => (
-                    <div key={row.product_name} className="grid items-center px-4 py-3 border-b border-gray-50"
-                      style={{ gridTemplateColumns: COL }}>
-                      <p className="text-sm font-medium text-gray-800">{row.product_name}</p>
-                      <span className="text-center text-sm text-gray-500">{fmt(row.unit_price)}</span>
-                      <span className="text-center text-sm font-semibold text-gray-700">{row.sales_qty}</span>
-                      <span className={`text-center text-sm font-bold ${row.sales_revenue > 0 ? 'text-emerald-700' : 'text-gray-300'}`}>
-                        {fmt(row.sales_revenue)}
-                      </span>
-                    </div>
-                  ))}
+                  {cups.map(row => {
+                    const hasRegular = row.regular_qty > 0
+                    const hasPromo   = row.promo_qty > 0
+                    if (!hasRegular && !hasPromo) return null
+                    return (
+                      <div key={row.product_name}>
+                        {/* Fila nombre del vaso */}
+                        <div className="px-4 pt-2.5 pb-0.5">
+                          <p className="text-sm font-semibold text-gray-800">{row.product_name}</p>
+                        </div>
+                        {/* Sub-fila Regular */}
+                        {hasRegular && (
+                          <div className="grid items-center px-4 py-1.5 border-b border-gray-50 bg-white"
+                            style={{ gridTemplateColumns: COL }}>
+                            <span className="text-xs text-gray-500 pl-3">Precio regular</span>
+                            <span className="text-center text-xs text-gray-500">{fmt(row.unit_price)}</span>
+                            <span className="text-center text-sm font-semibold text-gray-700">{row.regular_qty}</span>
+                            <span className="text-center text-sm font-bold text-emerald-700">{fmt(row.regular_revenue)}</span>
+                          </div>
+                        )}
+                        {/* Sub-fila Promo */}
+                        {hasPromo && (
+                          <div className="grid items-center px-4 py-1.5 border-b border-gray-100 bg-amber-50/50"
+                            style={{ gridTemplateColumns: COL }}>
+                            <span className="text-xs text-amber-700 pl-3">Promoción</span>
+                            <span className="text-center text-xs text-amber-600">{row.promo_unit ? fmt(row.promo_unit) : '—'}</span>
+                            <span className="text-center text-sm font-semibold text-amber-700">{row.promo_qty}</span>
+                            <span className="text-center text-sm font-bold text-amber-700">{fmt(row.promo_revenue)}</span>
+                          </div>
+                        )}
+                        {/* Sub-total del tamaño */}
+                        {hasRegular && hasPromo && (
+                          <div className="grid items-center px-4 py-1.5 border-b border-gray-200 bg-gray-50"
+                            style={{ gridTemplateColumns: COL }}>
+                            <span className="text-xs font-semibold text-gray-600 pl-3">Subtotal {row.product_name}</span>
+                            <span />
+                            <span className="text-center text-sm font-bold text-gray-700">{row.sales_qty}</span>
+                            <span className="text-center text-sm font-bold text-emerald-800">{fmt(row.sales_revenue)}</span>
+                          </div>
+                        )}
+                      </div>
+                    )
+                  })}
                 </>
               )}
 

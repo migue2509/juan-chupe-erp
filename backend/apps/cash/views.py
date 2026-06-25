@@ -96,19 +96,35 @@ class CashAuditViewSet(viewsets.ModelViewSet):
             except Exception:
                 pass
 
-        # ── Revenue real por vaso — solo POS ──
+        # ── Revenue real por vaso — solo POS, separado regular vs promo ──
         from apps.products.models import CupSize, Topping
         from apps.inventory.models import CupStock, ToppingStock
 
         cup_revenue = {}
         for cs in CupSize.objects.filter(is_active=True):
-            name = f'Vaso {cs.size}'
-            agg  = SaleItem.objects.filter(
-                sale__shift=shift, sale__is_delivery=False, cup_size=cs
-            ).aggregate(qty=Sum('quantity'), rev=Sum('subtotal'))
+            name     = f'Vaso {cs.size}'
+            base_qs  = SaleItem.objects.filter(sale__shift=shift, sale__is_delivery=False, cup_size=cs)
+
+            # Ventas a precio regular (sin promoción)
+            reg = base_qs.filter(sale__promotion__isnull=True).aggregate(qty=Sum('quantity'), rev=Sum('subtotal'))
+            # Ventas con promoción (precio diferente)
+            promo_items = base_qs.filter(sale__promotion__isnull=False)
+            promo = promo_items.aggregate(qty=Sum('quantity'), rev=Sum('subtotal'))
+
+            # Precio unitario promedio de promo (para mostrar en tabla)
+            promo_unit = None
+            if int(promo['qty'] or 0) > 0:
+                promo_unit = int(int(promo['rev'] or 0) / int(promo['qty']))
+
             cup_revenue[name] = {
-                'sales_qty':     int(agg['qty'] or 0),
-                'sales_revenue': int(agg['rev'] or 0),
+                'regular_qty':     int(reg['qty'] or 0),
+                'regular_revenue': int(reg['rev'] or 0),
+                'promo_qty':       int(promo['qty'] or 0),
+                'promo_revenue':   int(promo['rev'] or 0),
+                'promo_unit':      promo_unit,
+                # totales consolidados
+                'sales_qty':     int((reg['qty'] or 0) + (promo['qty'] or 0)),
+                'sales_revenue': int((reg['rev'] or 0) + (promo['rev'] or 0)),
             }
 
         # ── Catálogo ──
