@@ -271,8 +271,8 @@ export default function Deliveries() {
           </div>
 
           <div className="grid px-4 py-2.5 bg-slate-50 border-b border-gray-100 text-[10px] font-semibold text-gray-400 uppercase tracking-widest gap-2"
-            style={{ gridTemplateColumns: '44px 110px 52px 1fr 85px 85px 110px 76px' }}>
-            {['#', 'Fecha / Hora', 'Cliente', 'Dirección', 'Total', 'Pago', 'Domiciliario', 'Estado'].map(h => <span key={h}>{h}</span>)}
+            style={{ gridTemplateColumns: '44px 110px 80px 52px 1fr 85px 85px 110px 76px' }}>
+            {['#', 'Fecha / Hora', 'Jornada', 'Cliente', 'Dirección', 'Total', 'Pago', 'Domiciliario', 'Estado'].map(h => <span key={h}>{h}</span>)}
           </div>
 
           <div className="divide-y divide-gray-50">
@@ -289,12 +289,13 @@ export default function Deliveries() {
                   <div
                     onClick={() => setSelected(selected?.id === d.id ? null : d)}
                     className="grid px-4 py-3 items-center gap-2 hover:bg-slate-50 transition-colors cursor-pointer"
-                    style={{ gridTemplateColumns: '44px 110px 52px 1fr 85px 85px 110px 76px' }}>
+                    style={{ gridTemplateColumns: '44px 110px 80px 52px 1fr 85px 85px 110px 76px' }}>
                     <span className="font-mono text-xs font-bold text-brand-navy">#{d.id}</span>
                     <span className="text-xs tabular-nums text-gray-500 leading-tight">
                       <span className="block">{new Date(d.created_at).toLocaleDateString('es-CO', { day: '2-digit', month: '2-digit', year: '2-digit' })}</span>
                       <span className="block text-gray-400">{fmtTime(d.created_at)}</span>
                     </span>
+                    <span className="text-xs font-medium text-brand-navy bg-blue-50 px-1.5 py-0.5 rounded-full truncate">{d.shift_label || '—'}</span>
                     <span className="font-mono text-sm font-bold text-gray-700 text-center">{d.four_digits || '—'}</span>
                     <span className="text-sm text-gray-800 truncate">{d.address}</span>
                     <span className="text-sm font-semibold text-brand-pink tabular-nums">{fmt(sale?.total || 0)}</span>
