@@ -10,7 +10,6 @@ import Shifts from '../pages/Shifts'
 import Promotions from '../pages/Promotions'
 import Expenses from '../pages/Expenses'
 import Deliveries from '../pages/Deliveries'
-import CashAudit from '../pages/CashAudit'
 import Reports from '../pages/Reports'
 import Users from '../pages/Users'
 import Billing from '../pages/Billing'
@@ -41,7 +40,6 @@ export default function AppRoutes() {
         <Route path="inventory" element={<PrivateRoute adminOnly><Inventory /></PrivateRoute>} />
         <Route path="promotions" element={<PrivateRoute adminOnly><Promotions /></PrivateRoute>} />
         <Route path="shifts" element={<PrivateRoute adminOnly><Shifts /></PrivateRoute>} />
-        <Route path="cash-audit" element={<PrivateRoute adminOnly><CashAudit /></PrivateRoute>} />
         <Route path="reports" element={<PrivateRoute adminOnly><Reports /></PrivateRoute>} />
         <Route path="users" element={<PrivateRoute adminOnly><Users /></PrivateRoute>} />
         <Route path="attendance" element={<PrivateRoute><Attendance /></PrivateRoute>} />

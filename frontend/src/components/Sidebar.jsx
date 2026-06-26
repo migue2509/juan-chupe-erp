@@ -23,7 +23,6 @@ const NAV_ADMIN = [
   { to: '/products',   label: 'Productos',      icon: 'products' },
   { to: '/inventory',  label: 'Inventario',     icon: 'inventory' },
   { to: '/promotions', label: 'Promociones',    icon: 'promotions' },
-  { to: '/cash-audit', label: 'Arqueo de Caja', icon: 'cashaudit' },
   { to: '/reports',    label: 'Reportes',       icon: 'reports' },
   { to: '/users',      label: 'Usuarios',       icon: 'users' },
   { to: '/attendance', label: 'Asistencia',     icon: 'attendance' },
