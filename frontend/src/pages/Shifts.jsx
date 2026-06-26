@@ -1129,35 +1129,50 @@ function ShiftDetail({ shift, onBack, onShiftUpdate }) {
 
                             {/* Pago */}
                             <div className="border-t border-gray-200 pt-2 flex flex-col gap-0.5 text-xs text-gray-500">
-                              {s.payment_method === 'cash' || s.payment_method === 'mixed' ? (
-                                <div className="flex justify-between">
-                                  <span>Efectivo recibido</span>
-                                  <span>{fmt(s.cash_received)}</span>
+                              {/* Bloque cortesía — igual que en Facturas */}
+                              {s.is_courtesy ? (
+                                <div className="p-3 bg-pink-50 border border-pink-100 rounded-xl space-y-1 mb-1">
+                                  <p className="text-xs font-semibold text-pink-600 uppercase tracking-wide">Cortesía</p>
+                                  <div className="flex justify-between text-sm">
+                                    <span className="text-gray-500">Valor de la factura</span>
+                                    <span className="font-medium text-gray-700">{fmt(s.total)}</span>
+                                  </div>
+                                  <div className="flex justify-between text-sm">
+                                    <span className="text-gray-500">Dinero recibido</span>
+                                    <span className="font-medium text-green-600">{fmt(s.courtesy_paid || 0)}</span>
+                                  </div>
+                                  <div className="flex justify-between text-sm border-t border-pink-100 pt-1">
+                                    <span className="text-gray-500">Gasto generado</span>
+                                    <span className="font-bold text-red-500">{fmt(Number(s.total) - Number(s.courtesy_paid || 0))}</span>
+                                  </div>
                                 </div>
-                              ) : null}
-                              {s.change_given > 0 && (
-                                <div className="flex justify-between">
-                                  <span>Cambio</span>
-                                  <span>{fmt(s.change_given)}</span>
-                                </div>
-                              )}
-                              {s.transfer_amount > 0 && (
-                                <div className="flex justify-between">
-                                  <span>Transferencia</span>
-                                  <span>{fmt(s.transfer_amount)}</span>
-                                </div>
-                              )}
-                              {s.transfer_reference && (
-                                <div className="flex justify-between">
-                                  <span>Referencia</span>
-                                  <span className="font-mono">{s.transfer_reference}</span>
-                                </div>
-                              )}
-                              {s.is_courtesy && s.courtesy_paid > 0 && (
-                                <div className="flex justify-between">
-                                  <span>Pagado (cortesía)</span>
-                                  <span>{fmt(s.courtesy_paid)}</span>
-                                </div>
+                              ) : (
+                                <>
+                                  {(s.payment_method === 'cash' || s.payment_method === 'mixed') && (
+                                    <div className="flex justify-between">
+                                      <span>Efectivo recibido</span>
+                                      <span>{fmt(s.cash_received)}</span>
+                                    </div>
+                                  )}
+                                  {s.change_given > 0 && (
+                                    <div className="flex justify-between">
+                                      <span>Cambio</span>
+                                      <span>{fmt(s.change_given)}</span>
+                                    </div>
+                                  )}
+                                  {s.transfer_amount > 0 && (
+                                    <div className="flex justify-between">
+                                      <span>Transferencia</span>
+                                      <span>{fmt(s.transfer_amount)}</span>
+                                    </div>
+                                  )}
+                                  {s.transfer_reference && (
+                                    <div className="flex justify-between">
+                                      <span>Referencia</span>
+                                      <span className="font-mono">{s.transfer_reference}</span>
+                                    </div>
+                                  )}
+                                </>
                               )}
                               {s.notes && (
                                 <div className="flex justify-between gap-4">
@@ -1165,6 +1180,15 @@ function ShiftDetail({ shift, onBack, onShiftUpdate }) {
                                   <span className="text-right text-gray-600">{s.notes}</span>
                                 </div>
                               )}
+                            </div>
+                            {/* Total / Recibido */}
+                            <div className="border-t border-gray-100 pt-2 flex justify-between items-center">
+                              <span className="text-xs font-semibold text-gray-500">
+                                {s.is_courtesy ? 'Recibido' : 'Total'}
+                              </span>
+                              <span className="text-base font-bold text-brand-pink">
+                                {fmt(s.is_courtesy ? (s.courtesy_paid || 0) : s.total)}
+                              </span>
                             </div>
                           </div>
                         )}
