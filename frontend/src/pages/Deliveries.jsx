@@ -120,7 +120,7 @@ export default function Deliveries() {
   const clearDates    = () => { setDateFrom(''); setDateTo('') }
 
   const counts = Object.keys(STATUS).reduce((acc, k) => {
-    acc[k] = deliveries.filter(d => d.status === k).length
+    acc[k] = filtered.filter(d => d.status === k).length
     return acc
   }, {})
 

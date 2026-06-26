@@ -153,9 +153,9 @@ export default function Expenses() {
     } catch { toast.error('Error al eliminar') }
   }
 
-  const totalAll      = expenses.reduce((s, e) => s + Number(e.amount), 0)
-  const totalPos      = expenses.filter(e => e.origin === 'pos').reduce((s, e) => s + Number(e.amount), 0)
-  const totalDelivery = expenses.filter(e => e.origin === 'delivery').reduce((s, e) => s + Number(e.amount), 0)
+  const totalAll      = filtered.reduce((s, e) => s + Number(e.amount), 0)
+  const totalPos      = filtered.filter(e => e.origin === 'pos').reduce((s, e) => s + Number(e.amount), 0)
+  const totalDelivery = filtered.filter(e => e.origin === 'delivery').reduce((s, e) => s + Number(e.amount), 0)
 
   return (
     <div className="space-y-5">
