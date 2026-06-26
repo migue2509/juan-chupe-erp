@@ -102,6 +102,30 @@ export default function Deliveries() {
     } catch { toast.error('Error') }
   }
 
+  // Editar domicilio
+  const [editing,  setEditing]  = useState(null)
+  const [editForm, setEditForm] = useState({})
+
+  const openEdit = (d, e) => {
+    e.stopPropagation()
+    setEditForm({ address: d.address, four_digits: d.four_digits, notes: d.notes || '', delivery_person: d.delivery_person || '' })
+    setEditing(d)
+  }
+
+  const saveEdit = async () => {
+    try {
+      await updateDelivery(editing.id, {
+        address:         editForm.address.trim(),
+        four_digits:     editForm.four_digits.trim(),
+        notes:           editForm.notes.trim(),
+        delivery_person: editForm.delivery_person || null,
+      })
+      toast.success('Domicilio actualizado')
+      setEditing(null)
+      load()
+    } catch { toast.error('Error al guardar') }
+  }
+
   const [dateFrom, setDateFrom] = useState('')
   const [dateTo,   setDateTo]   = useState('')
 
@@ -274,6 +298,11 @@ export default function Deliveries() {
                       {activeDomiciliarios.map(p => (
                         <option key={p.id} value={p.id}>{p.name}</option>
                       ))}
+                      {/* Mantener trazabilidad: mostrar el asignado aunque esté inactivo */}
+                      {d.delivery_person && !activeDomiciliarios.find(p => p.id === d.delivery_person) && (() => {
+                        const inactivo = domiciliarios.find(p => p.id === d.delivery_person)
+                        return inactivo ? <option key={inactivo.id} value={inactivo.id}>{inactivo.name} (inactivo)</option> : null
+                      })()}
                     </select>
                     <span className={`text-xs font-semibold px-2 py-0.5 rounded-full w-fit ${s.cls}`}>{s.label}</span>
                   </div>
@@ -320,6 +349,9 @@ export default function Deliveries() {
                             <option key={k} value={k}>{sv.label}</option>
                           ))}
                         </select>
+                        <button onClick={(e) => openEdit(d, e)} className="btn-secondary py-1.5 text-xs">
+                          Editar
+                        </button>
                         {d.status !== 'cancelled' && (
                           <button onClick={() => cancelDelivery(d)} className="btn-secondary py-1.5 text-xs text-red-500">
                             Cancelar
@@ -382,6 +414,53 @@ export default function Deliveries() {
         </div>
 
       </div>
+
+      {/* Modal editar domicilio */}
+      {editing && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+              <h2 className="text-base font-semibold">Editar domicilio #{editing.id}</h2>
+              <button onClick={() => setEditing(null)} className="text-gray-400 hover:text-gray-600 text-xl leading-none">×</button>
+            </div>
+            <div className="px-6 py-5 space-y-4">
+              <div>
+                <label className="label">Dirección</label>
+                <input className="input" value={editForm.address}
+                  onChange={e => setEditForm(f => ({ ...f, address: e.target.value }))} />
+              </div>
+              <div>
+                <label className="label">Cliente</label>
+                <input className="input" value={editForm.four_digits}
+                  onChange={e => setEditForm(f => ({ ...f, four_digits: e.target.value }))} />
+              </div>
+              <div>
+                <label className="label">Domiciliario</label>
+                <select className="input" value={editForm.delivery_person}
+                  onChange={e => setEditForm(f => ({ ...f, delivery_person: e.target.value }))}>
+                  <option value="">Sin asignar</option>
+                  {activeDomiciliarios.map(p => (
+                    <option key={p.id} value={p.id}>{p.name}</option>
+                  ))}
+                  {editForm.delivery_person && !activeDomiciliarios.find(p => p.id === Number(editForm.delivery_person)) && (() => {
+                    const inactivo = domiciliarios.find(p => p.id === Number(editForm.delivery_person))
+                    return inactivo ? <option key={inactivo.id} value={inactivo.id}>{inactivo.name} (inactivo)</option> : null
+                  })()}
+                </select>
+              </div>
+              <div>
+                <label className="label">Notas</label>
+                <input className="input" value={editForm.notes}
+                  onChange={e => setEditForm(f => ({ ...f, notes: e.target.value }))} />
+              </div>
+            </div>
+            <div className="flex justify-end gap-3 px-6 py-4 border-t border-gray-100">
+              <button onClick={() => setEditing(null)} className="btn-secondary text-sm">Cancelar</button>
+              <button onClick={saveEdit} className="btn-primary text-sm">Guardar</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
