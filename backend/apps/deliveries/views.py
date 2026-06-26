@@ -22,6 +22,9 @@ class DeliveryViewSet(viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         shift = Shift.get_active()
+        if not shift:
+            from rest_framework.exceptions import ValidationError
+            raise ValidationError('No hay jornada activa. El administrador debe abrir el día.')
         serializer.save(shift=shift)
 
     @action(detail=True, methods=['post'], permission_classes=[IsAdmin])

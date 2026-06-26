@@ -97,7 +97,7 @@ export default function Expenses() {
       setForm(EMPTY_FORM)
       setShowForm(false)
       load()
-    } catch { toast.error('Error al registrar gasto') }
+    } catch (err) { toast.error(err?.response?.data?.detail || err?.response?.data?.[0] || 'Error al registrar gasto') }
     setSubmitting(false)
   }
 
@@ -140,7 +140,7 @@ export default function Expenses() {
       toast.success('Gasto actualizado')
       setEditing(null)
       load()
-    } catch { toast.error('Error al actualizar') }
+    } catch (err) { toast.error(err?.response?.data?.detail || 'Error al actualizar') }
     setESaving(false)
   }
 
