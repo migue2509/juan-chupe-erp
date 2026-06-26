@@ -164,6 +164,8 @@ export default function Expenses() {
   const totalAll      = filtered.reduce((s, e) => s + Number(e.amount), 0)
   const totalPos      = filtered.filter(e => e.origin === 'pos').reduce((s, e) => s + Number(e.amount), 0)
   const totalDelivery = filtered.filter(e => e.origin === 'delivery').reduce((s, e) => s + Number(e.amount), 0)
+  const totalCash     = filtered.filter(e => e.from_daily_cash).reduce((s, e) => s + Number(e.amount), 0)
+  const totalNoCash   = filtered.filter(e => !e.from_daily_cash).reduce((s, e) => s + Number(e.amount), 0)
 
   return (
     <div className="space-y-5">
@@ -181,10 +183,18 @@ export default function Expenses() {
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-5 gap-4">
         <div className="stat-card">
           <span className="stat-label">Total gastos</span>
           <span className="stat-value text-red-500">{fmt(totalAll)}</span>
+        </div>
+        <div className="stat-card">
+          <span className="stat-label">Afecta caja</span>
+          <span className="stat-value text-orange-500">{fmt(totalCash)}</span>
+        </div>
+        <div className="stat-card">
+          <span className="stat-label">No afecta caja</span>
+          <span className="stat-value text-gray-400">{fmt(totalNoCash)}</span>
         </div>
         <div className="stat-card">
           <span className="stat-label">Punto de Venta</span>
