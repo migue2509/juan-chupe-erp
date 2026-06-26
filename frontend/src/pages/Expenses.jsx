@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { getExpenses, createExpense, updateExpense, deleteExpense, getShifts } from '../api'
+import { getExpenses, createExpense, updateExpense, deleteExpense, getShifts, getActiveShift } from '../api'
 import { Icon } from '../components/Icons'
 import { useAuth } from '../context/AuthContext'
 import toast from 'react-hot-toast'
@@ -72,6 +72,7 @@ export default function Expenses() {
   const [dateTo,       setDateTo]       = useState('')
   const [shiftFilter,  setShiftFilter]  = useState('all')
   const [shifts,       setShifts]       = useState([])
+  const [activeShift,  setActiveShift]  = useState(null)
 
   // Edición
   const [editing,   setEditing]   = useState(null)
@@ -87,6 +88,7 @@ export default function Expenses() {
   useEffect(() => {
     load()
     getShifts().then(r => setShifts((r.data?.results ?? r.data ?? []).sort((a,b) => b.id - a.id)))
+    getActiveShift().then(r => setActiveShift(r.data?.shift ?? null)).catch(() => {})
   }, [])
   useEffect(() => { load(filterOrigin) }, [filterOrigin])
 
@@ -197,7 +199,15 @@ export default function Expenses() {
       {/* Form */}
       {showForm && (
         <div className="card border-l-4 border-brand-pink">
-          <h2 className="mb-4">Nuevo Gasto</h2>
+          <div className="flex items-center justify-between mb-4">
+            <h2>Nuevo Gasto</h2>
+            {activeShift
+              ? <span className="text-xs font-semibold px-3 py-1 rounded-full bg-blue-50 text-brand-navy border border-blue-100">
+                  Jornada #{activeShift.id} · {new Date(activeShift.opened_at).toLocaleDateString('es-CO', { day: '2-digit', month: '2-digit', year: '2-digit' })}
+                </span>
+              : <span className="text-xs font-semibold px-3 py-1 rounded-full bg-red-50 text-red-600 border border-red-100">Sin jornada activa</span>
+            }
+          </div>
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
 

@@ -1052,7 +1052,12 @@ function ShiftDetail({ shift, onBack, onShiftUpdate }) {
           {/* Ventas */}
           <div className="card p-0 overflow-hidden">
             <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
-              <h2>Ventas</h2>
+              <div className="flex items-center gap-3">
+                <h2>Ventas</h2>
+                <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-blue-50 text-brand-navy border border-blue-100">
+                  Jornada #{detail.shift.id} · {new Date(detail.shift.opened_at).toLocaleDateString('es-CO', { day: '2-digit', month: '2-digit', year: '2-digit' })}
+                </span>
+              </div>
               <span className="text-xs text-gray-400">{detail.sales.length} registros</span>
             </div>
             {/* Header tabla — mismo estilo que Billing */}
@@ -1210,7 +1215,12 @@ function ShiftDetail({ shift, onBack, onShiftUpdate }) {
           {detail.expenses.length > 0 && (
             <div className="card p-0 overflow-hidden">
               <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
-                <h2>Gastos de la jornada</h2>
+                <div className="flex items-center gap-3">
+                  <h2>Gastos de la jornada</h2>
+                  <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-blue-50 text-brand-navy border border-blue-100">
+                    Jornada #{detail.shift.id} · {new Date(detail.shift.opened_at).toLocaleDateString('es-CO', { day: '2-digit', month: '2-digit', year: '2-digit' })}
+                  </span>
+                </div>
                 <span className="text-xs text-gray-400">{detail.expenses.length} registros</span>
               </div>
 
