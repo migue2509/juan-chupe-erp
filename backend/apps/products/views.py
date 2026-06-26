@@ -30,10 +30,15 @@ class FlavorViewSet(viewsets.ModelViewSet):
 
 
 class CupSizeViewSet(viewsets.ModelViewSet):
-    """Devuelve todos los vasos para admin; filtrar is_active en frontend si necesario"""
-    queryset = CupSize.objects.all().order_by('price')
     serializer_class = CupSizeSerializer
     permission_classes = [IsAdminOrReadOnly]
+
+    def get_queryset(self):
+        qs = CupSize.objects.all().order_by('price')
+        is_active = self.request.query_params.get('is_active')
+        if is_active is not None:
+            qs = qs.filter(is_active=is_active.lower() in ('true', '1'))
+        return qs
 
     def perform_create(self, serializer):
         """Auto-crea CupStock al crear un vaso"""

@@ -88,11 +88,15 @@ class CashAuditViewSet(viewsets.ModelViewSet):
 
         # ── Cierre de la jornada anterior ──
         prev_shift = Shift.objects.filter(opened_at__lt=shift.opened_at).order_by('-opened_at').first()
-        prev_closing = {}
+        # Matching por product_id (resistente a renombres); fallback a product_name
+        prev_closing = {}   # product_id → closing_stock
+        prev_closing_name = {}  # product_name → closing_stock (fallback)
         if prev_shift:
             try:
                 for item in prev_shift.cash_audits.filter(channel='pos').first().items.all():
-                    prev_closing[item.product_name] = item.closing_stock
+                    if item.product_id:
+                        prev_closing[item.product_id] = item.closing_stock
+                    prev_closing_name[item.product_name] = item.closing_stock
             except Exception:
                 pass
 
@@ -100,8 +104,15 @@ class CashAuditViewSet(viewsets.ModelViewSet):
         from apps.products.models import CupSize, Topping
         from apps.inventory.models import CupStock, ToppingStock
 
+        # Incluir vasos con ventas en la jornada aunque hayan sido desactivados mid-shift
+        cup_sizes_with_sales = CupSize.objects.filter(
+            saleitem__sale__shift=shift, saleitem__sale__is_delivery=False
+        ).distinct()
+        all_active_cups = CupSize.objects.filter(is_active=True)
+        cups_to_process = (all_active_cups | cup_sizes_with_sales).distinct()
+
         cup_revenue = {}
-        for cs in CupSize.objects.filter(is_active=True):
+        for cs in cups_to_process:
             name     = f'Vaso {cs.size}'
             base_qs  = SaleItem.objects.filter(sale__shift=shift, sale__is_delivery=False, cup_size=cs)
 
@@ -129,17 +140,21 @@ class CashAuditViewSet(viewsets.ModelViewSet):
 
         # ── Catálogo ──
         catalog = []
-        for cs in CupSize.objects.filter(is_active=True).order_by('price'):
+        for cs in cups_to_process.order_by('price'):
             name = f'Vaso {cs.size}'
             try:    stock = cs.stock.quantity
             except: stock = 0
+            prev = prev_closing.get(cs.pk, prev_closing_name.get(name, 0))
             catalog.append({
                 'product_name':  name,
                 'product_type':  'cup',
+                'product_id':    cs.pk,
                 'unit_price':    int(cs.price),
                 'current_stock': stock,
-                'prev_closing':  prev_closing.get(name, 0),
-                **cup_revenue.get(name, {'sales_qty': 0, 'sales_revenue': 0}),
+                'prev_closing':  prev,
+                **cup_revenue.get(name, {'sales_qty': 0, 'sales_revenue': 0,
+                                         'regular_qty': 0, 'regular_revenue': 0,
+                                         'promo_qty': 0, 'promo_revenue': 0, 'promo_unit': None}),
             })
 
         for t in Topping.objects.filter(is_active=True).order_by('name'):
@@ -148,12 +163,14 @@ class CashAuditViewSet(viewsets.ModelViewSet):
             t_agg = SaleItem.objects.filter(
                 sale__shift=shift, topping=t, cup_size__isnull=True
             ).aggregate(qty=Sum('quantity'), rev=Sum('subtotal'))
+            prev_t = prev_closing.get(t.pk, prev_closing_name.get(t.name, 0))
             catalog.append({
                 'product_name':  t.name,
                 'product_type':  'topping',
+                'product_id':    t.pk,
                 'unit_price':    int(t.price) if hasattr(t, 'price') else 0,
                 'current_stock': stock,
-                'prev_closing':  prev_closing.get(t.name, 0),
+                'prev_closing':  prev_t,
                 'sales_qty':     int(t_agg['qty'] or 0),
                 'sales_revenue': int(t_agg['rev'] or 0),
             })

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { getPromotions, createPromotion, updatePromotion, togglePromotion, getAllCupSizes } from '../api'
+import { getPromotions, createPromotion, updatePromotion, togglePromotion, getCupSizes } from '../api'
 import toast from 'react-hot-toast'
 
 const fmt = n => `$${Number(n).toLocaleString('es-CO')}`
@@ -17,7 +17,7 @@ export default function Promotions() {
 
   useEffect(() => {
     load()
-    getAllCupSizes().then(r => setCupSizes(r.data?.results ?? r.data ?? []))
+    getCupSizes().then(r => setCupSizes(r.data?.results ?? r.data ?? []))
   }, [])
 
   const openNew = () => { setForm(EMPTY_FORM); setEditing(null); setShowForm(true) }

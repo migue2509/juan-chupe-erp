@@ -61,11 +61,18 @@ export default function POS() {
       try { const r = await fn(); set(r.data?.results ?? r.data ?? []) }
       catch (e) { console.error(`POS: ${label}`, e?.response?.data ?? e) }
     }
-    get(getFlavors,          setFlavors,    'sabores')
-    get(getCupSizes,         setCupSizes,   'vasos')
-    get(getToppings,         setToppings,   'toppings')
-    get(getActivePromotions, setPromotions, 'promos')
-    get(getTransferMethods,  setTransferMethods, 'transfer-methods')
+    const loadAll = () => {
+      get(getFlavors,          setFlavors,    'sabores')
+      get(getCupSizes,         setCupSizes,   'vasos')
+      get(getToppings,         setToppings,   'toppings')
+      get(getActivePromotions, setPromotions, 'promos')
+      get(getTransferMethods,  setTransferMethods, 'transfer-methods')
+    }
+    loadAll()
+    // Refresca cuando el usuario vuelve a la pestaña
+    const onVisible = () => { if (document.visibilityState === 'visible') loadAll() }
+    document.addEventListener('visibilitychange', onVisible)
+    return () => document.removeEventListener('visibilitychange', onVisible)
   }, [])
 
   // ─── Item regular ─────────────────────────────────────────────────────────

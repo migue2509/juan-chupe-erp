@@ -58,6 +58,7 @@ class ShiftAuditItem(models.Model):
     audit        = models.ForeignKey(CashAudit, on_delete=models.CASCADE, related_name='items')
     product_name = models.CharField(max_length=100)
     product_type = models.CharField(max_length=20, choices=PRODUCT_TYPE_CHOICES, default='cup')
+    product_id   = models.PositiveIntegerField(null=True, blank=True, help_text='ID real del CupSize/Topping — para matching por ID sin depender del nombre')
     unit_price   = models.DecimalField(max_digits=10, decimal_places=0, default=0)
 
     opening_stock = models.IntegerField(default=0, help_text='Stock al iniciar la jornada')

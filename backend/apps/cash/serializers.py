@@ -9,7 +9,7 @@ class ShiftAuditItemSerializer(serializers.ModelSerializer):
     class Meta:
         model  = ShiftAuditItem
         fields = [
-            'id', 'product_name', 'product_type', 'unit_price',
+            'id', 'product_name', 'product_type', 'product_id', 'unit_price',
             'opening_stock', 'entries', 'closing_stock',
             'available', 'sold',
         ]
