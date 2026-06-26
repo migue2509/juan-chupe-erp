@@ -105,11 +105,11 @@ class CashAuditViewSet(viewsets.ModelViewSet):
         from apps.inventory.models import CupStock, ToppingStock
 
         # Incluir vasos con ventas en la jornada aunque hayan sido desactivados mid-shift
-        cup_sizes_with_sales = CupSize.objects.filter(
+        active_ids = set(CupSize.objects.filter(is_active=True).values_list('id', flat=True))
+        sales_ids  = set(CupSize.objects.filter(
             saleitem__sale__shift=shift, saleitem__sale__is_delivery=False
-        ).distinct()
-        all_active_cups = CupSize.objects.filter(is_active=True)
-        cups_to_process = (all_active_cups | cup_sizes_with_sales).distinct()
+        ).values_list('id', flat=True))
+        cups_to_process = CupSize.objects.filter(id__in=active_ids | sales_ids)
 
         cup_revenue = {}
         for cs in cups_to_process:

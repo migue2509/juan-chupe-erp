@@ -8,7 +8,7 @@ class ShiftSerializer(serializers.ModelSerializer):
     has_audit      = serializers.SerializerMethodField()
 
     def get_has_audit(self, obj):
-        return hasattr(obj, 'cash_audit') and obj.cash_audit is not None
+        return obj.cash_audits.exists()
 
     class Meta:
         model = Shift
