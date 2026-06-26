@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { getExpenses, createExpense, updateExpense, deleteExpense } from '../api'
+import { getExpenses, createExpense, updateExpense, deleteExpense, getShifts } from '../api'
 import { Icon } from '../components/Icons'
 import { useAuth } from '../context/AuthContext'
 import toast from 'react-hot-toast'
@@ -70,6 +70,8 @@ export default function Expenses() {
   const [descSearch,   setDescSearch]   = useState('')
   const [dateFrom,     setDateFrom]     = useState('')
   const [dateTo,       setDateTo]       = useState('')
+  const [shiftFilter,  setShiftFilter]  = useState('all')
+  const [shifts,       setShifts]       = useState([])
 
   // Edición
   const [editing,   setEditing]   = useState(null)
@@ -82,7 +84,10 @@ export default function Expenses() {
     getExpenses(params).then(r => setExpenses(r.data?.results ?? r.data ?? []))
   }
 
-  useEffect(() => { load() }, [])
+  useEffect(() => {
+    load()
+    getShifts().then(r => setShifts((r.data?.results ?? r.data ?? []).sort((a,b) => b.id - a.id)))
+  }, [])
   useEffect(() => { load(filterOrigin) }, [filterOrigin])
 
   const handleSubmit = async (e) => {
@@ -103,6 +108,7 @@ export default function Expenses() {
 
   const filtered = expenses.filter(e => {
     if (filterOrigin !== 'all' && e.origin !== filterOrigin) return false
+    if (shiftFilter !== 'all' && e.shift !== Number(shiftFilter)) return false
     if (descSearch && !(e.description || '').toLowerCase().includes(descSearch.toLowerCase())) return false
     if (dateFrom || dateTo) {
       const d = new Date(e.created_at)
@@ -113,8 +119,8 @@ export default function Expenses() {
     return true
   })
 
-  const hasFilters   = descSearch || dateFrom || dateTo || filterOrigin !== 'all'
-  const clearFilters = () => { setDescSearch(''); setDateFrom(''); setDateTo(''); setFilterOrigin('all'); load('all') }
+  const hasFilters   = descSearch || dateFrom || dateTo || filterOrigin !== 'all' || shiftFilter !== 'all'
+  const clearFilters = () => { setDescSearch(''); setDateFrom(''); setDateTo(''); setFilterOrigin('all'); setShiftFilter('all'); load('all') }
 
   const openEdit = (e) => {
     setEditing(e)
@@ -288,6 +294,14 @@ export default function Expenses() {
             onChange={e => setDescSearch(e.target.value)}
           />
         </div>
+        <select className="input py-1.5 text-sm w-44" value={shiftFilter} onChange={e => setShiftFilter(e.target.value)}>
+          <option value="all">Todas las jornadas</option>
+          {shifts.map(s => (
+            <option key={s.id} value={s.id}>
+              #{s.id} · {new Date(s.opened_at).toLocaleDateString('es-CO', { day: '2-digit', month: '2-digit', year: '2-digit' })}
+            </option>
+          ))}
+        </select>
         <div className="flex items-center gap-2">
           <label className="text-xs text-gray-400 whitespace-nowrap">Desde</label>
           <input type="date" className="input py-1.5 text-sm w-36"
@@ -323,8 +337,8 @@ export default function Expenses() {
 
         {/* Table header */}
         <div className="grid px-5 py-2.5 bg-slate-50 border-b border-gray-100 text-[10px] font-semibold text-gray-400 uppercase tracking-widest gap-3"
-          style={{ gridTemplateColumns: '60px 80px 130px 80px 1fr 120px 90px 90px 80px 64px' }}>
-          {['Hora', 'Fecha', 'Categoría', 'Canal', 'Descripción', 'Registrado por', 'Caja', 'Método', 'Monto', ''].map(h => (
+          style={{ gridTemplateColumns: '60px 80px 90px 130px 80px 1fr 120px 90px 90px 80px 64px' }}>
+          {['Hora', 'Fecha', 'Jornada', 'Categoría', 'Canal', 'Descripción', 'Registrado por', 'Caja', 'Método', 'Monto', ''].map(h => (
             <span key={h}>{h}</span>
           ))}
         </div>
@@ -338,9 +352,10 @@ export default function Expenses() {
           ) : filtered.map(e => (
             <div key={e.id}
               className="grid px-5 py-3 items-center gap-3 hover:bg-slate-50 transition-colors"
-              style={{ gridTemplateColumns: '60px 80px 130px 80px 1fr 120px 90px 90px 80px 64px' }}>
+              style={{ gridTemplateColumns: '60px 80px 90px 130px 80px 1fr 120px 90px 90px 80px 64px' }}>
               <span className="text-sm tabular-nums text-gray-500">{fmtTime(e.created_at)}</span>
               <span className="text-sm tabular-nums text-gray-500">{fmtDate(e.created_at)}</span>
+              <span className="text-xs font-medium text-brand-navy bg-blue-50 px-2 py-0.5 rounded-full truncate">{e.shift_label}</span>
               <span className={`text-xs font-medium px-2 py-0.5 rounded-full w-fit ${CAT_BADGE[e.category] ?? 'bg-gray-100 text-gray-600'}`}>
                 {e.category_label}
               </span>

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { getInvoices, editSale, getAllFlavors, getCupSizes, getToppings, getOperatives } from '../api'
+import { getInvoices, editSale, getAllFlavors, getCupSizes, getToppings, getOperatives, getShifts } from '../api'
 import { Icon } from '../components/Icons'
 import { useAuth } from '../context/AuthContext'
 import toast from 'react-hot-toast'
@@ -33,6 +33,8 @@ export default function Billing() {
   const [sellerSearch, setSellerSearch] = useState('')
   const [dateFrom,     setDateFrom]     = useState('')
   const [dateTo,       setDateTo]       = useState('')
+  const [shiftFilter,  setShiftFilter]  = useState('all')
+  const [shifts,       setShifts]       = useState([])
 
   // Formulario de edición
   const [eForm, setEForm] = useState({})
@@ -44,9 +46,10 @@ export default function Billing() {
   useEffect(() => {
     load()
     const x = r => r.data?.results ?? r.data ?? []
-    Promise.all([getAllFlavors(), getCupSizes(), getToppings(), getOperatives()])
-      .then(([f, c, t, o]) => {
+    Promise.all([getAllFlavors(), getCupSizes(), getToppings(), getOperatives(), getShifts()])
+      .then(([f, c, t, o, s]) => {
         setFlavors(x(f)); setCupSizes(x(c)); setToppings(x(t)); setOperatives(x(o))
+        setShifts((x(s)).sort((a, b) => b.id - a.id))
       }).catch(() => {})
   }, [])
 
@@ -100,6 +103,7 @@ export default function Billing() {
   const filtered = invoices.filter(inv => {
     const name = (inv.sale_detail?.seller_name || '').toLowerCase()
     if (sellerSearch && !name.includes(sellerSearch.toLowerCase())) return false
+    if (shiftFilter !== 'all' && inv.shift !== Number(shiftFilter)) return false
     if (dateFrom || dateTo) {
       const d = new Date(inv.created_at)
       d.setHours(0, 0, 0, 0)
@@ -109,8 +113,8 @@ export default function Billing() {
     return true
   })
 
-  const clearFilters = () => { setSellerSearch(''); setDateFrom(''); setDateTo('') }
-  const hasFilters   = sellerSearch || dateFrom || dateTo
+  const clearFilters = () => { setSellerSearch(''); setDateFrom(''); setDateTo(''); setShiftFilter('all') }
+  const hasFilters   = sellerSearch || dateFrom || dateTo || shiftFilter !== 'all'
 
   if (loading) return (
     <div className="flex justify-center py-16">
@@ -139,6 +143,14 @@ export default function Billing() {
             onChange={e => setSellerSearch(e.target.value)}
           />
         </div>
+        <select className="input py-1.5 text-sm w-44" value={shiftFilter} onChange={e => setShiftFilter(e.target.value)}>
+          <option value="all">Todas las jornadas</option>
+          {shifts.map(s => (
+            <option key={s.id} value={s.id}>
+              #{s.id} · {new Date(s.opened_at).toLocaleDateString('es-CO', { day: '2-digit', month: '2-digit', year: '2-digit' })}
+            </option>
+          ))}
+        </select>
         <div className="flex items-center gap-2">
           <label className="text-xs text-gray-400 whitespace-nowrap">Desde</label>
           <input type="date" className="input py-1.5 text-sm w-36"
@@ -159,8 +171,8 @@ export default function Billing() {
       <div className="card p-0 overflow-hidden">
         {/* Header */}
         <div className="grid px-5 py-3 bg-slate-50 border-b border-gray-100 text-[10px] font-semibold text-gray-400 uppercase tracking-widest gap-3"
-          style={{ gridTemplateColumns: '130px 70px 70px 1fr 110px 90px 90px 80px 50px' }}>
-          {['Número', 'Hora', 'Fecha', 'Vendedora', 'Total', 'Canal', 'Pago', 'Estado', ''].map(h => <span key={h}>{h}</span>)}
+          style={{ gridTemplateColumns: '130px 70px 70px 90px 1fr 110px 90px 90px 80px 50px' }}>
+          {['Número', 'Hora', 'Fecha', 'Jornada', 'Vendedora', 'Total', 'Canal', 'Pago', 'Estado', ''].map(h => <span key={h}>{h}</span>)}
         </div>
 
         <div className="divide-y divide-gray-50">
@@ -173,10 +185,11 @@ export default function Billing() {
             <div key={inv.id}
               onClick={() => openDetail(inv)}
               className="grid px-5 py-3.5 items-center gap-3 hover:bg-slate-50 transition-colors cursor-pointer"
-              style={{ gridTemplateColumns: '130px 70px 70px 1fr 110px 90px 90px 80px 50px' }}>
+              style={{ gridTemplateColumns: '130px 70px 70px 90px 1fr 110px 90px 90px 80px 50px' }}>
               <span className="font-mono font-semibold text-brand-navy text-sm">{inv.invoice_number}</span>
               <span className="text-sm tabular-nums text-gray-500">{fmtTime(inv.created_at)}</span>
               <span className="text-sm tabular-nums text-gray-400">{fmtDate(inv.created_at)}</span>
+              <span className="text-xs font-medium text-brand-navy bg-blue-50 px-2 py-0.5 rounded-full truncate">{inv.shift_label}</span>
               <span className="text-sm text-gray-700">{inv.sale_detail?.seller_name || '—'}</span>
               <span className="tabular-nums">
                 <span className="text-sm font-bold text-brand-pink">

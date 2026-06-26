@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { getDeliveries, updateDelivery, cancelDeliveryReq, getDomiciliarios, createDomiciliario, updateDomiciliario } from '../api'
+import { getDeliveries, updateDelivery, cancelDeliveryReq, getDomiciliarios, createDomiciliario, updateDomiciliario, getShifts } from '../api'
 import { Icon } from '../components/Icons'
 import toast from 'react-hot-toast'
 
@@ -33,9 +33,10 @@ export default function Deliveries() {
 
   const load = async () => {
     try {
-      const [dRes, domRes] = await Promise.all([getDeliveries(), getDomiciliarios()])
+      const [dRes, domRes, sRes] = await Promise.all([getDeliveries(), getDomiciliarios(), getShifts()])
       setDeliveries(dRes.data?.results ?? dRes.data ?? [])
       setDomiciliarios(domRes.data?.results ?? domRes.data ?? [])
+      setShifts((sRes.data?.results ?? sRes.data ?? []).sort((a, b) => b.id - a.id))
     } catch {}
     setLoading(false)
   }
@@ -126,11 +127,14 @@ export default function Deliveries() {
     } catch { toast.error('Error al guardar') }
   }
 
-  const [dateFrom, setDateFrom] = useState('')
-  const [dateTo,   setDateTo]   = useState('')
+  const [dateFrom,    setDateFrom]    = useState('')
+  const [dateTo,      setDateTo]      = useState('')
+  const [shiftFilter, setShiftFilter] = useState('all')
+  const [shifts,      setShifts]      = useState([])
 
   const filtered = deliveries.filter(d => {
     if (statusFilter !== 'all' && d.status !== statusFilter) return false
+    if (shiftFilter !== 'all' && d.shift !== Number(shiftFilter)) return false
     if (dateFrom || dateTo) {
       const d2 = new Date(d.created_at)
       d2.setHours(0, 0, 0, 0)
@@ -140,8 +144,8 @@ export default function Deliveries() {
     return true
   })
 
-  const hasDateFilter = dateFrom || dateTo
-  const clearDates    = () => { setDateFrom(''); setDateTo('') }
+  const hasDateFilter = dateFrom || dateTo || shiftFilter !== 'all'
+  const clearDates    = () => { setDateFrom(''); setDateTo(''); setShiftFilter('all') }
 
   const counts = Object.keys(STATUS).reduce((acc, k) => {
     acc[k] = filtered.filter(d => d.status === k).length
@@ -191,6 +195,14 @@ export default function Deliveries() {
 
       {/* Filtro fechas */}
       <div className="card py-3 px-4 flex flex-wrap items-center gap-3">
+        <select className="input py-1.5 text-sm w-44" value={shiftFilter} onChange={e => setShiftFilter(e.target.value)}>
+          <option value="all">Todas las jornadas</option>
+          {shifts.map(s => (
+            <option key={s.id} value={s.id}>
+              #{s.id} · {new Date(s.opened_at).toLocaleDateString('es-CO', { day: '2-digit', month: '2-digit', year: '2-digit' })}
+            </option>
+          ))}
+        </select>
         <div className="flex items-center gap-2">
           <label className="text-xs text-gray-400 whitespace-nowrap">Desde</label>
           <input type="date" className="input py-1.5 text-sm w-36"
@@ -310,7 +322,10 @@ export default function Deliveries() {
                   {/* Detalle expandido */}
                   {selected?.id === d.id && (
                     <div className="px-5 pb-4 pt-3 bg-blue-50 border-t border-blue-100 space-y-3">
-                      <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest">Pedido</p>
+                      <div className="flex items-center gap-2">
+                        <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest">Pedido</p>
+                        <span className="text-xs font-medium text-brand-navy bg-blue-100 px-2 py-0.5 rounded-full">Jornada {d.shift_label}</span>
+                      </div>
                       <div className="space-y-1">
                         {sale?.items?.map(item => (
                           <div key={item.id} className="flex justify-between text-sm">
