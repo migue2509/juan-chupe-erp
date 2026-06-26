@@ -1269,10 +1269,27 @@ function ShiftDetail({ shift, onBack, onShiftUpdate }) {
                 })}
               </div>
 
-              <div className="px-5 py-3 bg-red-50 border-t border-red-100 flex justify-between text-sm font-semibold">
-                <span className="text-red-700">Total gastos</span>
-                <span className="text-red-600">- {fmt(detail.summary.total_expenses)}</span>
-              </div>
+              {(() => {
+                const afectaCaja = detail.expenses.filter(e => e.from_daily_cash).reduce((s, e) => s + Number(e.amount), 0)
+                const noAfecta   = detail.expenses.filter(e => !e.from_daily_cash).reduce((s, e) => s + Number(e.amount), 0)
+                const totalG     = afectaCaja + noAfecta
+                return (
+                  <div className="px-5 py-3 bg-red-50 border-t border-red-100 space-y-1">
+                    <div className="flex justify-between text-xs text-gray-500">
+                      <span>Gastos que afectan caja</span>
+                      <span className="font-semibold text-red-500">- {fmt(afectaCaja)}</span>
+                    </div>
+                    <div className="flex justify-between text-xs text-gray-500">
+                      <span>Gastos que no afectan caja</span>
+                      <span className="font-semibold text-gray-400">- {fmt(noAfecta)}</span>
+                    </div>
+                    <div className="flex justify-between pt-1 border-t border-red-100">
+                      <span className="text-sm font-bold text-red-700">Total gastos</span>
+                      <span className="text-sm font-bold text-red-600">- {fmt(totalG)}</span>
+                    </div>
+                  </div>
+                )
+              })()}
             </div>
           )}
         </>

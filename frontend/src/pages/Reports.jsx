@@ -521,19 +521,25 @@ export default function Reports() {
                 </>
               )}
               <div className="px-5 py-3 border-t border-gray-100 bg-slate-50 space-y-1">
-                <div className="flex justify-between items-center">
-                  <span className="text-xs text-gray-400 font-semibold uppercase tracking-wide">Gastos efectivo</span>
+                <div className="flex justify-between items-center text-xs text-gray-500">
+                  <span>Gastos que afectan caja</span>
+                  <span className="font-semibold text-red-500">- {fmt(data.expense_by_cat?.reduce((s, e) => s + (e.afecta_caja || 0), 0) ?? 0)}</span>
+                </div>
+                <div className="flex justify-between items-center text-xs text-gray-500">
+                  <span>Gastos que no afectan caja</span>
+                  <span className="font-semibold text-gray-400">- {fmt(data.expense_by_cat?.reduce((s, e) => s + (e.no_afecta || 0), 0) ?? 0)}</span>
+                </div>
+                <div className="flex justify-between items-center pt-1 border-t border-gray-200">
+                  <span className="text-xs font-bold text-gray-600 uppercase tracking-wide">Total gastos</span>
+                  <span className="text-base font-bold text-red-500">- {fmt(data.total_expenses ?? 0)}</span>
+                </div>
+                <div className="flex justify-between items-center pt-1 border-t border-gray-100">
+                  <span className="text-xs text-gray-400 font-semibold uppercase tracking-wide">Efectivo</span>
                   <span className="text-sm font-bold text-gray-700">{fmt(data.total_expenses_cash ?? 0)}</span>
                 </div>
                 <div className="flex justify-between items-center">
-                  <span className="text-xs text-gray-400 font-semibold uppercase tracking-wide">Gastos transferencia</span>
+                  <span className="text-xs text-gray-400 font-semibold uppercase tracking-wide">Transferencia</span>
                   <span className="text-sm font-bold text-cyan-700">{fmt(data.total_expenses_transfer ?? 0)}</span>
-                </div>
-                <div className="flex justify-between items-center pt-1 border-t border-gray-100">
-                  <span className="text-xs text-gray-400 font-semibold uppercase tracking-wide">Neto efectivo en caja</span>
-                  <span className={`text-base font-bold ${(data.net_efectivo ?? data.net_cash) < 0 ? 'text-red-500' : 'text-green-600'}`}>
-                    {fmt(data.net_efectivo ?? data.net_cash)}
-                  </span>
                 </div>
               </div>
             </div>

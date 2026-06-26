@@ -396,14 +396,27 @@ export default function Expenses() {
           ))}
         </div>
 
-        {filtered.length > 0 && (
-          <div className="flex items-center justify-between px-5 py-3 border-t border-gray-100 bg-slate-50">
-            <span className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Total</span>
-            <span className="text-base font-bold text-red-500">
-              {fmt(filtered.reduce((s, e) => s + Number(e.amount), 0))}
-            </span>
-          </div>
-        )}
+        {filtered.length > 0 && (() => {
+          const afectaCaja  = filtered.filter(e => e.from_daily_cash).reduce((s, e) => s + Number(e.amount), 0)
+          const noAfecta    = filtered.filter(e => !e.from_daily_cash).reduce((s, e) => s + Number(e.amount), 0)
+          const totalG      = afectaCaja + noAfecta
+          return (
+            <div className="px-5 py-3 border-t border-gray-100 bg-slate-50 space-y-1">
+              <div className="flex justify-between text-xs text-gray-500">
+                <span>Gastos que afectan caja</span>
+                <span className="font-semibold text-red-500">- {fmt(afectaCaja)}</span>
+              </div>
+              <div className="flex justify-between text-xs text-gray-500">
+                <span>Gastos que no afectan caja</span>
+                <span className="font-semibold text-gray-400">- {fmt(noAfecta)}</span>
+              </div>
+              <div className="flex justify-between pt-1 border-t border-gray-200">
+                <span className="text-xs font-bold text-gray-600 uppercase tracking-wide">Total gastos</span>
+                <span className="text-base font-bold text-red-500">- {fmt(totalG)}</span>
+              </div>
+            </div>
+          )
+        })()}
       </div>
 
       {/* Modal edición */}
