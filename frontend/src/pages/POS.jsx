@@ -162,9 +162,6 @@ export default function POS() {
   const handleSubmit = async () => {
     if (items.length === 0) { toast.error('Agrega al menos un producto'); return }
     if (isDelivery && !deliveryAddress.trim()) { toast.error('Ingresa la dirección del domicilio'); return }
-    if (isDelivery && deliveryFourDigits && deliveryFourDigits.length !== 4) {
-      toast.error('Los dígitos deben ser exactamente 4'); return
-    }
     setSubmitting(true)
     try {
       const promoIds = [...new Set(items.map(i => i.promoId).filter(Boolean))]
@@ -611,11 +608,11 @@ export default function POS() {
                   <input className="input text-sm" placeholder="Calle, barrio..."
                     value={deliveryAddress} onChange={e => setDeliveryAddress(e.target.value)} />
                 </div>
-                <div className="w-20">
-                  <label className="label">4 dígitos</label>
-                  <input className="input text-sm" placeholder="0000" maxLength={4}
+                <div className="w-28">
+                  <label className="label">Cliente</label>
+                  <input className="input text-sm" placeholder="Nombre..."
                     value={deliveryFourDigits}
-                    onChange={e => setDeliveryFourDigits(e.target.value.replace(/\D/g, '').slice(0, 4))} />
+                    onChange={e => setDeliveryFourDigits(e.target.value)} />
                 </div>
               </div>
               <div>

@@ -236,7 +236,7 @@ export default function Deliveries() {
 
           <div className="grid px-4 py-2.5 bg-slate-50 border-b border-gray-100 text-[10px] font-semibold text-gray-400 uppercase tracking-widest gap-2"
             style={{ gridTemplateColumns: '44px 110px 52px 1fr 85px 85px 110px 76px' }}>
-            {['#', 'Fecha / Hora', '4 díg.', 'Dirección', 'Total', 'Pago', 'Domiciliario', 'Estado'].map(h => <span key={h}>{h}</span>)}
+            {['#', 'Fecha / Hora', 'Cliente', 'Dirección', 'Total', 'Pago', 'Domiciliario', 'Estado'].map(h => <span key={h}>{h}</span>)}
           </div>
 
           <div className="divide-y divide-gray-50">
