@@ -115,6 +115,7 @@ class SaleViewSet(viewsets.ReadOnlyModelViewSet):
             sale = Sale.objects.create(
                 shift=shift,
                 seller=seller,
+                seller_name=seller.full_name if seller else '',
                 promotion=promotion,
                 payment_method=data['payment_method'],
                 cash_received=data.get('cash_received', Decimal('0')),

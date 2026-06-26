@@ -59,22 +59,42 @@ function POSResumenModal({ shiftId, onClose }) {
 
         <div className="flex-1 overflow-y-auto p-6 space-y-6">
           {/* Cards POS */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
             <div className="card p-4 text-center">
               <p className="text-xs text-gray-400 uppercase tracking-wide mb-1">Ventas POS</p>
               <p className="text-xl font-bold text-blue-700">{fmt(p.pos_total)}</p>
             </div>
             <div className="card p-4 text-center">
-              <p className="text-xs text-gray-400 uppercase tracking-wide mb-1">Efectivo</p>
+              <p className="text-xs text-gray-400 uppercase tracking-wide mb-1">Efectivo POS</p>
               <p className="text-xl font-bold text-gray-800">{fmt(p.pos_cash)}</p>
-            </div>
-            <div className="card p-4 text-center">
-              <p className="text-xs text-gray-400 uppercase tracking-wide mb-1">Gastos caja</p>
-              <p className="text-xl font-bold text-red-500">- {fmt(p.expenses_from_cash)}</p>
+              {p.pos_transfer > 0 && <p className="text-xs text-gray-400">Transfer: {fmt(p.pos_transfer)}</p>}
             </div>
             <div className="card p-4 text-center border-2 border-blue-200">
               <p className="text-xs text-gray-400 uppercase tracking-wide mb-1">Neto a entregar</p>
               <p className="text-xl font-bold text-blue-700">{fmt(p.net_expected_cash)}</p>
+              <p className="text-xs text-gray-400">Solo resta gastos en efectivo</p>
+            </div>
+          </div>
+          {/* Gastos POS breakdown */}
+          <div className="card p-4 border-l-4 border-red-200">
+            <p className="text-[10px] font-bold text-red-500 uppercase tracking-widest mb-3">Gastos POS</p>
+            <div className="grid grid-cols-4 gap-3">
+              <div className="text-center">
+                <p className="text-xs text-gray-400 uppercase tracking-wide mb-1">Afectan caja</p>
+                <p className="text-base font-bold text-red-500">- {fmt((p.expenses_from_cash || 0) + (p.expenses_pos_transfer || 0))}</p>
+              </div>
+              <div className="text-center">
+                <p className="text-xs text-gray-400 uppercase tracking-wide mb-1">No afectan caja</p>
+                <p className="text-base font-bold text-gray-400">- {fmt(p.expenses_pos_no_cash || 0)}</p>
+              </div>
+              <div className="text-center">
+                <p className="text-xs text-gray-400 uppercase tracking-wide mb-1">Efectivo (descuenta)</p>
+                <p className="text-base font-bold text-red-600">- {fmt(p.expenses_from_cash || 0)}</p>
+              </div>
+              <div className="text-center">
+                <p className="text-xs text-gray-400 uppercase tracking-wide mb-1">Transferencia</p>
+                <p className="text-base font-bold text-cyan-600">- {fmt(p.expenses_pos_transfer || 0)}</p>
+              </div>
             </div>
           </div>
 
@@ -243,7 +263,8 @@ function DomiciliosResumenModal({ shiftId, onClose }) {
 
         <div className="p-6">
           {p.delivery_total > 0 ? (
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <>
+            <div className="grid grid-cols-3 gap-3">
               <div className="card p-4 text-center">
                 <p className="text-xs text-gray-400 uppercase tracking-wide mb-1">Total domicilios</p>
                 <p className="text-xl font-bold text-orange-600">{fmt(p.delivery_total)}</p>
@@ -251,16 +272,37 @@ function DomiciliosResumenModal({ shiftId, onClose }) {
               <div className="card p-4 text-center">
                 <p className="text-xs text-gray-400 uppercase tracking-wide mb-1">Efectivo</p>
                 <p className="text-xl font-bold text-gray-800">{fmt(p.delivery_cash)}</p>
-              </div>
-              <div className="card p-4 text-center">
-                <p className="text-xs text-gray-400 uppercase tracking-wide mb-1">Gastos caja</p>
-                <p className="text-xl font-bold text-red-500">- {fmt(p.delivery_expenses_cash)}</p>
+                {p.delivery_transfer > 0 && <p className="text-xs text-gray-400">Transfer: {fmt(p.delivery_transfer)}</p>}
               </div>
               <div className="card p-4 text-center border-2 border-orange-200">
                 <p className="text-xs text-gray-400 uppercase tracking-wide mb-1">Neto a entregar</p>
                 <p className="text-xl font-bold text-orange-600">{fmt(p.delivery_net_cash)}</p>
+                <p className="text-xs text-gray-400">Solo resta gastos en efectivo</p>
               </div>
             </div>
+            {/* Gastos Domicilios breakdown */}
+            <div className="card p-4 mt-3 border-l-4 border-red-200">
+              <p className="text-[10px] font-bold text-red-500 uppercase tracking-widest mb-3">Gastos Domicilios</p>
+              <div className="grid grid-cols-4 gap-3">
+                <div className="text-center">
+                  <p className="text-xs text-gray-400 uppercase tracking-wide mb-1">Afectan caja</p>
+                  <p className="text-base font-bold text-red-500">- {fmt((p.delivery_expenses_cash || 0) + (p.delivery_expenses_transfer || 0))}</p>
+                </div>
+                <div className="text-center">
+                  <p className="text-xs text-gray-400 uppercase tracking-wide mb-1">No afectan caja</p>
+                  <p className="text-base font-bold text-gray-400">- {fmt(p.delivery_expenses_no_cash || 0)}</p>
+                </div>
+                <div className="text-center">
+                  <p className="text-xs text-gray-400 uppercase tracking-wide mb-1">Efectivo (descuenta)</p>
+                  <p className="text-base font-bold text-red-600">- {fmt(p.delivery_expenses_cash || 0)}</p>
+                </div>
+                <div className="text-center">
+                  <p className="text-xs text-gray-400 uppercase tracking-wide mb-1">Transferencia</p>
+                  <p className="text-base font-bold text-cyan-600">- {fmt(p.delivery_expenses_transfer || 0)}</p>
+                </div>
+              </div>
+            </div>
+            </>
           ) : (
             <div className="text-center py-10 text-gray-400">
               <p className="text-sm">Esta jornada no tuvo ventas de domicilios.</p>
@@ -410,7 +452,7 @@ function ArqueoModal({ shiftId, onClose, onSaved }) {
             <>
               <div>
                 <p className="text-[10px] font-bold text-blue-500 uppercase tracking-widest mb-2">POS — Caja física</p>
-                <div className="grid grid-cols-4 gap-3">
+                <div className="grid grid-cols-3 gap-3">
                   <div className="card p-4 text-center">
                     <p className="text-xs text-gray-400 uppercase tracking-wide mb-1">Ventas POS</p>
                     <p className="text-xl font-bold text-blue-700">{fmt(prefill.pos_total)}</p>
@@ -419,13 +461,19 @@ function ArqueoModal({ shiftId, onClose, onSaved }) {
                     <p className="text-xs text-gray-400 uppercase tracking-wide mb-1">Efectivo POS</p>
                     <p className="text-xl font-bold text-gray-800">{fmt(prefill.pos_cash)}</p>
                   </div>
-                  <div className="card p-4 text-center">
-                    <p className="text-xs text-gray-400 uppercase tracking-wide mb-1">Gastos en caja</p>
-                    <p className="text-xl font-bold text-red-500">- {fmt(prefill.expenses_from_cash)}</p>
-                  </div>
                   <div className="card p-4 text-center border-2 border-blue-200">
                     <p className="text-xs text-gray-400 uppercase tracking-wide mb-1">Neto a entregar</p>
                     <p className="text-xl font-bold text-blue-700">{fmt(prefill.net_expected_cash)}</p>
+                    <p className="text-xs text-gray-400">Solo resta gastos efectivo</p>
+                  </div>
+                </div>
+                <div className="card p-3 mt-2 border-l-4 border-red-200">
+                  <p className="text-[10px] font-bold text-red-500 uppercase tracking-widest mb-2">Gastos POS</p>
+                  <div className="grid grid-cols-4 gap-2">
+                    <div className="text-center"><p className="text-xs text-gray-400 mb-0.5">Afectan caja</p><p className="text-sm font-bold text-red-500">- {fmt((prefill.expenses_from_cash||0)+(prefill.expenses_pos_transfer||0))}</p></div>
+                    <div className="text-center"><p className="text-xs text-gray-400 mb-0.5">No afectan caja</p><p className="text-sm font-bold text-gray-400">- {fmt(prefill.expenses_pos_no_cash||0)}</p></div>
+                    <div className="text-center"><p className="text-xs text-gray-400 mb-0.5">Efectivo (descuenta)</p><p className="text-sm font-bold text-red-600">- {fmt(prefill.expenses_from_cash||0)}</p></div>
+                    <div className="text-center"><p className="text-xs text-gray-400 mb-0.5">Transferencia</p><p className="text-sm font-bold text-cyan-600">- {fmt(prefill.expenses_pos_transfer||0)}</p></div>
                   </div>
                 </div>
               </div>
@@ -434,7 +482,7 @@ function ArqueoModal({ shiftId, onClose, onSaved }) {
               {prefill.delivery_total > 0 && (
                 <div>
                   <p className="text-[10px] font-bold text-orange-500 uppercase tracking-widest mb-2">Domicilios — Dinero</p>
-                  <div className="grid grid-cols-4 gap-3">
+                  <div className="grid grid-cols-3 gap-3">
                     <div className="card p-4 text-center">
                       <p className="text-xs text-gray-400 uppercase tracking-wide mb-1">Total domicilios</p>
                       <p className="text-xl font-bold text-orange-600">{fmt(prefill.delivery_total)}</p>
@@ -443,13 +491,19 @@ function ArqueoModal({ shiftId, onClose, onSaved }) {
                       <p className="text-xs text-gray-400 uppercase tracking-wide mb-1">Efectivo</p>
                       <p className="text-xl font-bold text-gray-800">{fmt(prefill.delivery_cash)}</p>
                     </div>
-                    <div className="card p-4 text-center">
-                      <p className="text-xs text-gray-400 uppercase tracking-wide mb-1">Gastos en caja</p>
-                      <p className="text-xl font-bold text-red-500">- {fmt(prefill.delivery_expenses_cash)}</p>
-                    </div>
                     <div className="card p-4 text-center border-2 border-orange-200">
                       <p className="text-xs text-gray-400 uppercase tracking-wide mb-1">Neto a entregar</p>
                       <p className="text-xl font-bold text-orange-600">{fmt(prefill.delivery_net_cash)}</p>
+                      <p className="text-xs text-gray-400">Solo resta gastos efectivo</p>
+                    </div>
+                  </div>
+                  <div className="card p-3 mt-2 border-l-4 border-red-200">
+                    <p className="text-[10px] font-bold text-red-500 uppercase tracking-widest mb-2">Gastos Domicilios</p>
+                    <div className="grid grid-cols-4 gap-2">
+                      <div className="text-center"><p className="text-xs text-gray-400 mb-0.5">Afectan caja</p><p className="text-sm font-bold text-red-500">- {fmt((prefill.delivery_expenses_cash||0)+(prefill.delivery_expenses_transfer||0))}</p></div>
+                      <div className="text-center"><p className="text-xs text-gray-400 mb-0.5">No afectan caja</p><p className="text-sm font-bold text-gray-400">- {fmt(prefill.delivery_expenses_no_cash||0)}</p></div>
+                      <div className="text-center"><p className="text-xs text-gray-400 mb-0.5">Efectivo (descuenta)</p><p className="text-sm font-bold text-red-600">- {fmt(prefill.delivery_expenses_cash||0)}</p></div>
+                      <div className="text-center"><p className="text-xs text-gray-400 mb-0.5">Transferencia</p><p className="text-sm font-bold text-cyan-600">- {fmt(prefill.delivery_expenses_transfer||0)}</p></div>
                     </div>
                   </div>
                 </div>
@@ -710,7 +764,7 @@ function ViewArqueoModal({ arqueoId, shiftId, onClose }) {
           {prefill && (
             <div>
               <p className="text-[10px] font-bold text-blue-500 uppercase tracking-widest mb-2">POS — Caja física</p>
-              <div className="grid grid-cols-4 gap-3">
+              <div className="grid grid-cols-3 gap-3">
                 <div className="card p-4 text-center">
                   <p className="text-xs text-gray-400 uppercase tracking-wide mb-1">Ventas POS</p>
                   <p className="text-xl font-bold text-blue-700">{fmt(prefill.pos_total)}</p>
@@ -719,13 +773,19 @@ function ViewArqueoModal({ arqueoId, shiftId, onClose }) {
                   <p className="text-xs text-gray-400 uppercase tracking-wide mb-1">Efectivo POS</p>
                   <p className="text-xl font-bold text-gray-800">{fmt(prefill.pos_cash)}</p>
                 </div>
-                <div className="card p-4 text-center">
-                  <p className="text-xs text-gray-400 uppercase tracking-wide mb-1">Gastos en caja</p>
-                  <p className="text-xl font-bold text-red-500">- {fmt(prefill.expenses_from_cash)}</p>
-                </div>
                 <div className="card p-4 text-center border-2 border-blue-200">
                   <p className="text-xs text-gray-400 uppercase tracking-wide mb-1">Neto a entregar</p>
                   <p className="text-xl font-bold text-blue-700">{fmt(prefill.net_expected_cash)}</p>
+                  <p className="text-xs text-gray-400">Solo resta gastos efectivo</p>
+                </div>
+              </div>
+              <div className="card p-3 mt-2 border-l-4 border-red-200">
+                <p className="text-[10px] font-bold text-red-500 uppercase tracking-widest mb-2">Gastos POS</p>
+                <div className="grid grid-cols-4 gap-2">
+                  <div className="text-center"><p className="text-xs text-gray-400 mb-0.5">Afectan caja</p><p className="text-sm font-bold text-red-500">- {fmt((prefill.expenses_from_cash||0)+(prefill.expenses_pos_transfer||0))}</p></div>
+                  <div className="text-center"><p className="text-xs text-gray-400 mb-0.5">No afectan caja</p><p className="text-sm font-bold text-gray-400">- {fmt(prefill.expenses_pos_no_cash||0)}</p></div>
+                  <div className="text-center"><p className="text-xs text-gray-400 mb-0.5">Efectivo (descuenta)</p><p className="text-sm font-bold text-red-600">- {fmt(prefill.expenses_from_cash||0)}</p></div>
+                  <div className="text-center"><p className="text-xs text-gray-400 mb-0.5">Transferencia</p><p className="text-sm font-bold text-cyan-600">- {fmt(prefill.expenses_pos_transfer||0)}</p></div>
                 </div>
               </div>
             </div>
@@ -735,7 +795,7 @@ function ViewArqueoModal({ arqueoId, shiftId, onClose }) {
           {prefill && prefill.delivery_total > 0 && (
             <div>
               <p className="text-[10px] font-bold text-orange-500 uppercase tracking-widest mb-2">Domicilios — Dinero</p>
-              <div className="grid grid-cols-4 gap-3">
+              <div className="grid grid-cols-3 gap-3">
                 <div className="card p-4 text-center">
                   <p className="text-xs text-gray-400 uppercase tracking-wide mb-1">Total domicilios</p>
                   <p className="text-xl font-bold text-orange-600">{fmt(prefill.delivery_total)}</p>
@@ -744,13 +804,19 @@ function ViewArqueoModal({ arqueoId, shiftId, onClose }) {
                   <p className="text-xs text-gray-400 uppercase tracking-wide mb-1">Efectivo</p>
                   <p className="text-xl font-bold text-gray-800">{fmt(prefill.delivery_cash)}</p>
                 </div>
-                <div className="card p-4 text-center">
-                  <p className="text-xs text-gray-400 uppercase tracking-wide mb-1">Gastos en caja</p>
-                  <p className="text-xl font-bold text-red-500">- {fmt(prefill.delivery_expenses_cash)}</p>
-                </div>
                 <div className="card p-4 text-center border-2 border-orange-200">
                   <p className="text-xs text-gray-400 uppercase tracking-wide mb-1">Neto a entregar</p>
                   <p className="text-xl font-bold text-orange-600">{fmt(prefill.delivery_net_cash)}</p>
+                  <p className="text-xs text-gray-400">Solo resta gastos efectivo</p>
+                </div>
+              </div>
+              <div className="card p-3 mt-2 border-l-4 border-red-200">
+                <p className="text-[10px] font-bold text-red-500 uppercase tracking-widest mb-2">Gastos Domicilios</p>
+                <div className="grid grid-cols-4 gap-2">
+                  <div className="text-center"><p className="text-xs text-gray-400 mb-0.5">Afectan caja</p><p className="text-sm font-bold text-red-500">- {fmt((prefill.delivery_expenses_cash||0)+(prefill.delivery_expenses_transfer||0))}</p></div>
+                  <div className="text-center"><p className="text-xs text-gray-400 mb-0.5">No afectan caja</p><p className="text-sm font-bold text-gray-400">- {fmt(prefill.delivery_expenses_no_cash||0)}</p></div>
+                  <div className="text-center"><p className="text-xs text-gray-400 mb-0.5">Efectivo (descuenta)</p><p className="text-sm font-bold text-red-600">- {fmt(prefill.delivery_expenses_cash||0)}</p></div>
+                  <div className="text-center"><p className="text-xs text-gray-400 mb-0.5">Transferencia</p><p className="text-sm font-bold text-cyan-600">- {fmt(prefill.delivery_expenses_transfer||0)}</p></div>
                 </div>
               </div>
             </div>
@@ -978,76 +1044,129 @@ function ShiftDetail({ shift, onBack, onShiftUpdate }) {
       {!loading && detail && (
         <>
           {/* KPI cards — cambian según el canal seleccionado */}
-          {channel === 'all' && (
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-              <div className="stat-card">
-                <p className="stat-label">Total (POS + Domicilios)</p>
-                <p className="text-xl font-bold text-gray-900 tabular-nums">{fmt(detail.summary.all_total)}</p>
-              </div>
-              <div className="stat-card">
-                <p className="stat-label">Efectivo POS</p>
-                <p className="text-xl font-bold text-green-600 tabular-nums">{fmt(detail.summary.pos_cash)}</p>
-                <p className="text-xs text-gray-400">Transfer: {fmt(detail.summary.pos_transfer)}</p>
-              </div>
-              <div className="stat-card">
-                <p className="stat-label">Caja Domicilios</p>
-                <p className="text-xl font-bold text-purple-600 tabular-nums">{fmt(detail.summary.dom_cash)}</p>
-                <p className="text-xs text-gray-400">Transfer: {fmt(detail.summary.dom_transfer)}</p>
-              </div>
-              <div className="stat-card">
-                <p className="stat-label">Gastos jornada</p>
-                <p className="text-xl font-bold text-red-500 tabular-nums">- {fmt(detail.summary.total_expenses)}</p>
-                <p className="text-xs text-gray-400">
-                  Neto efectivo: {fmt((detail.summary.pos_cash || 0) - (detail.summary.total_expenses || 0))}
-                </p>
-              </div>
-            </div>
-          )}
+          {channel === 'all' && (() => {
+            const expAfecta   = detail.expenses.filter(e => e.from_daily_cash).reduce((s,e) => s+Number(e.amount), 0)
+            const expNoAfecta = detail.expenses.filter(e => !e.from_daily_cash).reduce((s,e) => s+Number(e.amount), 0)
+            const expTotalG   = expAfecta + expNoAfecta
+            const expEfectivo = detail.expenses.filter(e => e.from_daily_cash && e.payment_method === 'cash').reduce((s,e) => s+Number(e.amount), 0)
+            const expTransfer = detail.expenses.filter(e => e.from_daily_cash && e.payment_method === 'transfer').reduce((s,e) => s+Number(e.amount), 0)
+            return (
+              <>
+                <div className="grid grid-cols-3 gap-3">
+                  <div className="stat-card">
+                    <p className="stat-label">Total (POS + Domicilios)</p>
+                    <p className="text-xl font-bold text-gray-900 tabular-nums">{fmt(detail.summary.all_total)}</p>
+                  </div>
+                  <div className="stat-card">
+                    <p className="stat-label">Efectivo POS</p>
+                    <p className="text-xl font-bold text-green-600 tabular-nums">{fmt(detail.summary.pos_cash)}</p>
+                    <p className="text-xs text-gray-400">Transfer: {fmt(detail.summary.pos_transfer)}</p>
+                  </div>
+                  <div className="stat-card">
+                    <p className="stat-label">Caja Domicilios</p>
+                    <p className="text-xl font-bold text-purple-600 tabular-nums">{fmt(detail.summary.dom_cash)}</p>
+                    <p className="text-xs text-gray-400">Transfer: {fmt(detail.summary.dom_transfer)}</p>
+                  </div>
+                </div>
+                {/* Gastos Jornada breakdown */}
+                <div className="card p-4 border-l-4 border-red-300">
+                  <p className="text-[10px] font-bold text-red-500 uppercase tracking-widest mb-3">Gastos Jornada</p>
+                  <div className="grid grid-cols-5 gap-3">
+                    <div className="text-center">
+                      <p className="text-xs text-gray-400 uppercase tracking-wide mb-1">Afectan caja</p>
+                      <p className="text-lg font-bold text-red-500">- {fmt(expAfecta)}</p>
+                    </div>
+                    <div className="text-center">
+                      <p className="text-xs text-gray-400 uppercase tracking-wide mb-1">No afectan caja</p>
+                      <p className="text-lg font-bold text-gray-400">- {fmt(expNoAfecta)}</p>
+                    </div>
+                    <div className="text-center border-x border-gray-100">
+                      <p className="text-xs text-gray-400 uppercase tracking-wide mb-1">Total gastos</p>
+                      <p className="text-lg font-bold text-red-700">- {fmt(expTotalG)}</p>
+                    </div>
+                    <div className="text-center">
+                      <p className="text-xs text-gray-400 uppercase tracking-wide mb-1">Efectivo</p>
+                      <p className="text-lg font-bold text-gray-700">- {fmt(expEfectivo)}</p>
+                    </div>
+                    <div className="text-center">
+                      <p className="text-xs text-gray-400 uppercase tracking-wide mb-1">Transferencia</p>
+                      <p className="text-lg font-bold text-cyan-600">- {fmt(expTransfer)}</p>
+                    </div>
+                  </div>
+                </div>
+              </>
+            )
+          })()}
 
-          {channel === 'pos' && (
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-              <div className="stat-card">
-                <p className="stat-label">Total POS</p>
-                <p className="text-xl font-bold text-blue-700 tabular-nums">{fmt(detail.summary.pos_total)}</p>
-              </div>
-              <div className="stat-card">
-                <p className="stat-label">Efectivo POS</p>
-                <p className="text-xl font-bold text-green-600 tabular-nums">{fmt(detail.summary.pos_cash)}</p>
-              </div>
-              <div className="stat-card">
-                <p className="stat-label">Transferencias POS</p>
-                <p className="text-xl font-bold text-indigo-600 tabular-nums">{fmt(detail.summary.pos_transfer)}</p>
-              </div>
-              <div className="stat-card">
-                <p className="stat-label">Gastos jornada</p>
-                <p className="text-xl font-bold text-red-500 tabular-nums">- {fmt(detail.summary.pos_expenses)}</p>
-                <p className="text-xs text-gray-400">
-                  Neto: {fmt((detail.summary.pos_cash || 0) - (detail.summary.pos_expenses || 0))}
-                </p>
-              </div>
-            </div>
-          )}
+          {channel === 'pos' && (() => {
+            const expAfecta   = detail.expenses.filter(e => e.from_daily_cash).reduce((s,e) => s+Number(e.amount), 0)
+            const expNoAfecta = detail.expenses.filter(e => !e.from_daily_cash).reduce((s,e) => s+Number(e.amount), 0)
+            const expEfectivo = detail.expenses.filter(e => e.from_daily_cash && e.payment_method === 'cash').reduce((s,e) => s+Number(e.amount), 0)
+            const expTransfer = detail.expenses.filter(e => e.from_daily_cash && e.payment_method === 'transfer').reduce((s,e) => s+Number(e.amount), 0)
+            return (
+              <>
+                <div className="grid grid-cols-3 gap-3">
+                  <div className="stat-card">
+                    <p className="stat-label">Total POS</p>
+                    <p className="text-xl font-bold text-blue-700 tabular-nums">{fmt(detail.summary.pos_total)}</p>
+                  </div>
+                  <div className="stat-card">
+                    <p className="stat-label">Efectivo POS</p>
+                    <p className="text-xl font-bold text-green-600 tabular-nums">{fmt(detail.summary.pos_cash)}</p>
+                  </div>
+                  <div className="stat-card">
+                    <p className="stat-label">Transferencias POS</p>
+                    <p className="text-xl font-bold text-indigo-600 tabular-nums">{fmt(detail.summary.pos_transfer)}</p>
+                  </div>
+                </div>
+                <div className="card p-4 border-l-4 border-red-300">
+                  <p className="text-[10px] font-bold text-red-500 uppercase tracking-widest mb-3">Gastos POS</p>
+                  <div className="grid grid-cols-5 gap-3">
+                    <div className="text-center"><p className="text-xs text-gray-400 uppercase tracking-wide mb-1">Afectan caja</p><p className="text-lg font-bold text-red-500">- {fmt(expAfecta)}</p></div>
+                    <div className="text-center"><p className="text-xs text-gray-400 uppercase tracking-wide mb-1">No afectan caja</p><p className="text-lg font-bold text-gray-400">- {fmt(expNoAfecta)}</p></div>
+                    <div className="text-center border-x border-gray-100"><p className="text-xs text-gray-400 uppercase tracking-wide mb-1">Total gastos</p><p className="text-lg font-bold text-red-700">- {fmt(expAfecta + expNoAfecta)}</p></div>
+                    <div className="text-center"><p className="text-xs text-gray-400 uppercase tracking-wide mb-1">Efectivo</p><p className="text-lg font-bold text-gray-700">- {fmt(expEfectivo)}</p></div>
+                    <div className="text-center"><p className="text-xs text-gray-400 uppercase tracking-wide mb-1">Transferencia</p><p className="text-lg font-bold text-cyan-600">- {fmt(expTransfer)}</p></div>
+                  </div>
+                </div>
+              </>
+            )
+          })()}
 
-          {channel === 'delivery' && (
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-              <div className="stat-card">
-                <p className="stat-label">Total Domicilios</p>
-                <p className="text-xl font-bold text-purple-600 tabular-nums">{fmt(detail.summary.dom_total)}</p>
-              </div>
-              <div className="stat-card">
-                <p className="stat-label">Efectivo Domicilios</p>
-                <p className="text-xl font-bold text-green-600 tabular-nums">{fmt(detail.summary.dom_cash)}</p>
-              </div>
-              <div className="stat-card">
-                <p className="stat-label">Transferencias Domicilios</p>
-                <p className="text-xl font-bold text-indigo-600 tabular-nums">{fmt(detail.summary.dom_transfer)}</p>
-              </div>
-              <div className="stat-card">
-                <p className="stat-label">Gastos domicilios</p>
-                <p className="text-xl font-bold text-red-500 tabular-nums">- {fmt(detail.summary.dom_expenses)}</p>
-              </div>
-            </div>
-          )}
+          {channel === 'delivery' && (() => {
+            const expAfecta   = detail.expenses.filter(e => e.from_daily_cash).reduce((s,e) => s+Number(e.amount), 0)
+            const expNoAfecta = detail.expenses.filter(e => !e.from_daily_cash).reduce((s,e) => s+Number(e.amount), 0)
+            const expEfectivo = detail.expenses.filter(e => e.from_daily_cash && e.payment_method === 'cash').reduce((s,e) => s+Number(e.amount), 0)
+            const expTransfer = detail.expenses.filter(e => e.from_daily_cash && e.payment_method === 'transfer').reduce((s,e) => s+Number(e.amount), 0)
+            return (
+              <>
+                <div className="grid grid-cols-3 gap-3">
+                  <div className="stat-card">
+                    <p className="stat-label">Total Domicilios</p>
+                    <p className="text-xl font-bold text-purple-600 tabular-nums">{fmt(detail.summary.dom_total)}</p>
+                  </div>
+                  <div className="stat-card">
+                    <p className="stat-label">Efectivo Domicilios</p>
+                    <p className="text-xl font-bold text-green-600 tabular-nums">{fmt(detail.summary.dom_cash)}</p>
+                  </div>
+                  <div className="stat-card">
+                    <p className="stat-label">Transferencias Domicilios</p>
+                    <p className="text-xl font-bold text-indigo-600 tabular-nums">{fmt(detail.summary.dom_transfer)}</p>
+                  </div>
+                </div>
+                <div className="card p-4 border-l-4 border-red-300">
+                  <p className="text-[10px] font-bold text-red-500 uppercase tracking-widest mb-3">Gastos Domicilios</p>
+                  <div className="grid grid-cols-5 gap-3">
+                    <div className="text-center"><p className="text-xs text-gray-400 uppercase tracking-wide mb-1">Afectan caja</p><p className="text-lg font-bold text-red-500">- {fmt(expAfecta)}</p></div>
+                    <div className="text-center"><p className="text-xs text-gray-400 uppercase tracking-wide mb-1">No afectan caja</p><p className="text-lg font-bold text-gray-400">- {fmt(expNoAfecta)}</p></div>
+                    <div className="text-center border-x border-gray-100"><p className="text-xs text-gray-400 uppercase tracking-wide mb-1">Total gastos</p><p className="text-lg font-bold text-red-700">- {fmt(expAfecta + expNoAfecta)}</p></div>
+                    <div className="text-center"><p className="text-xs text-gray-400 uppercase tracking-wide mb-1">Efectivo</p><p className="text-lg font-bold text-gray-700">- {fmt(expEfectivo)}</p></div>
+                    <div className="text-center"><p className="text-xs text-gray-400 uppercase tracking-wide mb-1">Transferencia</p><p className="text-lg font-bold text-cyan-600">- {fmt(expTransfer)}</p></div>
+                  </div>
+                </div>
+              </>
+            )
+          })()}
 
           {/* Ventas */}
           <div className="card p-0 overflow-hidden">

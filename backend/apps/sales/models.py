@@ -15,6 +15,10 @@ class Sale(models.Model):
         'users.User', on_delete=models.SET_NULL, null=True, blank=True,
         related_name='sales', help_text='Vendedora seleccionada'
     )
+    seller_name = models.CharField(
+        max_length=120, blank=True, default='',
+        help_text='Nombre de la vendedora al momento de la venta (persiste si se elimina el usuario)'
+    )
     promotion = models.ForeignKey(
         'promotions.Promotion', on_delete=models.SET_NULL, null=True, blank=True
     )

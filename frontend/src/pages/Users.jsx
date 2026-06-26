@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { getUsers, createUser, updateUser, toggleUser, changePassword } from '../api/auth'
+import { getUsers, createUser, updateUser, toggleUser, changePassword, deleteUser } from '../api/auth'
 import { Icon } from '../components/Icons'
 import toast from 'react-hot-toast'
 
@@ -88,6 +88,18 @@ export default function Users() {
       toast.success(u.is_active ? 'Usuario desactivado' : 'Usuario activado')
       load()
     } catch { toast.error('Error al cambiar estado') }
+  }
+
+  // ── Eliminar ──
+  const handleDelete = async (u) => {
+    if (!confirm(`¿Eliminar a "${u.full_name}"? Sus ventas quedarán registradas con su nombre.`)) return
+    try {
+      await deleteUser(u.id)
+      toast.success(`"${u.full_name}" eliminado`)
+      load()
+    } catch (err) {
+      toast.error(err?.response?.data?.detail || 'Error al eliminar')
+    }
   }
 
   // ── Cambiar contraseña ──
@@ -255,6 +267,14 @@ export default function Users() {
                           ? <><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></>
                           : <><path d="M9 12l2 2 4-4"/><circle cx="12" cy="12" r="10"/></>
                         }
+                      </svg>
+                    </button>
+                    {/* Eliminar */}
+                    <button onClick={() => handleDelete(u)}
+                      className="w-7 h-7 rounded-lg flex items-center justify-center text-gray-300 hover:bg-red-50 hover:text-red-500 transition-all"
+                      title="Eliminar usuario">
+                      <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/>
                       </svg>
                     </button>
                   </div>

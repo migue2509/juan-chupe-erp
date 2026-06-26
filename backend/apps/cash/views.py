@@ -69,9 +69,29 @@ class CashAuditViewSet(viewsets.ModelViewSet):
                 from_daily_cash=True, payment_method='cash', origin='pos'
             )
         )
+        expenses_pos_transfer = sum(
+            e.amount for e in shift.expenses.filter(
+                from_daily_cash=True, payment_method='transfer', origin='pos'
+            )
+        )
+        expenses_pos_no_cash = sum(
+            e.amount for e in shift.expenses.filter(
+                from_daily_cash=False, origin='pos'
+            )
+        )
         expenses_dom_cash = sum(
             e.amount for e in shift.expenses.filter(
                 from_daily_cash=True, payment_method='cash', origin='delivery'
+            )
+        )
+        expenses_dom_transfer = sum(
+            e.amount for e in shift.expenses.filter(
+                from_daily_cash=True, payment_method='transfer', origin='delivery'
+            )
+        )
+        expenses_dom_no_cash = sum(
+            e.amount for e in shift.expenses.filter(
+                from_daily_cash=False, origin='delivery'
             )
         )
 
@@ -178,19 +198,23 @@ class CashAuditViewSet(viewsets.ModelViewSet):
         return Response({
             'shift_id': shift.id,
             # POS
-            'pos_total':          pos_total,
-            'pos_cash':           pos_cash,
-            'pos_transfer':       pos_transfer,
-            'expenses_from_cash': expenses_pos_cash,
-            'net_expected_cash':  pos_cash - expenses_pos_cash,
-            'expected_cash':      pos_cash,
-            'expected_transfer':  pos_transfer,
+            'pos_total':              pos_total,
+            'pos_cash':               pos_cash,
+            'pos_transfer':           pos_transfer,
+            'expenses_from_cash':     expenses_pos_cash,       # gastos efectivo que salen de caja
+            'expenses_pos_transfer':  expenses_pos_transfer,   # gastos transferencia POS (informativo)
+            'expenses_pos_no_cash':   expenses_pos_no_cash,    # gastos que no afectan caja POS
+            'net_expected_cash':      pos_cash - expenses_pos_cash,  # solo resta gastos en efectivo
+            'expected_cash':          pos_cash,
+            'expected_transfer':      pos_transfer,
             # Domicilios
-            'delivery_total':         delivery_total,
-            'delivery_cash':          delivery_cash,
-            'delivery_transfer':      delivery_transfer,
-            'delivery_expenses_cash': expenses_dom_cash,
-            'delivery_net_cash':      delivery_cash - expenses_dom_cash,
+            'delivery_total':           delivery_total,
+            'delivery_cash':            delivery_cash,
+            'delivery_transfer':        delivery_transfer,
+            'delivery_expenses_cash':   expenses_dom_cash,       # gastos efectivo domicilios
+            'delivery_expenses_transfer': expenses_dom_transfer, # gastos transferencia domicilios
+            'delivery_expenses_no_cash':  expenses_dom_no_cash,  # gastos que no afectan caja dom
+            'delivery_net_cash':        delivery_cash - expenses_dom_cash,
             # Catálogo (liquidación solo POS)
             'catalog': catalog,
             # Estado de arqueos

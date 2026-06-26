@@ -1,4 +1,5 @@
 from rest_framework import viewsets, status
+from django.db.models.deletion import ProtectedError
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.permissions import AllowAny
@@ -43,6 +44,24 @@ class UserViewSet(viewsets.ModelViewSet):
         users = User.objects.filter(role='operative', is_active=True)
         serializer = UserSerializer(users, many=True)
         return Response(serializer.data)
+
+    def destroy(self, request, *args, **kwargs):
+        user = self.get_object()
+        if user == request.user:
+            return Response(
+                {'detail': 'No puedes eliminar tu propia cuenta.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        # Snapshot del nombre en todas las ventas antes de eliminar
+        user.sales.all().update(seller_name=user.full_name)
+        try:
+            user.delete()
+        except ProtectedError:
+            return Response(
+                {'detail': f'No se puede eliminar a "{user.full_name}" porque tiene jornadas registradas. Desactívalo en su lugar.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
     @action(detail=True, methods=['patch'], url_path='toggle-active')
     def toggle_active(self, request, pk=None):

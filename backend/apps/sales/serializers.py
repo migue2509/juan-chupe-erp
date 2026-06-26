@@ -50,8 +50,14 @@ class SaleItemSerializer(serializers.ModelSerializer):
 
 class SaleSerializer(serializers.ModelSerializer):
     items          = SaleItemSerializer(many=True, read_only=True)
-    seller_name    = serializers.CharField(source='seller.full_name', read_only=True, default='')
+    seller_name    = serializers.SerializerMethodField()
     promotion_name = serializers.CharField(source='promotion.name',   read_only=True, default='')
+
+    def get_seller_name(self, obj):
+        # Si el usuario aún existe usa su nombre actual; si fue eliminado usa el snapshot
+        if obj.seller:
+            return obj.seller.full_name
+        return obj.seller_name or '—'
     is_voided      = serializers.SerializerMethodField()
     delivery_status = serializers.SerializerMethodField()
 
