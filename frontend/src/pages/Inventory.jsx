@@ -144,10 +144,20 @@ export default function Inventory() {
 
       {/* Alerta crítica */}
       {criticalItems.length > 0 && (
-        <div className="flex items-center gap-3 px-4 py-3 bg-red-50 border border-red-200 rounded-xl text-sm">
-          <Icon name="alert" className="w-4 h-4 text-red-500 flex-shrink-0" />
-          <span className="font-semibold text-red-700">{criticalItems.length} insumo{criticalItems.length > 1 ? 's' : ''} en nivel crítico:</span>
-          <span className="text-red-600">{criticalItems.join(', ')}</span>
+        <div className="bg-red-50 border border-red-200 rounded-xl px-4 py-3">
+          <div className="flex items-center gap-2 mb-2">
+            <Icon name="alert" className="w-4 h-4 text-red-500 flex-shrink-0" />
+            <span className="text-sm font-semibold text-red-700">
+              {criticalItems.length} insumo{criticalItems.length > 1 ? 's' : ''} en nivel crítico
+            </span>
+          </div>
+          <div className="flex flex-wrap gap-1.5">
+            {criticalItems.map((name, i) => (
+              <span key={i} className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-700 border border-red-200">
+                {name}
+              </span>
+            ))}
+          </div>
         </div>
       )}
 
