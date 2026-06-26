@@ -1,4 +1,4 @@
-import { Outlet } from 'react-router-dom'
+import { Outlet, useNavigate } from 'react-router-dom'
 import { useEffect, useState, useCallback } from 'react'
 import Sidebar from './Sidebar'
 import Topbar from './Topbar'
@@ -6,7 +6,8 @@ import { useAuth } from '../context/AuthContext'
 import { getActiveShift } from '../api'
 
 export default function Layout() {
-  const { user } = useAuth()
+  const { user, logout } = useAuth()
+  const navigate = useNavigate()
   const isOperative = user?.role === 'operative'
 
   const [activeShift, setActiveShift] = useState(null)
@@ -53,10 +54,13 @@ export default function Layout() {
         <p className="text-sm text-gray-400 mb-6">
           El sistema está bloqueado hasta que el administrador abra la jornada del día.
         </p>
-        <button
-          onClick={checkShift}
-          className="btn-primary w-full">
+        <button onClick={checkShift} className="btn-primary w-full">
           Verificar de nuevo
+        </button>
+        <button
+          onClick={() => { logout(); navigate('/login') }}
+          className="btn-secondary w-full mt-3">
+          Cerrar sesión
         </button>
         <p className="text-xs text-gray-300 mt-4">Revisando automáticamente cada 30 segundos…</p>
       </div>
