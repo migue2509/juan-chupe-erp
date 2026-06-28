@@ -85,10 +85,11 @@ export default function Dashboard() {
     if (filter === 'delivery') return e.origin === 'delivery'
     return true
   })
-  // Gastos que afectan caja: solo los marcados como from_daily_cash
-  const totalGastos = filteredExpenses
-    .filter(e => e.from_daily_cash)
-    .reduce((sum, e) => sum + Number(e.amount || 0), 0)
+  const gastosAfectaCaja  = filteredExpenses.filter(e =>  e.from_daily_cash).reduce((sum, e) => sum + Number(e.amount || 0), 0)
+  const gastosNoAfectaCaja= filteredExpenses.filter(e => !e.from_daily_cash).reduce((sum, e) => sum + Number(e.amount || 0), 0)
+  const gastosTotalAll    = gastosAfectaCaja + gastosNoAfectaCaja
+  // alias para compatibilidad con cálculo de neto
+  const totalGastos       = gastosAfectaCaja
   // Gastos pagados en efectivo (reducen el efectivo físico disponible)
   const gastosEfectivo = filteredExpenses
     .filter(e => e.from_daily_cash && e.payment_method === 'cash')
@@ -195,10 +196,10 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* ── Stats 6-col ── */}
-      <div className="grid grid-cols-2 lg:grid-cols-6 gap-4">
+      {/* ── Stats ventas (5-col) ── */}
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
         {/* Total dinero */}
-        <div className="stat-card lg:col-span-1">
+        <div className="stat-card">
           <div className="flex items-center justify-between mb-1">
             <span className="stat-label">Total dinero</span>
             <span className="w-7 h-7 rounded-lg bg-pink-50 flex items-center justify-center text-brand-pink">
@@ -241,17 +242,6 @@ export default function Dashboard() {
           <span className="stat-value text-gray-900 text-xl">{fmt(totalTransf)}</span>
         </div>
 
-        {/* Gastos */}
-        <div className="stat-card">
-          <div className="flex items-center justify-between mb-1">
-            <span className="stat-label">Gastos</span>
-            <span className="w-7 h-7 rounded-lg bg-red-50 flex items-center justify-center text-red-400">
-              <Icon name="expenses" className="w-3.5 h-3.5" />
-            </span>
-          </div>
-          <span className="stat-value text-red-500 text-xl">{fmt(totalGastos)}</span>
-        </div>
-
         {/* Neto en caja */}
         <div className="stat-card">
           <div className="flex items-center justify-between mb-1">
@@ -264,6 +254,45 @@ export default function Dashboard() {
             {fmt(netoEnCaja)}
           </span>
           <p className="text-[10px] text-gray-400 mt-0.5">Ventas − Gastos</p>
+        </div>
+      </div>
+
+      {/* ── Stats gastos (3-col) ── */}
+      <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
+        {/* Total gastos */}
+        <div className="stat-card col-span-2 lg:col-span-1">
+          <div className="flex items-center justify-between mb-1">
+            <span className="stat-label">Total gastos</span>
+            <span className="w-7 h-7 rounded-lg bg-red-50 flex items-center justify-center text-red-400">
+              <Icon name="expenses" className="w-3.5 h-3.5" />
+            </span>
+          </div>
+          <span className="stat-value text-red-500 text-xl">{fmt(gastosTotalAll)}</span>
+          <p className="text-[10px] text-gray-400 mt-0.5">{filteredExpenses.length} registros</p>
+        </div>
+
+        {/* Afecta caja */}
+        <div className="stat-card">
+          <div className="flex items-center justify-between mb-1">
+            <span className="stat-label">Afecta caja</span>
+            <span className="w-7 h-7 rounded-lg bg-orange-50 flex items-center justify-center text-orange-500">
+              <Icon name="cash" className="w-3.5 h-3.5" />
+            </span>
+          </div>
+          <span className="stat-value text-orange-500 text-xl">{fmt(gastosAfectaCaja)}</span>
+          <p className="text-[10px] text-gray-400 mt-0.5">{filteredExpenses.filter(e => e.from_daily_cash).length} gastos</p>
+        </div>
+
+        {/* No afecta caja */}
+        <div className="stat-card">
+          <div className="flex items-center justify-between mb-1">
+            <span className="stat-label">No afecta caja</span>
+            <span className="w-7 h-7 rounded-lg bg-gray-100 flex items-center justify-center text-gray-400">
+              <Icon name="expenses" className="w-3.5 h-3.5" />
+            </span>
+          </div>
+          <span className="stat-value text-gray-500 text-xl">{fmt(gastosNoAfectaCaja)}</span>
+          <p className="text-[10px] text-gray-400 mt-0.5">{filteredExpenses.filter(e => !e.from_daily_cash).length} gastos</p>
         </div>
       </div>
 
@@ -471,9 +500,19 @@ export default function Dashboard() {
               )}
             </div>
             {filteredExpenses.length > 0 && (
-              <div className="flex items-center justify-between px-5 py-3 border-t border-gray-100 bg-slate-50">
-                <span className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Total gastos</span>
-                <span className="text-sm font-bold text-red-500 tabular-nums">-{fmt(totalGastos)}</span>
+              <div className="border-t border-gray-100 bg-slate-50 divide-y divide-gray-100">
+                <div className="flex items-center justify-between px-5 py-2">
+                  <span className="text-xs text-gray-400">Afecta caja</span>
+                  <span className="text-xs font-semibold text-orange-500 tabular-nums">-{fmt(gastosAfectaCaja)}</span>
+                </div>
+                <div className="flex items-center justify-between px-5 py-2">
+                  <span className="text-xs text-gray-400">No afecta caja</span>
+                  <span className="text-xs font-semibold text-gray-400 tabular-nums">-{fmt(gastosNoAfectaCaja)}</span>
+                </div>
+                <div className="flex items-center justify-between px-5 py-2.5">
+                  <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Total</span>
+                  <span className="text-sm font-bold text-red-500 tabular-nums">-{fmt(gastosTotalAll)}</span>
+                </div>
               </div>
             )}
           </div>
