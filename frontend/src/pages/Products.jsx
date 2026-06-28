@@ -1,4 +1,6 @@
 import { useEffect, useState } from 'react'
+import data from '@emoji-mart/data'
+import Picker from '@emoji-mart/react'
 import {
   getAllFlavors, createFlavor, updateFlavor, deleteFlavor,
   getAllCupSizes, createCupSize, updateCupSize, deleteCupSize,
@@ -20,7 +22,36 @@ const TABS = [
   { key: 'toppings', label: 'Toppings',            icon: 'promotions' },
 ]
 
-const EMPTY_FLAVOR  = { name: '', category: 'water', color: '#00E5FF', min_stock_ml: 500 }
+const EMPTY_FLAVOR  = { name: '', category: 'water', emoji: '🍓', min_stock_ml: 500 }
+
+function EmojiPicker({ value, onChange }) {
+  const [open, setOpen] = useState(false)
+
+  return (
+    <div className="relative">
+      <button type="button" onClick={() => setOpen(v => !v)}
+        className="flex items-center gap-2 px-3 py-2 border border-gray-200 rounded-xl hover:border-gray-300 transition-all bg-white">
+        <span className="text-2xl leading-none">{value || '❓'}</span>
+        <span className="text-sm text-gray-400">Cambiar emoji</span>
+      </button>
+      {open && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30"
+          onMouseDown={(e) => { if (e.target === e.currentTarget) setOpen(false) }}>
+          <div className="shadow-2xl rounded-2xl overflow-hidden">
+            <Picker
+              data={data}
+              locale="es"
+              onEmojiSelect={(em) => { onChange(em.native); setOpen(false) }}
+              theme="light"
+              previewPosition="none"
+              skinTonePosition="none"
+            />
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
 const EMPTY_CUP     = { size: '', ml: '', price: '', min_quantity: 10 }
 const EMPTY_TOPPING = { name: '', price: 2000, min_stock: 0, linked_category: '' }
 
@@ -55,13 +86,8 @@ function EditRow({ fields, initial, onSave, onCancel, saving }) {
               onChange={e => setForm(p => ({ ...p, [f.key]: e.target.value }))}>
               {f.options.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
             </select>
-          ) : f.type === 'color' ? (
-            <div className="flex gap-1 items-center">
-              <input type="color" className="h-9 w-10 rounded-lg border border-gray-200 cursor-pointer p-0.5"
-                value={form[f.key]} onChange={e => setForm(p => ({ ...p, [f.key]: e.target.value }))} />
-              <input className="input text-sm" value={form[f.key]}
-                onChange={e => setForm(p => ({ ...p, [f.key]: e.target.value }))} />
-            </div>
+          ) : f.type === 'emoji' ? (
+            <EmojiPicker value={form[f.key]} onChange={v => setForm(p => ({ ...p, [f.key]: v }))} />
           ) : (
             <input className="input text-sm" type={f.type || 'text'} placeholder={f.placeholder}
               value={form[f.key]} onChange={e => setForm(p => ({ ...p, [f.key]: e.target.value }))} />
@@ -146,7 +172,7 @@ export default function Products() {
   const handleFlavorCreate = async (e) => {
     e.preventDefault(); setSaving(true)
     try {
-      await createFlavor(flavorForm)
+      await createFlavor({ name: flavorForm.name, category: flavorForm.category, emoji: flavorForm.emoji, min_stock_ml: flavorForm.min_stock_ml })
       toast.success(`Bolsa "${flavorForm.name}" creada`)
       setFlavorForm(EMPTY_FLAVOR); setShowCreate(false); load()
     } catch { toast.error('Error al crear bolsa') }
@@ -155,7 +181,7 @@ export default function Products() {
   const handleFlavorSave = async (form) => {
     setSaving(true)
     try {
-      await updateFlavor(editing.id, { name: form.name, category: form.category, color: form.color })
+      await updateFlavor(editing.id, { name: form.name, category: form.category, emoji: form.emoji })
       if (editing.bagId && form.min_stock_ml !== undefined) {
         await updateBag(editing.bagId, { min_stock_ml: Number(form.min_stock_ml) })
       }
@@ -282,13 +308,8 @@ export default function Products() {
                 </select>
               </div>
               <div>
-                <label className="label">Color en UI</label>
-                <div className="flex gap-2 items-center">
-                  <input type="color" className="h-10 w-12 rounded-lg border border-gray-200 cursor-pointer p-0.5"
-                    value={flavorForm.color} onChange={e => setFlavorForm(f => ({ ...f, color: e.target.value }))} />
-                  <input className="input" value={flavorForm.color}
-                    onChange={e => setFlavorForm(f => ({ ...f, color: e.target.value }))} />
-                </div>
+                <label className="label">Emoji del sabor</label>
+                <EmojiPicker value={flavorForm.emoji} onChange={v => setFlavorForm(f => ({ ...f, emoji: v }))} />
               </div>
               <div>
                 <label className="label">Stock mínimo (ml)</label>
@@ -399,8 +420,8 @@ export default function Products() {
               value={search} onChange={e => setSearch(e.target.value)} />
           </div>
           <div className="grid px-5 py-3 bg-slate-50 border-b border-gray-100 text-[10px] font-semibold text-gray-400 uppercase tracking-widest gap-3"
-            style={{ gridTemplateColumns: '2rem 1fr 140px 80px 100px 1fr 180px' }}>
-            {['', 'Nombre', 'Categoría', 'Color', 'Mín. ml', 'Fechas', 'Acciones'].map(h => <span key={h}>{h}</span>)}
+            style={{ gridTemplateColumns: '2.5rem 1fr 140px 100px 1fr 180px' }}>
+            {['', 'Nombre', 'Categoría', 'Mín. ml', 'Fechas', 'Acciones'].map(h => <span key={h}>{h}</span>)}
           </div>
           <div className="divide-y divide-gray-50">
             {filteredFlavors.length === 0 ? (
@@ -415,24 +436,22 @@ export default function Products() {
                     fields={[
                       { key: 'name',         label: 'Nombre',    width: 160 },
                       { key: 'category',     label: 'Categoría', type: 'select', width: 180, options: FLAVOR_CATS.map(c => ({ value: c.value, label: c.label })) },
-                      { key: 'color',        label: 'Color',     type: 'color',  width: 180 },
+                      { key: 'emoji',        label: 'Emoji',     type: 'emoji',  width: 300 },
                       { key: 'min_stock_ml', label: 'Mín. ml',  type: 'number', width: 100, placeholder: '500' },
                     ]}
-                    initial={{ name: f.name, category: f.category, color: f.color, min_stock_ml: f.bag?.min_stock_ml ?? 500 }}
+                    initial={{ name: f.name, category: f.category, emoji: f.emoji ?? '', min_stock_ml: f.bag?.min_stock_ml ?? 500 }}
                     onSave={handleFlavorSave}
                     onCancel={() => setEditing(null)}
                     saving={saving}
                   />
                 ) : (
                   <div className={`grid px-5 py-3 items-center gap-3 hover:bg-slate-50 transition-colors ${!f.is_active ? 'opacity-40' : ''}`}
-                    style={{ gridTemplateColumns: '2rem 1fr 140px 80px 100px 1fr 180px' }}>
-                    <div className="w-7 h-7 rounded-full border-2 border-white shadow flex-shrink-0"
-                      style={{ background: f.color || '#e5e7eb' }} />
+                    style={{ gridTemplateColumns: '2.5rem 1fr 140px 100px 1fr 180px' }}>
+                    <span className="text-2xl leading-none">{f.emoji || '❓'}</span>
                     <span className="font-medium text-sm text-gray-800">{f.name}</span>
                     <span className="text-sm text-gray-500">
                       {FLAVOR_CATS.find(c => c.value === f.category)?.label ?? f.category}
                     </span>
-                    <span className="text-xs font-mono text-gray-400">{f.color}</span>
                     <span className="text-sm text-gray-600 tabular-nums">{f.bag?.min_stock_ml ?? '—'} ml</span>
                     <div className="flex flex-col gap-0.5">
                       <Timestamp label="Creado" date={f.created_at} />

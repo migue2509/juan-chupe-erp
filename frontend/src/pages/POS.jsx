@@ -311,11 +311,9 @@ export default function POS() {
                         return (
                           <button key={f.id} onClick={() => togglePromoFlavor(f.id)}
                             className={`p-3 rounded-xl text-center border-2 transition-all text-sm font-medium ${
-                              sel ? 'border-brand-pink bg-brand-pink/8 text-brand-pink' : 'border-gray-100 text-gray-600 hover:border-gray-200 hover:bg-gray-50'
-                            }`}
-                            style={sel && f.color ? { borderColor: f.color, backgroundColor: `${f.color}12` } : {}}>
-                            <div className="w-8 h-8 rounded-full mx-auto mb-1.5 border-2 border-white shadow-sm"
-                              style={{ background: f.color || '#e5e7eb' }} />
+                              sel ? 'border-brand-pink bg-pink-50 text-brand-pink' : 'border-gray-100 text-gray-600 hover:border-gray-200 hover:bg-gray-50'
+                            }`}>
+                            <div className="text-2xl leading-none mx-auto mb-1.5">{f.emoji || '🍧'}</div>
                             <div className="text-xs leading-tight">{f.name}</div>
                           </button>
                         )
@@ -393,11 +391,9 @@ export default function POS() {
                       return (
                         <button key={f.id} onClick={() => toggleFlavor(f.id)}
                           className={`p-3 rounded-xl text-center border-2 transition-all text-sm font-medium ${
-                            sel ? 'border-brand-pink bg-brand-pink/8 text-brand-pink' : 'border-gray-100 text-gray-600 hover:border-gray-200 hover:bg-gray-50'
-                          }`}
-                          style={sel && f.color ? { borderColor: f.color, backgroundColor: `${f.color}12` } : {}}>
-                          <div className="w-8 h-8 rounded-full mx-auto mb-1.5 border-2 border-white shadow-sm"
-                            style={{ background: f.color || '#e5e7eb' }} />
+                            sel ? 'border-brand-pink bg-pink-50 text-brand-pink' : 'border-gray-100 text-gray-600 hover:border-gray-200 hover:bg-gray-50'
+                          }`}>
+                          <div className="text-2xl leading-none mx-auto mb-1.5">{f.emoji || '🍧'}</div>
                           <div className="text-xs leading-tight">{f.name}</div>
                         </button>
                       )
