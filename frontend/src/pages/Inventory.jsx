@@ -35,6 +35,8 @@ export default function Inventory() {
   const [loading,   setLoading]   = useState(true)
   const [search,      setSearch]      = useState('')
   const [typeFilter,  setTypeFilter]  = useState('')
+  const [dateFrom,    setDateFrom]    = useState('')
+  const [dateTo,      setDateTo]      = useState('')
   const [stockSearch, setStockSearch] = useState('')
   const [modal, setModal] = useState(null)
   const [mForm, setMForm] = useState({ itemType: 'cup', itemId: '', qty: '', amount: '', notes: '' })
@@ -92,6 +94,11 @@ export default function Inventory() {
   const filteredMovements = movements.filter(m => {
     const matchType   = typeFilter ? m.movement_type === typeFilter : true
     const matchSearch = search ? m.item_name?.toLowerCase().includes(search.toLowerCase()) : true
+    if (dateFrom || dateTo) {
+      const d = new Date(m.created_at); d.setHours(0, 0, 0, 0)
+      if (dateFrom && d < new Date(dateFrom)) return false
+      if (dateTo   && d > new Date(dateTo))   return false
+    }
     return matchType && matchSearch
   })
 
@@ -275,8 +282,8 @@ export default function Inventory() {
               <Icon name="reports" className="w-4 h-4 text-brand-purple" />
               <h2>Movimientos</h2>
             </div>
-            <div className="flex items-center gap-2">
-              <input className="input py-1.5 text-xs w-36" placeholder="Buscar insumo..."
+            <div className="flex items-center gap-2 flex-wrap">
+              <input className="input py-1.5 text-xs w-32" placeholder="Buscar insumo..."
                 value={search} onChange={e => setSearch(e.target.value)} />
               <select className="input py-1.5 text-xs w-28" value={typeFilter} onChange={e => setTypeFilter(e.target.value)}>
                 <option value="">Todos</option>
@@ -284,6 +291,22 @@ export default function Inventory() {
                 <option value="out">Salida</option>
                 <option value="adjustment">Ajuste</option>
               </select>
+              <div className="flex items-center gap-1.5">
+                <label className="text-[11px] text-gray-400 whitespace-nowrap">Desde</label>
+                <input type="date" className="input py-1.5 text-xs w-32"
+                  value={dateFrom} onChange={e => setDateFrom(e.target.value)} />
+              </div>
+              <div className="flex items-center gap-1.5">
+                <label className="text-[11px] text-gray-400 whitespace-nowrap">Hasta</label>
+                <input type="date" className="input py-1.5 text-xs w-32"
+                  value={dateTo} onChange={e => setDateTo(e.target.value)} />
+              </div>
+              {(dateFrom || dateTo) && (
+                <button onClick={() => { setDateFrom(''); setDateTo('') }}
+                  className="text-[11px] text-gray-400 hover:text-gray-600 underline whitespace-nowrap">
+                  Limpiar
+                </button>
+              )}
             </div>
           </div>
 
