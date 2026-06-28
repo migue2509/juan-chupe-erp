@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { getBags, getCupStocks, getToppingStocks, addBagStock, addCupStock, addToppingStock, getMovements } from '../api'
+import { getBags, getCupStocks, getToppingStocks, addBagStock, addCupStock, addToppingStock, adjustBagStock, adjustCupStock, adjustToppingStock, getMovements } from '../api'
 import { Icon } from '../components/Icons'
 import toast from 'react-hot-toast'
 
@@ -39,6 +39,9 @@ export default function Inventory() {
   const [modal, setModal] = useState(null)
   const [mForm, setMForm] = useState({ itemType: 'cup', itemId: '', qty: '', amount: '', notes: '' })
   const [saving, setSaving] = useState(false)
+  const [adjModal, setAdjModal] = useState(null) // { type, id, name, unit }
+  const [adjForm,  setAdjForm]  = useState({ direction: 'add', qty: '', notes: '' })
+  const [adjSaving, setAdjSaving] = useState(false)
 
   const load = async () => {
     try {
@@ -91,6 +94,32 @@ export default function Inventory() {
     const matchSearch = search ? m.item_name?.toLowerCase().includes(search.toLowerCase()) : true
     return matchType && matchSearch
   })
+
+  const openAdjModal = (item) => {
+    setAdjModal(item)
+    setAdjForm({ direction: 'add', qty: '', notes: '' })
+  }
+
+  const handleAdjust = async () => {
+    if (!adjForm.qty || Number(adjForm.qty) <= 0) { toast.error('Ingresa la cantidad'); return }
+    if (!adjForm.notes.trim()) { toast.error('El motivo es obligatorio'); return }
+    setAdjSaving(true)
+    const delta = adjForm.direction === 'add' ? Number(adjForm.qty) : -Number(adjForm.qty)
+    try {
+      if (adjModal.type === 'bag') {
+        await adjustBagStock(adjModal.id, { delta_ml: delta * 6500, notes: adjForm.notes })
+      } else if (adjModal.type === 'cup') {
+        await adjustCupStock(adjModal.id, { delta, notes: adjForm.notes })
+      } else {
+        await adjustToppingStock(adjModal.id, { delta, notes: adjForm.notes })
+      }
+      toast.success('Ajuste registrado')
+      setAdjModal(null); load()
+    } catch (err) {
+      toast.error(err?.response?.data?.detail || 'Error al ajustar')
+    }
+    setAdjSaving(false)
+  }
 
   const openModal = () => {
     setMForm({ itemType: 'cup', itemId: cups[0]?.id ?? '', qty: '', amount: '', notes: '' })
@@ -202,8 +231,8 @@ export default function Inventory() {
 
           {/* Tabla */}
           <div className="grid px-5 py-2.5 bg-slate-50 border-b border-gray-100 text-[10px] font-semibold text-gray-400 uppercase tracking-widest gap-3"
-            style={{ gridTemplateColumns: '1fr 110px 80px 90px' }}>
-            {['Insumo', 'Actual', 'Mínimo', 'Estado'].map(h => <span key={h}>{h}</span>)}
+            style={{ gridTemplateColumns: '1fr 110px 80px 90px 36px' }}>
+            {['Insumo', 'Actual', 'Mínimo', 'Estado', ''].map(h => <span key={h}>{h}</span>)}
           </div>
 
           <div className="divide-y divide-gray-50">
@@ -212,7 +241,7 @@ export default function Inventory() {
             ) : filteredStock.map(item => (
               <div key={`${item.type}-${item.id}`}
                 className="grid px-5 py-3 items-center gap-3 hover:bg-slate-50 transition-colors"
-                style={{ gridTemplateColumns: '1fr 110px 80px 90px' }}>
+                style={{ gridTemplateColumns: '1fr 110px 80px 90px 36px' }}>
                 <span className="text-sm font-medium text-gray-800">{item.name}</span>
                 <div className="flex items-center gap-1.5">
                   <span className="text-sm tabular-nums text-gray-700">{item.current.toLocaleString('es-CO')}</span>
@@ -225,6 +254,14 @@ export default function Inventory() {
                     {item.isCritical ? 'Crítico' : 'OK'}
                   </span>
                 </div>
+                <button
+                  onClick={() => openAdjModal(item)}
+                  title="Ajustar stock"
+                  className="w-7 h-7 flex items-center justify-center rounded-lg text-gray-400 hover:bg-amber-50 hover:text-amber-600 transition-all">
+                  <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"/>
+                  </svg>
+                </button>
               </div>
             ))
             }
@@ -288,6 +325,89 @@ export default function Inventory() {
         </div>
 
       </div>
+
+      {/* Modal — Ajuste de Stock */}
+      {adjModal && (
+        <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-xl w-96 overflow-hidden">
+            <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+              <div>
+                <h2>Ajuste de Inventario</h2>
+                <p className="text-xs text-gray-400 mt-0.5">{adjModal.name}</p>
+              </div>
+              <button onClick={() => setAdjModal(null)} className="text-gray-400 hover:text-gray-600">
+                <Icon name="x" className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="px-6 py-5 space-y-4">
+
+              {/* Stock actual */}
+              <div className="bg-slate-50 rounded-xl px-4 py-3 flex items-center justify-between">
+                <span className="text-sm text-gray-500">Stock actual</span>
+                <span className="text-sm font-bold text-gray-800">
+                  {adjModal.current.toLocaleString('es-CO')} {adjModal.unit}
+                </span>
+              </div>
+
+              {/* Dirección */}
+              <div>
+                <label className="label">Tipo de ajuste</label>
+                <div className="flex gap-2">
+                  {[{ v: 'add', l: '+ Agregar', cls: 'border-green-400 bg-green-50 text-green-700' },
+                    { v: 'sub', l: '− Reducir', cls: 'border-red-400 bg-red-50 text-red-600' }].map(o => (
+                    <button key={o.v} onClick={() => setAdjForm(f => ({ ...f, direction: o.v }))}
+                      className={`flex-1 py-2 rounded-xl text-sm font-medium border transition-all ${
+                        adjForm.direction === o.v ? o.cls : 'border-gray-200 text-gray-500 hover:border-gray-300'
+                      }`}>
+                      {o.l}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Cantidad */}
+              <div>
+                <label className="label">
+                  {adjModal.type === 'bag' ? 'Bolsas' : 'Unidades'}
+                </label>
+                <input type="number" className="input" placeholder="0" min="1"
+                  value={adjForm.qty} onChange={e => setAdjForm(f => ({ ...f, qty: e.target.value }))} />
+                {adjModal.type === 'bag' && adjForm.qty && (
+                  <p className="text-xs text-gray-400 mt-1">
+                    = {(Number(adjForm.qty) * 6500).toLocaleString('es-CO')} ml
+                    {adjForm.direction === 'add'
+                      ? ` → nuevo stock aprox. ${(adjModal.current + Number(adjForm.qty) * 6500).toLocaleString('es-CO')} ml`
+                      : ` → nuevo stock aprox. ${Math.max(0, adjModal.current - Number(adjForm.qty) * 6500).toLocaleString('es-CO')} ml`
+                    }
+                  </p>
+                )}
+                {adjModal.type !== 'bag' && adjForm.qty && (
+                  <p className="text-xs text-gray-400 mt-1">
+                    {adjForm.direction === 'add'
+                      ? `Nuevo stock: ${adjModal.current + Number(adjForm.qty)} ${adjModal.unit}`
+                      : `Nuevo stock: ${Math.max(0, adjModal.current - Number(adjForm.qty))} ${adjModal.unit}`
+                    }
+                  </p>
+                )}
+              </div>
+
+              {/* Motivo */}
+              <div>
+                <label className="label">Motivo <span className="text-red-400">*</span></label>
+                <input className="input" placeholder="Ej: Conteo físico, producto dañado, error previo..."
+                  value={adjForm.notes} onChange={e => setAdjForm(f => ({ ...f, notes: e.target.value }))} />
+              </div>
+            </div>
+            <div className="px-6 py-4 border-t border-gray-100 flex gap-2">
+              <button onClick={handleAdjust} disabled={adjSaving} className="btn-primary flex-1">
+                {adjSaving && <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />}
+                Registrar Ajuste
+              </button>
+              <button onClick={() => setAdjModal(null)} className="btn-secondary flex-1">Cancelar</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Modal — Registrar Entrada */}
       {modal && (

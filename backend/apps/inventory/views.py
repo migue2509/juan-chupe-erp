@@ -22,12 +22,6 @@ class FlavorBagViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=['post'], url_path='add-stock', permission_classes=[IsAdmin])
     def add_stock(self, request, pk=None):
-        """
-        Acepta:
-          - bags (int): número de bolsas a agregar. 1 bolsa = 6500 ml.
-          - quantity_ml (decimal): ml directos (si no se manda bags).
-          - amount (int, opcional): valor pagado por la compra → crea un Expense de tipo 'supply'.
-        """
         from decimal import Decimal
         bag = self.get_object()
         ML_PER_BAG = Decimal('6500')
@@ -48,7 +42,6 @@ class FlavorBagViewSet(viewsets.ModelViewSet):
             purchase_amount=int(amount) if amount else None,
             created_by=request.user, shift=shift
         )
-        # Registrar gasto de compra si viene el monto
         if amount and int(amount) > 0:
             from apps.expenses.models import Expense
             desc = notes or f'Compra bolsa {bag.flavor.name} — {bags_qty or ""} bolsa(s)'
@@ -57,6 +50,30 @@ class FlavorBagViewSet(viewsets.ModelViewSet):
                 category='supply', description=desc,
                 amount=int(amount), from_daily_cash=True,
             )
+        return Response(FlavorBagSerializer(bag).data)
+
+    @action(detail=True, methods=['post'], url_path='adjust', permission_classes=[IsAdmin])
+    def adjust(self, request, pk=None):
+        """Ajuste manual de stock. delta_ml positivo = agregar, negativo = reducir."""
+        from decimal import Decimal
+        bag = self.get_object()
+        delta_ml = Decimal(str(request.data.get('delta_ml', 0)))
+        notes    = request.data.get('notes', '').strip()
+        if not notes:
+            return Response({'detail': 'El motivo del ajuste es obligatorio.'}, status=status.HTTP_400_BAD_REQUEST)
+        if delta_ml == 0:
+            return Response({'detail': 'El delta no puede ser 0.'}, status=status.HTTP_400_BAD_REQUEST)
+        if delta_ml > 0:
+            bag.add_stock(delta_ml)
+        else:
+            bag.stock_ml = max(Decimal('0'), bag.stock_ml + delta_ml)
+            bag.save()
+        shift = Shift.get_active()
+        StockMovement.objects.create(
+            movement_type='adjustment', flavor_bag=bag,
+            quantity_ml=delta_ml, notes=f'Ajuste manual: {notes}',
+            created_by=request.user, shift=shift
+        )
         return Response(FlavorBagSerializer(bag).data)
 
 
@@ -99,6 +116,29 @@ class CupStockViewSet(viewsets.ModelViewSet):
             )
         return Response(CupStockSerializer(cup).data)
 
+    @action(detail=True, methods=['post'], url_path='adjust', permission_classes=[IsAdmin])
+    def adjust(self, request, pk=None):
+        """Ajuste manual. delta positivo = agregar, negativo = reducir."""
+        cup   = self.get_object()
+        delta = int(request.data.get('delta', 0))
+        notes = request.data.get('notes', '').strip()
+        if not notes:
+            return Response({'detail': 'El motivo del ajuste es obligatorio.'}, status=status.HTTP_400_BAD_REQUEST)
+        if delta == 0:
+            return Response({'detail': 'El delta no puede ser 0.'}, status=status.HTTP_400_BAD_REQUEST)
+        if delta > 0:
+            cup.add_stock(delta)
+        else:
+            cup.quantity = max(0, cup.quantity + delta)
+            cup.save()
+        shift = Shift.get_active()
+        StockMovement.objects.create(
+            movement_type='adjustment', cup_stock=cup,
+            quantity_units=delta, notes=f'Ajuste manual: {notes}',
+            created_by=request.user, shift=shift
+        )
+        return Response(CupStockSerializer(cup).data)
+
 
 class ToppingStockViewSet(viewsets.ModelViewSet):
     serializer_class = ToppingStockSerializer
@@ -124,6 +164,29 @@ class ToppingStockViewSet(viewsets.ModelViewSet):
         StockMovement.objects.create(
             movement_type='in', topping_stock=stock,
             quantity_units=qty, notes=notes,
+            created_by=request.user, shift=shift
+        )
+        return Response(ToppingStockSerializer(stock).data)
+
+    @action(detail=True, methods=['post'], url_path='adjust', permission_classes=[IsAdmin])
+    def adjust(self, request, pk=None):
+        """Ajuste manual. delta positivo = agregar, negativo = reducir."""
+        stock = self.get_object()
+        delta = int(request.data.get('delta', 0))
+        notes = request.data.get('notes', '').strip()
+        if not notes:
+            return Response({'detail': 'El motivo del ajuste es obligatorio.'}, status=status.HTTP_400_BAD_REQUEST)
+        if delta == 0:
+            return Response({'detail': 'El delta no puede ser 0.'}, status=status.HTTP_400_BAD_REQUEST)
+        if delta > 0:
+            stock.add_stock(delta)
+        else:
+            stock.quantity = max(0, stock.quantity + delta)
+            stock.save()
+        shift = Shift.get_active()
+        StockMovement.objects.create(
+            movement_type='adjustment', topping_stock=stock,
+            quantity_units=delta, notes=f'Ajuste manual: {notes}',
             created_by=request.user, shift=shift
         )
         return Response(ToppingStockSerializer(stock).data)
