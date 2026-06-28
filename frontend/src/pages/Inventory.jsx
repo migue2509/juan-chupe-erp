@@ -39,7 +39,7 @@ export default function Inventory() {
   const [dateTo,      setDateTo]      = useState('')
   const [stockSearch, setStockSearch] = useState('')
   const [modal, setModal] = useState(null)
-  const [mForm, setMForm] = useState({ itemType: 'cup', itemId: '', qty: '', amount: '', notes: '' })
+  const [mForm, setMForm] = useState({ itemType: 'cup', itemId: '', qty: '', amount: '', notes: '', from_daily_cash: true, payment_method: 'cash' })
   const [saving, setSaving] = useState(false)
   const [adjModal, setAdjModal] = useState(null) // { type, id, name, unit }
   const [adjForm,  setAdjForm]  = useState({ direction: 'add', qty: '', notes: '' })
@@ -129,7 +129,7 @@ export default function Inventory() {
   }
 
   const openModal = () => {
-    setMForm({ itemType: 'cup', itemId: cups[0]?.id ?? '', qty: '', amount: '', notes: '' })
+    setMForm({ itemType: 'cup', itemId: cups[0]?.id ?? '', qty: '', amount: '', notes: '', from_daily_cash: true, payment_method: 'cash' })
     setModal(true)
   }
 
@@ -144,7 +144,14 @@ export default function Inventory() {
     }
     setSaving(true)
     try {
-      const payload = { notes: mForm.notes, ...(needsAmount ? { amount: Number(mForm.amount) } : {}) }
+      const payload = {
+        notes: mForm.notes,
+        ...(needsAmount ? {
+          amount: Number(mForm.amount),
+          from_daily_cash: mForm.from_daily_cash,
+          payment_method: mForm.from_daily_cash ? mForm.payment_method : 'cash',
+        } : {}),
+      }
       if (mForm.itemType === 'bag') {
         await addBagStock(mForm.itemId, { ...payload, bags: Number(mForm.qty) })
       } else if (mForm.itemType === 'topping') {
@@ -485,14 +492,43 @@ export default function Inventory() {
               </div>
 
               {needsAmount && (
-                <div>
-                  <label className="label">Valor pagado (COP) <span className="text-red-400">*</span></label>
-                  <input type="number" className="input" placeholder="Ej: 45000" min="1"
-                    value={mForm.amount} onChange={e => setMForm(f => ({ ...f, amount: e.target.value }))} />
-                  <p className="text-xs text-gray-400 mt-1">
-                    Se registrará como gasto en categoría "Ingreso de Mercancía"
-                  </p>
-                </div>
+                <>
+                  <div>
+                    <label className="label">Valor pagado (COP) <span className="text-red-400">*</span></label>
+                    <input type="number" className="input" placeholder="Ej: 45000" min="1"
+                      value={mForm.amount} onChange={e => setMForm(f => ({ ...f, amount: e.target.value }))} />
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="flex items-center gap-2 cursor-pointer select-none">
+                      <input type="checkbox" checked={mForm.from_daily_cash}
+                        onChange={e => setMForm(f => ({ ...f, from_daily_cash: e.target.checked }))}
+                        className="w-4 h-4 accent-brand-pink rounded" />
+                      <span className="text-sm text-gray-700 font-medium">Afecta caja del día</span>
+                    </label>
+                    {!mForm.from_daily_cash && (
+                      <p className="text-xs text-gray-400 ml-6">El gasto se registra pero no descuenta la caja del día.</p>
+                    )}
+                    {mForm.from_daily_cash && (
+                      <div className="ml-6">
+                        <label className="label">Medio de pago</label>
+                        <div className="flex gap-2">
+                          {[{ v: 'cash', l: 'Efectivo' }, { v: 'transfer', l: 'Transferencia' }].map(o => (
+                            <button key={o.v} type="button"
+                              onClick={() => setMForm(f => ({ ...f, payment_method: o.v }))}
+                              className={`flex-1 py-2 rounded-xl text-sm font-medium border transition-all ${
+                                mForm.payment_method === o.v
+                                  ? 'border-brand-pink bg-pink-50 text-brand-pink'
+                                  : 'border-gray-200 text-gray-500 hover:border-gray-300'
+                              }`}>
+                              {o.l}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </>
               )}
 
               <div>

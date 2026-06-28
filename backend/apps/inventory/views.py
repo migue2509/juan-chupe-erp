@@ -32,8 +32,10 @@ class FlavorBagViewSet(viewsets.ModelViewSet):
             serializer = StockEntrySerializer(data=request.data)
             serializer.is_valid(raise_exception=True)
             ml = serializer.validated_data.get('quantity_ml', 0)
-        notes  = request.data.get('notes', '')
-        amount = request.data.get('amount')
+        notes           = request.data.get('notes', '')
+        amount          = request.data.get('amount')
+        from_daily_cash = request.data.get('from_daily_cash', True)
+        payment_method  = request.data.get('payment_method', 'cash')
         bag.add_stock(ml)
         shift = Shift.get_active()
         StockMovement.objects.create(
@@ -48,7 +50,9 @@ class FlavorBagViewSet(viewsets.ModelViewSet):
             Expense.objects.create(
                 shift=shift, registered_by=request.user,
                 category='supply', description=desc,
-                amount=int(amount), from_daily_cash=True,
+                amount=int(amount),
+                from_daily_cash=bool(from_daily_cash),
+                payment_method=payment_method if from_daily_cash else 'cash',
             )
         return Response(FlavorBagSerializer(bag).data)
 
@@ -93,10 +97,12 @@ class CupStockViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=['post'], url_path='add-stock', permission_classes=[IsAdmin])
     def add_stock(self, request, pk=None):
-        cup    = self.get_object()
-        qty    = int(request.data.get('quantity_units', 0))
-        notes  = request.data.get('notes', '')
-        amount = request.data.get('amount')
+        cup             = self.get_object()
+        qty             = int(request.data.get('quantity_units', 0))
+        notes           = request.data.get('notes', '')
+        amount          = request.data.get('amount')
+        from_daily_cash = request.data.get('from_daily_cash', True)
+        payment_method  = request.data.get('payment_method', 'cash')
         cup.add_stock(qty)
         shift = Shift.get_active()
         StockMovement.objects.create(
@@ -105,14 +111,15 @@ class CupStockViewSet(viewsets.ModelViewSet):
             purchase_amount=int(amount) if amount else None,
             created_by=request.user, shift=shift
         )
-        # Registrar gasto de compra si viene el monto
         if amount and int(amount) > 0:
             from apps.expenses.models import Expense
             desc = notes or f'Compra vasos {cup.cup_size.size} — {qty} unidades'
             Expense.objects.create(
                 shift=shift, registered_by=request.user,
                 category='supply', description=desc,
-                amount=int(amount), from_daily_cash=True,
+                amount=int(amount),
+                from_daily_cash=bool(from_daily_cash),
+                payment_method=payment_method if from_daily_cash else 'cash',
             )
         return Response(CupStockSerializer(cup).data)
 
