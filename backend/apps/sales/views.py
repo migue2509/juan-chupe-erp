@@ -234,6 +234,19 @@ class SaleViewSet(viewsets.ReadOnlyModelViewSet):
                 else:
                     sale.seller = None
 
+            if 'promotion_id' in request.data:
+                promo_id = request.data['promotion_id']
+                if promo_id:
+                    try: sale.promotion = Promotion.objects.get(id=promo_id)
+                    except: sale.promotion = None
+                else:
+                    sale.promotion = None
+
+            if 'is_courtesy' in request.data:
+                sale.is_courtesy = bool(request.data['is_courtesy'])
+            if 'courtesy_paid' in request.data:
+                sale.courtesy_paid = Decimal(str(request.data.get('courtesy_paid') or 0))
+
             # ── Si vienen items nuevos → revertir inventario y reemplazar ──
             if 'items' in request.data:
                 items_data = request.data['items']
@@ -274,8 +287,7 @@ class SaleViewSet(viewsets.ReadOnlyModelViewSet):
                     item.reverse_inventory()
                 sale.items.all().delete()
 
-                # Crear nuevos items
-                promo = sale.promotion
+                # Crear nuevos items (unit_price viene explícito desde el frontend)
                 for item_data in items_data:
                     cup_size = CupSize.objects.get(id=item_data['cup_size_id'])
                     topping  = None
@@ -283,8 +295,6 @@ class SaleViewSet(viewsets.ReadOnlyModelViewSet):
                         try: topping = Topping.objects.get(id=item_data['topping_id'])
                         except: pass
                     unit_price = item_data['unit_price']
-                    if promo:
-                        unit_price = promo.unit_price
                     sale_item = SaleItem.objects.create(
                         sale=sale, cup_size=cup_size, topping=topping,
                         unit_price=unit_price, quantity=item_data.get('quantity', 1),
