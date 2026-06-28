@@ -101,6 +101,19 @@ export default function Dashboard() {
     (a, b) => new Date(b.created_at) - new Date(a.created_at)
   )
 
+  // ── Ventas por vendedora ──
+  const vendedoraMap = {}
+  activeSales.forEach(s => {
+    const name = s.seller_name || 'Sin asignar'
+    if (!vendedoraMap[name]) vendedoraMap[name] = { total: 0, count: 0 }
+    vendedoraMap[name].total += s.is_courtesy ? Number(s.courtesy_paid || 0) : Number(s.total || 0)
+    vendedoraMap[name].count++
+  })
+  const vendedoraChart = Object.entries(vendedoraMap)
+    .map(([name, d]) => ({ name, ...d }))
+    .sort((a, b) => b.total - a.total)
+  const maxVendTotal = Math.max(...vendedoraChart.map(d => d.total), 1)
+
   // ── Delivery stats (solo cuando filter === 'delivery') ──
   const deliverySales = allSales.filter(s => s.is_delivery)
   const deliveryStatusCounts = {
@@ -361,7 +374,54 @@ export default function Dashboard() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 items-start">
 
         {/* Ventas recientes */}
-        <div className="lg:col-span-2 card p-0 overflow-hidden">
+        <div className="lg:col-span-2 space-y-5">
+
+        {/* Gráfico ventas por vendedora */}
+        <div className="card p-0 overflow-hidden">
+          <div className="flex items-center gap-2 px-5 py-4 border-b border-gray-100">
+            <Icon name="reports" className="w-4 h-4 text-brand-purple" />
+            <h2>Ventas por vendedora</h2>
+            <span className="badge-gray ml-auto">{activeSales.length} ventas</span>
+          </div>
+          {vendedoraChart.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-10 text-gray-300 text-sm">
+              <Icon name="billing" className="w-7 h-7 mb-2" />
+              Sin ventas aún
+            </div>
+          ) : (
+            <div className="px-5 py-4 space-y-3">
+              {vendedoraChart.map((d, i) => (
+                <div key={d.name}>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span className="w-5 h-5 rounded-full bg-pink-100 text-brand-pink text-[10px] font-bold flex items-center justify-center flex-shrink-0">
+                        {i + 1}
+                      </span>
+                      <span className="text-sm font-medium text-gray-800 truncate">{d.name}</span>
+                      <span className="badge-gray text-[10px] flex-shrink-0">{d.count} {d.count === 1 ? 'venta' : 'ventas'}</span>
+                    </div>
+                    <span className="text-sm font-bold text-gray-900 tabular-nums ml-3 flex-shrink-0">{fmt(d.total)}</span>
+                  </div>
+                  <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
+                    <div
+                      className="h-full rounded-full bg-gradient-to-r from-brand-pink to-pink-400 transition-all duration-500"
+                      style={{ width: `${(d.total / maxVendTotal) * 100}%` }}
+                    />
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+          {vendedoraChart.length > 0 && (
+            <div className="flex items-center justify-between px-5 py-3 border-t border-gray-100 bg-slate-50">
+              <span className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Total</span>
+              <span className="text-base font-bold text-gray-900 tabular-nums">{fmt(totalDinero)}</span>
+            </div>
+          )}
+        </div>
+
+        {/* Ventas recientes */}
+        <div className="card p-0 overflow-hidden">
           <div className="flex items-center justify-between px-5 py-4 border-b border-gray-50">
             <h2>Ventas recientes</h2>
             <span className="badge-gray">{cantidadVentas} {filter !== 'all' ? FILTERS.find(f=>f.key===filter)?.label.toLowerCase() : 'en total'}</span>
@@ -443,6 +503,8 @@ export default function Dashboard() {
             </div>
           )}
         </div>
+
+        </div>{/* fin lg:col-span-2 */}
 
         {/* Columna derecha: alertas + gastos */}
         <div className="space-y-5">
