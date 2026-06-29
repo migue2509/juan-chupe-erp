@@ -15,6 +15,7 @@ class DeliverySerializer(serializers.ModelSerializer):
     delivery_person_name = serializers.CharField(source='delivery_person.name', read_only=True, default='')
     sale_detail          = SaleSerializer(source='sale', read_only=True)
     shift_label          = serializers.SerializerMethodField()
+    invoice_number       = serializers.SerializerMethodField()
 
     def get_shift_label(self, obj):
         if obj.shift:
@@ -22,10 +23,16 @@ class DeliverySerializer(serializers.ModelSerializer):
             return f'#{obj.shift.id} · {local.strftime("%d/%m/%y")}'
         return '—'
 
+    def get_invoice_number(self, obj):
+        try:
+            return obj.sale.invoice.invoice_number
+        except Exception:
+            return None
+
     class Meta:
         model = Delivery
         fields = [
-            'id', 'sale', 'sale_detail', 'shift', 'shift_label',
+            'id', 'sale', 'sale_detail', 'invoice_number', 'shift', 'shift_label',
             'delivery_person', 'delivery_person_name',
             'four_digits', 'address', 'status', 'notes',
             'created_at', 'delivered_at',

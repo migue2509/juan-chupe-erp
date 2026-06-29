@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { getDeliveries, updateDelivery, cancelDeliveryReq, getDomiciliarios, createDomiciliario, updateDomiciliario, getShifts } from '../api'
+import { getDeliveries, updateDelivery, cancelDeliveryReq, getDomiciliarios, createDomiciliario, updateDomiciliario, getShifts, getExpenses } from '../api'
 import { Icon } from '../components/Icons'
 import toast from 'react-hot-toast'
 
@@ -23,20 +23,35 @@ const PAYMENT_BADGE  = {
 export default function Deliveries() {
   const [deliveries,     setDeliveries]     = useState([])
   const [domiciliarios,  setDomiciliarios]  = useState([])
+  const [expenses,       setExpenses]       = useState([])
   const [loading,        setLoading]        = useState(true)
   const [statusFilter,   setStatusFilter]   = useState('all')
   const [selected,       setSelected]       = useState(null)
+  const [shifts,         setShifts]         = useState([])
+  const [dateFrom,       setDateFrom]       = useState('')
+  const [dateTo,         setDateTo]         = useState('')
+  const [shiftFilter,    setShiftFilter]    = useState('all')
 
   // Crear domiciliario
   const [newName,  setNewName]  = useState('')
   const [creating, setCreating] = useState(false)
 
+  // Editar domicilio
+  const [editing,  setEditing]  = useState(null)
+  const [editForm, setEditForm] = useState({})
+
   const load = async () => {
     try {
-      const [dRes, domRes, sRes] = await Promise.all([getDeliveries(), getDomiciliarios(), getShifts()])
+      const [dRes, domRes, sRes, expRes] = await Promise.all([
+        getDeliveries(),
+        getDomiciliarios(),
+        getShifts(),
+        getExpenses({ origin: 'delivery' }),
+      ])
       setDeliveries(dRes.data?.results ?? dRes.data ?? [])
       setDomiciliarios(domRes.data?.results ?? domRes.data ?? [])
       setShifts((sRes.data?.results ?? sRes.data ?? []).sort((a, b) => b.id - a.id))
+      setExpenses(expRes.data?.results ?? expRes.data ?? [])
     } catch {}
     setLoading(false)
   }
@@ -103,10 +118,6 @@ export default function Deliveries() {
     } catch { toast.error('Error') }
   }
 
-  // Editar domicilio
-  const [editing,  setEditing]  = useState(null)
-  const [editForm, setEditForm] = useState({})
-
   const openEdit = (d, e) => {
     e.stopPropagation()
     setEditForm({ address: d.address, four_digits: d.four_digits, notes: d.notes || '', delivery_person: d.delivery_person || '' })
@@ -127,11 +138,7 @@ export default function Deliveries() {
     } catch { toast.error('Error al guardar') }
   }
 
-  const [dateFrom,    setDateFrom]    = useState('')
-  const [dateTo,      setDateTo]      = useState('')
-  const [shiftFilter, setShiftFilter] = useState('all')
-  const [shifts,      setShifts]      = useState([])
-
+  // ── Filtros ──
   const filtered = deliveries.filter(d => {
     if (statusFilter !== 'all' && d.status !== statusFilter) return false
     if (shiftFilter !== 'all' && d.shift !== Number(shiftFilter)) return false
@@ -152,17 +159,39 @@ export default function Deliveries() {
     return acc
   }, {})
 
-  // Gráfico por domiciliario — usa `filtered` para respetar filtros de fecha y estado
+  // ── Stats financieras (solo domicilios no cancelados del filtro) ──
+  const activeDels = filtered.filter(d => d.status !== 'cancelled')
+  const totalVentas = activeDels.reduce((s, d) => s + Number(d.sale_detail?.total || 0), 0)
+  const totalEfectivoVentas = activeDels.reduce((s, d) => {
+    const sale = d.sale_detail
+    if (!sale) return s
+    const total = Number(sale.total || 0)
+    const trf   = Number(sale.transfer_amount || 0)
+    if (sale.payment_method === 'cash')  return s + total
+    if (sale.payment_method === 'mixed') return s + Math.max(0, total - trf)
+    return s
+  }, 0)
+  const totalTransfer = activeDels.reduce((s, d) => s + Number(d.sale_detail?.transfer_amount || 0), 0)
+
+  // Gastos de domicilios que afectan caja en efectivo
+  const gastosEfectivo = expenses
+    .filter(e => e.from_daily_cash && e.payment_method === 'cash')
+    .reduce((s, e) => s + Number(e.amount || 0), 0)
+  const netoEfectivo = totalEfectivoVentas - gastosEfectivo
+
+  // ── Gráfico por domiciliario ──
   const domChart = {}
   filtered.forEach(d => {
     const name = d.delivery_person_name || 'Sin asignar'
-    if (!domChart[name]) domChart[name] = { total: 0, delivered: 0, on_way: 0, pending: 0, cancelled: 0 }
+    if (!domChart[name]) domChart[name] = { total: 0, delivered: 0, on_way: 0, pending: 0, cancelled: 0, monto: 0 }
     domChart[name].total++
     if (d.status) domChart[name][d.status] = (domChart[name][d.status] || 0) + 1
+    if (d.status !== 'cancelled') domChart[name].monto += Number(d.sale_detail?.total || 0)
   })
   const domChartArr = Object.entries(domChart)
     .map(([name, v]) => ({ name, ...v }))
     .sort((a, b) => b.total - a.total)
+  const maxMonto = Math.max(...domChartArr.map(d => d.monto), 1)
 
   const activeDomiciliarios = domiciliarios.filter(d => d.is_active)
 
@@ -181,7 +210,7 @@ export default function Deliveries() {
         <p className="text-sm text-gray-400 mt-0.5">{deliveries.length} pedido{deliveries.length !== 1 ? 's' : ''} registrado{deliveries.length !== 1 ? 's' : ''}</p>
       </div>
 
-      {/* Stats */}
+      {/* Cards estado */}
       <div className="grid grid-cols-4 gap-3">
         {Object.entries(STATUS).map(([key, s]) => (
           <button key={key}
@@ -191,6 +220,55 @@ export default function Deliveries() {
             <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${s.cls}`}>{s.label}</span>
           </button>
         ))}
+      </div>
+
+      {/* Cards financieras */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        {/* Total ventas */}
+        <div className="stat-card">
+          <div className="flex items-center justify-between mb-1">
+            <span className="stat-label">Total domicilios</span>
+            <span className="w-7 h-7 rounded-lg bg-pink-50 flex items-center justify-center text-brand-pink">
+              <Icon name="trending" className="w-3.5 h-3.5" />
+            </span>
+          </div>
+          <span className="stat-value text-gray-900 text-xl">{fmt(totalVentas)}</span>
+          <p className="text-[10px] text-gray-400 mt-0.5">{activeDels.length} pedidos activos</p>
+        </div>
+
+        {/* Efectivo */}
+        <div className="stat-card">
+          <div className="flex items-center justify-between mb-1">
+            <span className="stat-label">Efectivo bruto</span>
+            <span className="w-7 h-7 rounded-lg bg-green-50 flex items-center justify-center text-green-600">
+              <Icon name="cash" className="w-3.5 h-3.5" />
+            </span>
+          </div>
+          <span className="stat-value text-gray-900 text-xl">{fmt(totalEfectivoVentas)}</span>
+        </div>
+
+        {/* Neto efectivo */}
+        <div className="stat-card">
+          <div className="flex items-center justify-between mb-1">
+            <span className="stat-label">Neto efectivo</span>
+            <span className="w-7 h-7 rounded-lg bg-violet-50 flex items-center justify-center text-violet-600">
+              <Icon name="cash" className="w-3.5 h-3.5" />
+            </span>
+          </div>
+          <span className={`stat-value text-xl ${netoEfectivo >= 0 ? 'text-gray-900' : 'text-red-500'}`}>{fmt(netoEfectivo)}</span>
+          <p className="text-[10px] text-gray-400 mt-0.5">Efectivo − Gastos</p>
+        </div>
+
+        {/* Transferencia */}
+        <div className="stat-card">
+          <div className="flex items-center justify-between mb-1">
+            <span className="stat-label">Transferencias</span>
+            <span className="w-7 h-7 rounded-lg bg-cyan-50 flex items-center justify-center text-cyan-600">
+              <Icon name="transfer" className="w-3.5 h-3.5" />
+            </span>
+          </div>
+          <span className="stat-value text-cyan-600 text-xl">{fmt(totalTransfer)}</span>
+        </div>
       </div>
 
       {/* Filtro fechas */}
@@ -221,33 +299,65 @@ export default function Deliveries() {
         <span className="ml-auto text-xs text-gray-400">{filtered.length} de {deliveries.length} domicilios</span>
       </div>
 
-      {/* Gráfico por domiciliario */}
+      {/* Gráfico por domiciliario — cards con barra de monto */}
       {domChartArr.length > 0 && (
         <div className="card p-0 overflow-hidden">
           <div className="flex items-center gap-2 px-5 py-4 border-b border-gray-100">
-            <Icon name="reports" className="w-4 h-4 text-brand-purple" />
-            <h2>Domicilios por repartidor</h2>
-            <span className="badge-gray ml-auto">{filtered.length} en total</span>
+            <Icon name="bike" className="w-4 h-4 text-brand-cyan" />
+            <h2>Rendimiento por repartidor</h2>
+            <span className="badge-gray ml-auto">{filtered.length} domicilios</span>
           </div>
-          <div className="px-5 py-4 grid gap-4" style={{ gridTemplateColumns: `repeat(${Math.min(domChartArr.length, 4)}, 1fr)` }}>
-            {domChartArr.map(d => (
-              <div key={d.name} className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm font-semibold text-gray-800 truncate">{d.name}</span>
-                  <span className="text-lg font-bold text-gray-900 tabular-nums ml-2">{d.total}</span>
+          <div className="grid gap-0 divide-y divide-gray-50">
+            {domChartArr.map((d, i) => (
+              <div key={d.name} className="px-5 py-4">
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center gap-2">
+                    <span className="w-6 h-6 rounded-full bg-cyan-100 text-cyan-700 text-xs font-bold flex items-center justify-center flex-shrink-0">
+                      {i + 1}
+                    </span>
+                    <span className="text-sm font-semibold text-gray-800">{d.name}</span>
+                    <span className="badge-gray text-[10px]">{d.total} pedidos</span>
+                  </div>
+                  <div className="text-right">
+                    <span className="text-sm font-bold text-gray-900 tabular-nums block">{fmt(d.monto)}</span>
+                    <span className="text-[10px] text-gray-400">{d.delivered} entregados</span>
+                  </div>
                 </div>
-                {/* Barra apilada */}
-                <div className="h-3 bg-gray-100 rounded-full overflow-hidden flex">
-                  {d.delivered > 0 && <div title={`${d.delivered} entregados`} className="h-full bg-green-400" style={{ width: `${(d.delivered/d.total)*100}%` }} />}
-                  {d.on_way > 0    && <div title={`${d.on_way} en camino`}    className="h-full bg-cyan-400"  style={{ width: `${(d.on_way/d.total)*100}%` }} />}
-                  {d.pending > 0   && <div title={`${d.pending} pendientes`}  className="h-full bg-amber-400" style={{ width: `${(d.pending/d.total)*100}%` }} />}
-                  {d.cancelled > 0 && <div title={`${d.cancelled} cancelados`}className="h-full bg-red-400"   style={{ width: `${(d.cancelled/d.total)*100}%` }} />}
+
+                {/* Barra de monto proporcional */}
+                <div className="h-2 bg-gray-100 rounded-full overflow-hidden mb-2">
+                  <div
+                    className="h-full rounded-full bg-gradient-to-r from-brand-cyan to-cyan-400 transition-all duration-500"
+                    style={{ width: `${(d.monto / maxMonto) * 100}%` }}
+                  />
                 </div>
-                <div className="flex flex-wrap gap-x-3 gap-y-0.5">
-                  {d.delivered > 0 && <span className="text-[10px] font-medium text-green-600">✓ {d.delivered} entregados</span>}
-                  {d.on_way > 0    && <span className="text-[10px] font-medium text-cyan-600">↗ {d.on_way} en camino</span>}
-                  {d.pending > 0   && <span className="text-[10px] font-medium text-amber-600">◷ {d.pending} pendientes</span>}
-                  {d.cancelled > 0 && <span className="text-[10px] font-medium text-red-500">✕ {d.cancelled} cancelados</span>}
+
+                {/* Badges de estado */}
+                <div className="flex flex-wrap gap-2">
+                  {d.delivered > 0 && (
+                    <span className="flex items-center gap-1 text-[11px] font-medium bg-green-50 text-green-700 px-2 py-0.5 rounded-full">
+                      <span className="w-1.5 h-1.5 rounded-full bg-green-500 flex-shrink-0" />
+                      {d.delivered} entregados
+                    </span>
+                  )}
+                  {d.on_way > 0 && (
+                    <span className="flex items-center gap-1 text-[11px] font-medium bg-cyan-50 text-cyan-700 px-2 py-0.5 rounded-full">
+                      <span className="w-1.5 h-1.5 rounded-full bg-cyan-500 flex-shrink-0" />
+                      {d.on_way} en camino
+                    </span>
+                  )}
+                  {d.pending > 0 && (
+                    <span className="flex items-center gap-1 text-[11px] font-medium bg-amber-50 text-amber-700 px-2 py-0.5 rounded-full">
+                      <span className="w-1.5 h-1.5 rounded-full bg-amber-500 flex-shrink-0" />
+                      {d.pending} pendientes
+                    </span>
+                  )}
+                  {d.cancelled > 0 && (
+                    <span className="flex items-center gap-1 text-[11px] font-medium bg-red-50 text-red-600 px-2 py-0.5 rounded-full">
+                      <span className="w-1.5 h-1.5 rounded-full bg-red-500 flex-shrink-0" />
+                      {d.cancelled} cancelados
+                    </span>
+                  )}
                 </div>
               </div>
             ))}
@@ -271,8 +381,8 @@ export default function Deliveries() {
           </div>
 
           <div className="grid px-4 py-2.5 bg-slate-50 border-b border-gray-100 text-[10px] font-semibold text-gray-400 uppercase tracking-widest gap-2"
-            style={{ gridTemplateColumns: '44px 110px 80px 52px 1fr 85px 85px 110px 76px' }}>
-            {['#', 'Fecha / Hora', 'Jornada', 'Cliente', 'Dirección', 'Total', 'Pago', 'Domiciliario', 'Estado'].map(h => <span key={h}>{h}</span>)}
+            style={{ gridTemplateColumns: '44px 90px 80px 52px 1fr 70px 75px 100px 85px 70px' }}>
+            {['#', 'Fecha/Hora', 'Jornada', 'Cliente', 'Dirección', 'Factura', 'Total', 'Pago', 'Repartidor', 'Estado'].map(h => <span key={h}>{h}</span>)}
           </div>
 
           <div className="divide-y divide-gray-50">
@@ -289,7 +399,7 @@ export default function Deliveries() {
                   <div
                     onClick={() => setSelected(selected?.id === d.id ? null : d)}
                     className="grid px-4 py-3 items-center gap-2 hover:bg-slate-50 transition-colors cursor-pointer"
-                    style={{ gridTemplateColumns: '44px 110px 80px 52px 1fr 85px 85px 110px 76px' }}>
+                    style={{ gridTemplateColumns: '44px 90px 80px 52px 1fr 70px 75px 100px 85px 70px' }}>
                     <span className="font-mono text-xs font-bold text-brand-navy">#{d.id}</span>
                     <span className="text-xs tabular-nums text-gray-500 leading-tight">
                       <span className="block">{new Date(d.created_at).toLocaleDateString('es-CO', { day: '2-digit', month: '2-digit', year: '2-digit' })}</span>
@@ -298,6 +408,9 @@ export default function Deliveries() {
                     <span className="text-xs font-medium text-brand-navy bg-blue-50 px-1.5 py-0.5 rounded-full truncate">{d.shift_label || '—'}</span>
                     <span className="font-mono text-sm font-bold text-gray-700 text-center">{d.four_digits || '—'}</span>
                     <span className="text-sm text-gray-800 truncate">{d.address}</span>
+                    <span className="font-mono text-xs font-semibold text-brand-navy">
+                      {d.invoice_number ? `#${d.invoice_number}` : '—'}
+                    </span>
                     <span className="text-sm font-semibold text-brand-pink tabular-nums">{fmt(sale?.total || 0)}</span>
                     <span className={`text-xs font-medium px-2 py-0.5 rounded-full w-fit ${PAYMENT_BADGE[sale?.payment_method] ?? 'bg-gray-100 text-gray-500'}`}>
                       {PAYMENT_LABELS[sale?.payment_method] ?? '—'}
@@ -311,7 +424,6 @@ export default function Deliveries() {
                       {activeDomiciliarios.map(p => (
                         <option key={p.id} value={p.id}>{p.name}</option>
                       ))}
-                      {/* Mantener trazabilidad: mostrar el asignado aunque esté inactivo */}
                       {d.delivery_person && !activeDomiciliarios.find(p => p.id === d.delivery_person) && (() => {
                         const inactivo = domiciliarios.find(p => p.id === d.delivery_person)
                         return inactivo ? <option key={inactivo.id} value={inactivo.id}>{inactivo.name} (inactivo)</option> : null
@@ -326,6 +438,11 @@ export default function Deliveries() {
                       <div className="flex items-center gap-2">
                         <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest">Pedido</p>
                         <span className="text-xs font-medium text-brand-navy bg-blue-100 px-2 py-0.5 rounded-full">Jornada {d.shift_label}</span>
+                        {d.invoice_number && (
+                          <span className="text-xs font-medium text-brand-navy bg-blue-100 px-2 py-0.5 rounded-full">
+                            Factura #{d.invoice_number}
+                          </span>
+                        )}
                       </div>
                       <div className="space-y-1">
                         {sale?.items?.map(item => (
@@ -356,7 +473,6 @@ export default function Deliveries() {
                             {s.nextLabel}
                           </button>
                         )}
-                        {/* Selector libre de estado */}
                         <select
                           className="input py-1.5 text-xs w-36"
                           value={d.status}
@@ -408,21 +524,23 @@ export default function Deliveries() {
                 Sin domiciliarios
               </div>
             ) : domiciliarios.map(p => {
-              const enCamino = deliveries.filter(d => d.delivery_person === p.id && d.status === 'on_way').length
+              const enCamino    = deliveries.filter(d => d.delivery_person === p.id && d.status === 'on_way').length
+              const entregados  = deliveries.filter(d => d.delivery_person === p.id && d.status === 'delivered').length
               return (
-                <div key={p.id} className={`flex items-center justify-between px-5 py-3 ${!p.is_active ? 'opacity-40' : ''}`}>
-                  <div>
+                <div key={p.id} className={`px-5 py-3 ${!p.is_active ? 'opacity-40' : ''}`}>
+                  <div className="flex items-center justify-between">
                     <p className="text-sm font-medium text-gray-800">{p.name}</p>
-                    {enCamino > 0 && (
-                      <span className="text-xs text-cyan-600 font-medium">{enCamino} en camino</span>
-                    )}
+                    <button onClick={() => toggleDomiciliario(p)}
+                      className={`text-xs px-2.5 py-1 rounded-full font-medium transition-all ${
+                        p.is_active ? 'bg-green-50 text-green-700 hover:bg-green-100' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
+                      }`}>
+                      {p.is_active ? 'Activo' : 'Inactivo'}
+                    </button>
                   </div>
-                  <button onClick={() => toggleDomiciliario(p)}
-                    className={`text-xs px-2.5 py-1 rounded-full font-medium transition-all ${
-                      p.is_active ? 'bg-green-50 text-green-700 hover:bg-green-100' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
-                    }`}>
-                    {p.is_active ? 'Activo' : 'Inactivo'}
-                  </button>
+                  <div className="flex gap-3 mt-1">
+                    {enCamino > 0 && <span className="text-xs text-cyan-600 font-medium">{enCamino} en camino</span>}
+                    {entregados > 0 && <span className="text-xs text-green-600 font-medium">{entregados} entregados</span>}
+                  </div>
                 </div>
               )
             })}

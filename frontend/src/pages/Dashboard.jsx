@@ -524,9 +524,15 @@ export default function Dashboard() {
                 </div>
               ) : (
                 alerts.map(a => (
-                  <div key={a.id} className="flex items-center justify-between px-5 py-3">
-                    <span className="text-sm font-medium text-gray-700">{a.flavor_name}</span>
-                    <span className="badge-amber">{Number(a.stock_ml).toFixed(0)} ml</span>
+                  <div key={a.id} className="flex items-center justify-between px-5 py-3 gap-3">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span className="text-lg leading-none flex-shrink-0">{a.emoji}</span>
+                      <span className="text-sm font-medium text-gray-700 truncate">{a.name}</span>
+                    </div>
+                    <div className="flex items-center gap-1.5 flex-shrink-0">
+                      <span className="badge-amber tabular-nums">{a.stock}</span>
+                      <span className="text-[10px] text-gray-400">min {a.min}</span>
+                    </div>
                   </div>
                 ))
               )}

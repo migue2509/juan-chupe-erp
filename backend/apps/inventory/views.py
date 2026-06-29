@@ -17,8 +17,46 @@ class FlavorBagViewSet(viewsets.ModelViewSet):
 
     @action(detail=False, methods=['get'], url_path='alerts')
     def alerts(self, request):
-        low = FlavorBag.objects.filter(stock_ml__lte=500)
-        return Response(FlavorBagSerializer(low, many=True).data)
+        from django.db.models import F
+        low_bags = FlavorBag.objects.select_related('flavor').filter(
+            stock_ml__lte=F('min_stock_ml')
+        )
+        low_cups = CupStock.objects.select_related('cup_size').filter(
+            quantity__lte=F('min_quantity'), min_quantity__gt=0
+        )
+        low_toppings = ToppingStock.objects.select_related('topping').filter(
+            min_quantity__gt=0, quantity__lte=F('min_quantity')
+        )
+
+        alerts = []
+        for b in low_bags:
+            alerts.append({
+                'id':    f'bag-{b.id}',
+                'type':  'bag',
+                'name':  b.flavor.name,
+                'emoji': b.flavor.emoji or '🍓',
+                'stock': f'{b.stock_ml:.0f} ml',
+                'min':   f'{b.min_stock_ml:.0f} ml',
+            })
+        for c in low_cups:
+            alerts.append({
+                'id':    f'cup-{c.id}',
+                'type':  'cup',
+                'name':  f'Vasos {c.cup_size.size}',
+                'emoji': '🥤',
+                'stock': str(c.quantity),
+                'min':   str(c.min_quantity),
+            })
+        for t in low_toppings:
+            alerts.append({
+                'id':    f'topping-{t.id}',
+                'type':  'topping',
+                'name':  t.topping.name,
+                'emoji': '🍬',
+                'stock': str(t.quantity),
+                'min':   str(t.min_quantity),
+            })
+        return Response(alerts)
 
     @action(detail=True, methods=['post'], url_path='add-stock', permission_classes=[IsAdmin])
     def add_stock(self, request, pk=None):
