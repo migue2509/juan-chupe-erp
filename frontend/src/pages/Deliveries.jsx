@@ -173,11 +173,22 @@ export default function Deliveries() {
   }, 0)
   const totalTransfer = activeDels.reduce((s, d) => s + Number(d.sale_detail?.transfer_amount || 0), 0)
 
-  // Gastos de domicilios que afectan caja en efectivo
-  const gastosEfectivo = expenses
-    .filter(e => e.from_daily_cash && e.payment_method === 'cash')
-    .reduce((s, e) => s + Number(e.amount || 0), 0)
-  const netoEfectivo = totalEfectivoVentas - gastosEfectivo
+  // Gastos de domicilios — mismos filtros que los domicilios (jornada + fechas)
+  const filteredExpenses = expenses.filter(e => {
+    if (shiftFilter !== 'all' && e.shift !== Number(shiftFilter)) return false
+    if (dateFrom || dateTo) {
+      const d2 = new Date(e.created_at)
+      d2.setHours(0, 0, 0, 0)
+      if (dateFrom && d2 < new Date(dateFrom)) return false
+      if (dateTo   && d2 > new Date(dateTo))   return false
+    }
+    return true
+  })
+  const gastosAfectaCaja   = filteredExpenses.filter(e =>  e.from_daily_cash).reduce((s, e) => s + Number(e.amount || 0), 0)
+  const gastosNoAfectaCaja = filteredExpenses.filter(e => !e.from_daily_cash).reduce((s, e) => s + Number(e.amount || 0), 0)
+  const gastosTotal        = gastosAfectaCaja + gastosNoAfectaCaja
+  const gastosEfectivo     = filteredExpenses.filter(e => e.from_daily_cash && e.payment_method === 'cash').reduce((s, e) => s + Number(e.amount || 0), 0)
+  const netoEfectivo       = totalEfectivoVentas - gastosEfectivo
 
   // ── Gráfico por domiciliario ──
   const domChart = {}
@@ -223,7 +234,7 @@ export default function Deliveries() {
       </div>
 
       {/* Cards financieras */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
         {/* Total ventas */}
         <div className="stat-card">
           <div className="flex items-center justify-between mb-1">
@@ -236,7 +247,7 @@ export default function Deliveries() {
           <p className="text-[10px] text-gray-400 mt-0.5">{activeDels.length} pedidos activos</p>
         </div>
 
-        {/* Efectivo */}
+        {/* Efectivo bruto */}
         <div className="stat-card">
           <div className="flex items-center justify-between mb-1">
             <span className="stat-label">Efectivo bruto</span>
@@ -245,6 +256,21 @@ export default function Deliveries() {
             </span>
           </div>
           <span className="stat-value text-gray-900 text-xl">{fmt(totalEfectivoVentas)}</span>
+        </div>
+
+        {/* Gastos */}
+        <div className="stat-card">
+          <div className="flex items-center justify-between mb-1">
+            <span className="stat-label">Gastos</span>
+            <span className="w-7 h-7 rounded-lg bg-red-50 flex items-center justify-center text-red-400">
+              <Icon name="expenses" className="w-3.5 h-3.5" />
+            </span>
+          </div>
+          <span className="stat-value text-red-500 text-xl">{fmt(gastosTotal)}</span>
+          <p className="text-[10px] text-gray-400 mt-0.5">
+            <span className="text-orange-500">{fmt(gastosAfectaCaja)} caja</span>
+            {gastosNoAfectaCaja > 0 && <span> · {fmt(gastosNoAfectaCaja)} no caja</span>}
+          </p>
         </div>
 
         {/* Neto efectivo */}
@@ -259,7 +285,7 @@ export default function Deliveries() {
           <p className="text-[10px] text-gray-400 mt-0.5">Efectivo − Gastos</p>
         </div>
 
-        {/* Transferencia */}
+        {/* Transferencias */}
         <div className="stat-card">
           <div className="flex items-center justify-between mb-1">
             <span className="stat-label">Transferencias</span>
