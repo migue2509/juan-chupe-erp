@@ -189,6 +189,17 @@ class SaleViewSet(viewsets.ReadOnlyModelViewSet):
             from apps.billing.models import Invoice
             Invoice.objects.create(sale=sale, shift=shift)
 
+            # Auto-create Delivery record when is_delivery=True
+            if data.get('is_delivery'):
+                from apps.deliveries.models import Delivery
+                Delivery.objects.create(
+                    sale=sale,
+                    shift=shift,
+                    address=data.get('delivery_address', '').strip() or 'Sin dirección',
+                    four_digits=data.get('delivery_client', '').strip(),
+                    notes=data.get('delivery_notes', '').strip(),
+                )
+
         return Response(SaleSerializer(sale).data, status=status.HTTP_201_CREATED)
 
     @action(detail=True, methods=['patch'], url_path='edit', permission_classes=[IsOperative])

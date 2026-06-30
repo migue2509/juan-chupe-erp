@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { getFlavors, getCupSizes, getToppings, getActivePromotions, createSale, createDelivery, getTransferMethods } from '../api/index'
+import { getFlavors, getCupSizes, getToppings, getActivePromotions, createSale, getTransferMethods } from '../api/index'
 import { Icon } from '../components/Icons'
 import { useAuth } from '../context/AuthContext'
 import toast from 'react-hot-toast'
@@ -175,7 +175,10 @@ export default function POS() {
         cash_received:    isCourtesy ? (courtesyMethod === 'cash'     ? courtesyAmount : 0) : (Number(cashReceived) || 0),
         transfer_amount:  isCourtesy ? (courtesyMethod === 'transfer' ? courtesyAmount : 0) : (Number(transferAmount) || 0),
         transfer_reference: isCourtesy ? (courtesyMethod === 'transfer' ? courtesyTransferRef : '') : transferRef,
-        is_delivery: isDelivery,
+        is_delivery:      isDelivery,
+        delivery_address: isDelivery ? deliveryAddress.trim() : '',
+        delivery_client:  isDelivery ? deliveryFourDigits.trim() : '',
+        delivery_notes:   isDelivery ? deliveryNotes.trim() : '',
         is_courtesy: isCourtesy,
         courtesy_paid: courtesyAmount,
         items: items.map(i => ({
@@ -186,18 +189,6 @@ export default function POS() {
           quantity:    i.qty,
         }))
       })
-
-      // Si es domicilio, crear el registro de domicilio
-      if (isDelivery) {
-        try {
-          await createDelivery({
-            sale: saleRes.data.id,
-            address: deliveryAddress.trim(),
-            four_digits: deliveryFourDigits,
-            notes: deliveryNotes.trim(),
-          })
-        } catch { /* el domicilio falla silencioso, la venta ya quedó */ }
-      }
 
       toast.success('Venta registrada')
       setItems([])
