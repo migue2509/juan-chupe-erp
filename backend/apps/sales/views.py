@@ -335,23 +335,16 @@ class SaleViewSet(viewsets.ReadOnlyModelViewSet):
         shift = Shift.get_active()
         if not shift:
             return Response({'sales': [], 'total': 0})
+        # Autocorregir ventas huérfanas: is_delivery=True sin registro Delivery
+        from apps.deliveries.models import Delivery as DeliveryModel
+        orphans = Sale.objects.filter(shift=shift, is_delivery=True, delivery__isnull=True)
+        for orphan in orphans:
+            DeliveryModel.objects.get_or_create(
+                sale=orphan,
+                defaults=dict(shift=shift, address='Sin dirección', status='pending')
+            )
+
         # Incluir todas las ventas (incluyendo anuladas) para mostrar estado en dashboard
         sales = Sale.objects.filter(shift=shift).select_related('invoice', 'delivery__delivery_person')
         # Solo contar en el total las no anuladas
-        active_sales = [s for s in sales if not self._is_voided(s)]
-        total = sum(
-            (s.courtesy_paid if s.is_courtesy else s.total)
-            for s in active_sales
-        )
-        return Response({
-            'sales': SaleSerializer(sales, many=True).data,
-            'total': float(total),
-            'count': len(active_sales)
-        })
-
-    @staticmethod
-    def _is_voided(sale):
-        try:
-            return sale.invoice.voided
-        except Exception:
-            return False
+        active_sales = [s for s in sales if not self._is_vo

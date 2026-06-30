@@ -48,7 +48,20 @@ class Sale(models.Model):
     def calculate_total(self):
         total = sum(item.subtotal for item in self.items.all())
         self.total = total
-        self.change_given = max(Decimal('0'), self.cash_received - total)
+        if self.payment_method == 'mixed':
+            # Si no se ingresó monto de transferencia, lo calculamos del déficit de efectivo
+            if self.transfer_amount == Decimal('0'):
+                self.transfer_amount = max(Decimal('0'), total - self.cash_received)
+            # El cambio es solo sobre la porción en efectivo
+            cash_portion = total - self.transfer_amount
+            self.change_given = max(Decimal('0'), self.cash_received - cash_portion)
+        elif self.payment_method == 'transfer':
+            # Si no se ingresó transfer_amount, usar el total
+            if self.transfer_amount == Decimal('0'):
+                self.transfer_amount = total
+            self.change_given = Decimal('0')
+        else:
+            self.change_given = max(Decimal('0'), self.cash_received - total)
         self.save()
 
 
@@ -76,60 +89,53 @@ class SaleItem(models.Model):
         self.subtotal = (self.unit_price + self.topping_price) * self.quantity
         super().save(*args, **kwargs)
 
-    def reverse_inventory(self):
-        """Devuelve al inventario lo que consumió este item (para ediciones/correcciones)"""
-        if not self.cup_size:
-            # topping-only: devolver al stock del topping
-            if self.topping:
-                try:
-                    from apps.inventory.models import StockMovement
-                    from apps.shifts.models import Shift
-                    shift = Shift.get_active()
-                    ts = self.topping.stock
-                    ts.add_stock(self.quantity)
-                    StockMovement.objects.create(
-                        movement_type='adjustment', topping_stock=ts,
-                        quantity_units=self.quantity,
-                        notes=f'Corrección venta #{self.sale_id} — topping suelto',
-                        created_by=self.sale.seller, shift=shift
-                    )
-                except Exception:
-                    pass
-            return
+    def reverse_inventory(self, note_prefix=None):
+        """Devuelve al inventario lo que consumió este item."""
         from apps.inventory.models import FlavorBag, CupStock, StockMovement
         from apps.shifts.models import Shift
         shift = Shift.get_active()
-        cup_ml = self.cup_size.ml
-        sale_flavors = self.saleitems_flavors.all()
-        num_flavors  = sale_flavors.count()
-        for sf in sale_flavors:
-            try:
-                bag = sf.flavor.bag
-                ml  = cup_ml / Decimal(str(max(num_flavors, 1))) * self.quantity
-                bag.add_stock(ml)
+        prefix = note_prefix or f'Corrección venta #{self.sale_id}'
+
+        if not self.cup_size:
+            if self.topping:
+                ts = self.topping.stock
+                ts.add_stock(self.quantity)
                 StockMovement.objects.create(
-                    movement_type='adjustment', flavor_bag=bag,
-                    quantity_ml=ml,
-                    notes=f'Corrección venta #{self.sale_id}',
+                    movement_type='adjustment', topping_stock=ts,
+                    quantity_units=self.quantity,
+                    notes=f'{prefix} — topping',
                     created_by=self.sale.seller, shift=shift
                 )
-            except Exception:
-                pass
-        try:
-            cup_stock = CupStock.objects.get(cup_size=self.cup_size)
-            cup_stock.add_stock(self.quantity)
+            return
+
+        cup_ml = self.cup_size.ml
+        sale_flavors = self.saleitems_flavors.select_related('flavor__bag').all()
+        num_flavors  = sale_flavors.count()
+
+        for sf in sale_flavors:
+            bag = sf.flavor.bag
+            ml  = cup_ml / Decimal(str(max(num_flavors, 1))) * self.quantity
+            bag.add_stock(ml)
             StockMovement.objects.create(
-                movement_type='adjustment', cup_stock=cup_stock,
-                quantity_units=self.quantity,
-                notes=f'Corrección venta #{self.sale_id}',
+                movement_type='adjustment', flavor_bag=bag,
+                quantity_ml=ml,
+                notes=f'{prefix} — {sf.flavor.name}',
                 created_by=self.sale.seller, shift=shift
             )
-        except Exception:
-            pass
-        # Revertir bolsa de topping automática
+
+        cup_stock = CupStock.objects.get(cup_size=self.cup_size)
+        cup_stock.add_stock(self.quantity)
+        StockMovement.objects.create(
+            movement_type='adjustment', cup_stock=cup_stock,
+            quantity_units=self.quantity,
+            notes=f'{prefix} — vaso {self.cup_size.size}',
+            created_by=self.sale.seller, shift=shift
+        )
+
+        # Revertir topping automático
         try:
             from apps.products.models import Topping as ToppingModel
-            categories = {sf.flavor.category for sf in self.saleitems_flavors.select_related('flavor').all()}
+            categories = {sf.flavor.category for sf in sale_flavors}
             if categories:
                 primary_cat = next(iter(categories))
                 auto_topping = ToppingModel.objects.get(linked_category=primary_cat, is_active=True)
@@ -138,11 +144,11 @@ class SaleItem(models.Model):
                 StockMovement.objects.create(
                     movement_type='adjustment', topping_stock=auto_ts,
                     quantity_units=self.quantity,
-                    notes=f'Corrección venta #{self.sale_id} — bolsa auto',
+                    notes=f'{prefix} — topping auto',
                     created_by=self.sale.seller, shift=shift
                 )
-        except Exception:
-            pass
+        except ToppingModel.DoesNotExist:
+            pass  # No hay topping automático para esta categoría, es normal
 
     def apply_inventory(self):
         """Motor de consumo: descuenta ml por sabor y vasos (RN-008, RN-009)"""

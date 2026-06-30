@@ -155,7 +155,11 @@ export default function POS() {
   const removeItem   = (id) => setItems(prev => prev.filter(i => i.id !== id))
   const itemTotal    = (i) => (i.unit_price + (i.topping_price || 0)) * i.qty
   const orderTotal   = items.reduce((sum, i) => sum + itemTotal(i), 0)
-  const change       = paymentMethod === 'cash' && !isCourtesy ? Math.max(0, Number(cashReceived) - orderTotal) : 0
+  const change       = paymentMethod === 'cash' && !isCourtesy
+    ? Math.max(0, Number(cashReceived) - orderTotal)
+    : paymentMethod === 'mixed' && !isCourtesy
+      ? Math.max(0, Number(cashReceived) - Math.max(0, orderTotal - Number(transferAmount || 0)))
+      : 0
   const courtesyDiff = isCourtesy ? Math.max(0, orderTotal - Number(courtesyPaid || 0)) : 0
 
   // ─── Submit ───────────────────────────────────────────────────────────────
@@ -501,7 +505,7 @@ export default function POS() {
               <label className="label">Efectivo recibido</label>
               <input type="number" className="input" placeholder="0" value={cashReceived}
                 onChange={e => setCashReceived(e.target.value)} />
-              {cashReceived && Number(cashReceived) > 0 && (
+              {cashReceived && Number(cashReceived) > 0 && change > 0 && (
                 <p className="text-xs text-green-600 mt-1 font-semibold">Cambio: {fmt(change)}</p>
               )}
             </div>
@@ -513,6 +517,11 @@ export default function POS() {
                 <label className="label">Monto transferencia</label>
                 <input type="number" className="input" placeholder="0" value={transferAmount}
                   onChange={e => setTransferAmount(e.target.value)} />
+                {paymentMethod === 'mixed' && cashReceived && Number(cashReceived) > 0 && Number(cashReceived) < orderTotal && !transferAmount && (
+                  <p className="text-xs text-cyan-600 mt-1">
+                    Sugerido: {fmt(orderTotal - Number(cashReceived))}
+                  </p>
+                )}
               </div>
               <div>
                 <label className="label">Referencia</label>
@@ -699,13 +708,3 @@ export default function POS() {
           >
             <p className="font-bold text-gray-800 text-lg">{qrZoom.name}</p>
             <img src={qrZoom.url} alt={qrZoom.name} className="w-full object-contain rounded-xl" />
-            <p className="text-xs text-gray-400">Apunta la cámara al código para transferir</p>
-            <button onClick={() => setQrZoom(null)} className="btn-ghost w-full justify-center">
-              Cerrar
-            </button>
-          </div>
-        </div>
-      )}
-    </>
-  )
-}

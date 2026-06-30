@@ -44,6 +44,13 @@ export default function Dashboard() {
 
   useEffect(() => { load() }, [])
 
+  // Auto-refresh al recuperar el foco (ej. volver del POS)
+  useEffect(() => {
+    const onFocus = () => load()
+    window.addEventListener('focus', onFocus)
+    return () => window.removeEventListener('focus', onFocus)
+  }, [])
+
   const handleOpenShift = async () => {
     try { await openShift(); toast.success('Jornada abierta'); load() } catch {}
   }
@@ -52,35 +59,44 @@ export default function Dashboard() {
     try { await closeShift(); toast.success('Jornada cerrada'); load() } catch {}
   }
 
-  // ── Filter sales by category ──
-  // allSales incluye anuladas para mostrar en recientes; activeSales excluye anuladas para totales
+  // ── Filter sales by jornada activa + categoría ──
+  // Doble filtro: el backend ya filtra por jornada, pero también verificamos el campo shift en frontend
+  const shiftId = shift?.id
   const filteredSales = allSales.filter(s => {
-    if (filter === 'delivery') return s.is_delivery === true
-    if (filter === 'pos')      return s.is_delivery === false
+    if (shiftId && s.shift !== shiftId) return false   // solo ventas de la jornada activa
+    if (filter === 'delivery') return s.is_delivery === true && s.delivery_status !== null
+    if (filter === 'pos')      return !(s.is_delivery === true && s.delivery_status !== null)
     return true
   })
   const activeSales = filteredSales.filter(s => !s.is_voided)
 
   // ── Stats computed from ACTIVE (non-voided) sales ──
-  const totalDinero    = activeSales.reduce((sum, s) =>
-    sum + (s.is_courtesy ? Number(s.courtesy_paid || 0) : Number(s.total || 0)), 0)
   const cantidadVentas = activeSales.length
 
-  // Efectivo = ventas cash (total completo) + porción cash de ventas mixtas
-  // Cortesías: solo cuenta lo que realmente pagaron (courtesy_paid)
+  // Valor real de cada venta (cortesías: solo lo que pagaron)
+  const valorVenta = (s) => s.is_courtesy ? Number(s.courtesy_paid || 0) : Number(s.total || 0)
+
+  // TOTAL VENTAS = suma de todas las facturas de la jornada (efectivo + transferencias)
+  const totalDinero = activeSales.reduce((sum, s) => sum + valorVenta(s), 0)
+
+  // EFECTIVO = pagos cash completos + porción en efectivo de ventas mixtas
   const totalEfectivo = activeSales.reduce((sum, s) => {
-    if (s.is_courtesy) return sum + Number(s.courtesy_paid || 0)
-    const total = Number(s.total || 0)
-    const trf   = Number(s.transfer_amount || 0)
-    if (s.payment_method === 'cash')  return sum + total
-    if (s.payment_method === 'mixed') return sum + Math.max(0, total - trf)
-    return sum
+    const val = valorVenta(s)
+    if (s.payment_method === 'cash')  return sum + val
+    if (s.payment_method === 'mixed') return sum + Math.max(0, val - Number(s.transfer_amount || 0))
+    return sum  // transfer: no aporta efectivo
   }, 0)
 
-  // Transferencias = todas las ventas activas por transferencia + porción transfer de mixtas
-  const totalTransf = activeSales.reduce((sum, s) => sum + Number(s.transfer_amount || 0), 0)
+  // TRANSFERENCIAS = pagos transfer completos + porción transferencia de ventas mixtas
+  const totalTransf = activeSales.reduce((sum, s) => {
+    const val = valorVenta(s)
+    if (s.payment_method === 'transfer') return sum + val
+    if (s.payment_method === 'mixed')    return sum + Number(s.transfer_amount || 0)
+    return sum  // cash: no aporta transferencia
+  }, 0)
 
   const filteredExpenses = expenses.filter(e => {
+    if (shiftId && e.shift !== shiftId) return false   // solo gastos de la jornada activa
     if (filter === 'pos')      return e.origin === 'pos'
     if (filter === 'delivery') return e.origin === 'delivery'
     return true
@@ -115,12 +131,12 @@ export default function Dashboard() {
   const maxVendTotal = Math.max(...vendedoraChart.map(d => d.total), 1)
 
   // ── Delivery stats (solo cuando filter === 'delivery') ──
-  const deliverySales = allSales.filter(s => s.is_delivery)
+  // filteredSales ya contiene solo domicilios cuando filter==='delivery'
   const deliveryStatusCounts = {
-    pending:   deliverySales.filter(s => s.delivery_status === 'pending').length,
-    on_way:    deliverySales.filter(s => s.delivery_status === 'on_way').length,
-    delivered: deliverySales.filter(s => s.delivery_status === 'delivered').length,
-    cancelled: deliverySales.filter(s => s.delivery_status === 'cancelled').length,
+    pending:   filteredSales.filter(s => s.delivery_status === 'pending').length,
+    on_way:    filteredSales.filter(s => s.delivery_status === 'on_way').length,
+    delivered: filteredSales.filter(s => s.delivery_status === 'delivered').length,
+    cancelled: filteredSales.filter(s => s.delivery_status === 'cancelled').length,
   }
   const deliveryStatusConfig = [
     { key: 'pending',   label: 'Pendiente', cls: 'bg-amber-100 text-amber-700',  bar: 'bg-amber-400' },
@@ -130,7 +146,7 @@ export default function Dashboard() {
   ]
   // Domiciliarios chart data: agrupar por delivery_person_name
   const domiciliarioMap = {}
-  deliverySales.forEach(s => {
+  filteredSales.forEach(s => {
     const name = s.delivery_person_name || 'Sin asignar'
     if (!domiciliarioMap[name]) domiciliarioMap[name] = { total: 0, delivered: 0, cancelled: 0, pending: 0, on_way: 0 }
     domiciliarioMap[name].total++
@@ -158,19 +174,29 @@ export default function Dashboard() {
             {new Date().toLocaleDateString('es-CO', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
           </p>
         </div>
-        {isAdmin && (
-          shift ? (
-            <button onClick={handleCloseShift} className="btn-danger">
-              <Icon name="lock" className="w-4 h-4" />
-              Cerrar Jornada
-            </button>
-          ) : (
-            <button onClick={handleOpenShift} className="btn-lime">
-              <Icon name="unlock" className="w-4 h-4" />
-              Abrir Jornada
-            </button>
-          )
-        )}
+        <div className="flex items-center gap-2">
+          <button
+            onClick={load}
+            disabled={loading}
+            title="Actualizar datos"
+            className="w-8 h-8 rounded-lg border border-gray-200 bg-white flex items-center justify-center text-gray-400 hover:text-brand-pink hover:border-brand-pink transition-colors disabled:opacity-40"
+          >
+            <Icon name="refresh" className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+          </button>
+          {isAdmin && (
+            shift ? (
+              <button onClick={handleCloseShift} className="btn-danger">
+                <Icon name="lock" className="w-4 h-4" />
+                Cerrar Jornada
+              </button>
+            ) : (
+              <button onClick={handleOpenShift} className="btn-lime">
+                <Icon name="unlock" className="w-4 h-4" />
+                Abrir Jornada
+              </button>
+            )
+          )}
+        </div>
       </div>
 
       {/* ── Shift status + Category filter ── */}
@@ -214,23 +240,23 @@ export default function Dashboard() {
         {/* Total dinero */}
         <div className="stat-card">
           <div className="flex items-center justify-between mb-1">
-            <span className="stat-label">Total dinero</span>
-            <span className="w-7 h-7 rounded-lg bg-pink-50 flex items-center justify-center text-brand-pink">
-              <Icon name="trending" className="w-3.5 h-3.5" />
-            </span>
-          </div>
-          <span className="stat-value text-gray-900 text-xl">{fmt(totalDinero)}</span>
-        </div>
-
-        {/* Cantidad ventas */}
-        <div className="stat-card">
-          <div className="flex items-center justify-between mb-1">
             <span className="stat-label">Ventas</span>
             <span className="w-7 h-7 rounded-lg bg-pink-50 flex items-center justify-center text-brand-pink">
               <Icon name="billing" className="w-3.5 h-3.5" />
             </span>
           </div>
           <span className="stat-value text-gray-900 text-xl">{fmtN(cantidadVentas)}</span>
+        </div>
+
+        {/* Total dinero */}
+        <div className="stat-card">
+          <div className="flex items-center justify-between mb-1">
+            <span className="stat-label">Total ventas (efectivo + transferencias)</span>
+            <span className="w-7 h-7 rounded-lg bg-pink-50 flex items-center justify-center text-brand-pink">
+              <Icon name="trending" className="w-3.5 h-3.5" />
+            </span>
+          </div>
+          <span className="stat-value text-gray-900 text-xl">{fmt(totalDinero)}</span>
         </div>
 
         {/* Efectivo */}
@@ -318,7 +344,7 @@ export default function Dashboard() {
             <div className="flex items-center gap-2 px-5 py-4 border-b border-gray-100">
               <Icon name="bike" className="w-4 h-4 text-brand-cyan" />
               <h2>Estado del día</h2>
-              <span className="badge-gray ml-auto">{deliverySales.length} domicilios</span>
+              <span className="badge-gray ml-auto">{filteredSales.length} domicilios</span>
             </div>
             <div className="grid grid-cols-2 gap-0 divide-x divide-y divide-gray-100">
               {deliveryStatusConfig.map(({ key, label, cls, bar }) => (
@@ -327,7 +353,7 @@ export default function Dashboard() {
                   <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${cls}`}>{label}</span>
                   <div className="mt-2 h-1.5 bg-gray-100 rounded-full overflow-hidden">
                     <div className={`h-full rounded-full ${bar}`}
-                      style={{ width: deliverySales.length ? `${(deliveryStatusCounts[key] / deliverySales.length) * 100}%` : '0%' }} />
+                      style={{ width: filteredSales.length ? `${(deliveryStatusCounts[key] / filteredSales.length) * 100}%` : '0%' }} />
                   </div>
                 </div>
               ))}
@@ -560,34 +586,4 @@ export default function Dashboard() {
                       <p className="text-sm font-medium text-gray-800 truncate">{e.description}</p>
                       <p className="text-xs text-gray-400 mt-0.5">{e.category_label || e.category}</p>
                     </div>
-                    <span className="text-sm font-semibold text-red-500 tabular-nums flex-shrink-0">
-                      -{fmt(e.amount)}
-                    </span>
-                  </div>
-                ))
-              )}
-            </div>
-            {filteredExpenses.length > 0 && (
-              <div className="border-t border-gray-100 bg-slate-50 divide-y divide-gray-100">
-                <div className="flex items-center justify-between px-5 py-2">
-                  <span className="text-xs text-gray-400">Afecta caja</span>
-                  <span className="text-xs font-semibold text-orange-500 tabular-nums">-{fmt(gastosAfectaCaja)}</span>
-                </div>
-                <div className="flex items-center justify-between px-5 py-2">
-                  <span className="text-xs text-gray-400">No afecta caja</span>
-                  <span className="text-xs font-semibold text-gray-400 tabular-nums">-{fmt(gastosNoAfectaCaja)}</span>
-                </div>
-                <div className="flex items-center justify-between px-5 py-2.5">
-                  <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Total</span>
-                  <span className="text-sm font-bold text-red-500 tabular-nums">-{fmt(gastosTotalAll)}</span>
-                </div>
-              </div>
-            )}
-          </div>
-
-        </div>
-
-      </div>
-    </div>
-  )
-}
+                    <span className="text-sm font-semibold text-red-500 

@@ -312,7 +312,9 @@ export default function Billing() {
                 {PAYMENT_LABELS[inv.sale_detail?.payment_method] ?? inv.sale_detail?.payment_method}
               </span>
               <span className={`badge text-xs w-fit ${inv.voided ? 'badge-pink' : 'badge-lime'}`}>
-                {inv.voided ? 'Anulada' : 'Válida'}
+                {inv.voided
+                  ? (inv.void_reason?.includes('Domicilio cancelado') ? 'Cancelada' : 'Anulada')
+                  : 'Válida'}
               </span>
               <Icon name="chevronRight" className="w-4 h-4 text-gray-300" />
             </div>

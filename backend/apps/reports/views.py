@@ -28,7 +28,7 @@ class DailySummaryView(APIView):
         if not shift:
             return Response({'detail': 'No hay jornadas.'}, status=404)
 
-        sales = Sale.objects.filter(shift=shift)
+        sales = Sale.objects.filter(shift=shift).exclude(invoice__voided=True)
         total_sales    = sales.aggregate(total=Sum('total'))['total'] or Decimal('0')
         total_transfer = sum(s.transfer_amount for s in sales)
         total_cash     = total_sales - total_transfer
@@ -77,7 +77,7 @@ class WeeklyReportView(APIView):
         shifts = Shift.objects.filter(opened_at__gte=start, opened_at__lte=end)
         data = []
         for shift in shifts:
-            total = Sale.objects.filter(shift=shift).aggregate(t=Sum('total'))['t'] or Decimal('0')
+            total = Sale.objects.filter(shift=shift).exclude(invoice__voided=True).aggregate(t=Sum('total'))['t'] or Decimal('0')
             data.append({
                 'date': shift.opened_at.strftime('%d/%m/%Y'),
                 'total': float(total),
@@ -93,7 +93,7 @@ class MonthlyReportView(APIView):
         now = timezone.now()
         start = now.replace(day=1, hour=0, minute=0, second=0)
         shifts = Shift.objects.filter(opened_at__gte=start)
-        total = Sale.objects.filter(shift__in=shifts).aggregate(t=Sum('total'))['t'] or Decimal('0')
+        total = Sale.objects.filter(shift__in=shifts).exclude(invoice__voided=True).aggregate(t=Sum('total'))['t'] or Decimal('0')
         expense_total = Expense.objects.filter(shift__in=shifts).aggregate(t=Sum('amount'))['t'] or Decimal('0')
         return Response({
             'month': now.strftime('%B %Y'),
@@ -155,7 +155,7 @@ class RangeReportView(APIView):
         # ── Base querysets ────────────────────────────────────────────────────
         sales_qs = Sale.objects.filter(
             created_at__gte=start_dt, created_at__lte=end_dt,
-        )
+        ).exclude(invoice__voided=True)
         if channel == 'pos':
             sales_qs = sales_qs.filter(is_delivery=False)
         elif channel == 'delivery':
@@ -275,6 +275,3 @@ class RangeReportView(APIView):
             'deliveries':     delivery_stats,
             'payment_pct': {
                 'cash':     round(total_cash     / total_money * 100) if total_money else 0,
-                'transfer': round(total_transfer / total_money * 100) if total_money else 0,
-            },
-        })

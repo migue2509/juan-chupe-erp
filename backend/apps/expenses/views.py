@@ -23,6 +23,9 @@ class ExpenseViewSet(viewsets.ModelViewSet):
 
     @action(detail=False, methods=['get'], url_path='today')
     def today(self, request):
-        today = timezone.localdate()
-        expenses = Expense.objects.filter(created_at__date=today).select_related('registered_by')
-        return Response(ExpenseSerializer(expenses, many=True).data)
+        shift_id = request.query_params.get('shift_id')
+        if shift_id:
+            try:
+                shift = Shift.objects.get(id=shift_id)
+            except Shift.DoesNotExist:
+                

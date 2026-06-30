@@ -2,6 +2,7 @@ from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from django.utils import timezone
+from django.db import transaction
 from core.permissions import IsOperative, IsAdmin
 from apps.shifts.models import Shift
 from .models import Delivery, Domiciliario
@@ -15,7 +16,9 @@ class DomiciliarioViewSet(viewsets.ModelViewSet):
 
 
 class DeliveryViewSet(viewsets.ModelViewSet):
-    queryset = Delivery.objects.select_related('sale', 'delivery_person').all()
+    queryset = Delivery.objects.select_related(
+        'sale', 'sale__invoice', 'delivery_person'
+    ).all()
     serializer_class = DeliverySerializer
     permission_classes = [IsOperative]
     filterset_fields = ['status', 'shift']
@@ -27,7 +30,7 @@ class DeliveryViewSet(viewsets.ModelViewSet):
             raise ValidationError('No hay jornada activa. El administrador debe abrir el día.')
         serializer.save(shift=shift)
 
-    @action(detail=True, methods=['post'], permission_classes=[IsAdmin])
+    @action(detail=True, methods=['post'], permission_classes=[IsOperative])
     def cancel(self, request, pk=None):
         """
         Cancela un domicilio:
@@ -40,29 +43,30 @@ class DeliveryViewSet(viewsets.ModelViewSet):
         if delivery.status == 'cancelled':
             return Response({'detail': 'El domicilio ya está cancelado.'}, status=status.HTTP_400_BAD_REQUEST)
 
-        # 1 — Cancelar delivery
-        delivery.status = 'cancelled'
-        delivery.save(update_fields=['status'])
+        with transaction.atomic():
+            # 1 — Cancelar delivery
+            delivery.status = 'cancelled'
+            delivery.save(update_fields=['status'])
 
-        sale = delivery.sale
-        if sale:
-            # 2 — Anular factura
-            try:
-                invoice = sale.invoice
-                if not invoice.voided:
-                    invoice.voided     = True
-                    invoice.voided_by  = request.user
-                    invoice.voided_at  = timezone.now()
+            sale = delivery.sale
+            if sale:
+                # 2 — Anular factura
+                try:
+                    invoice = sale.invoice
+                except Exception:
+                    from apps.billing.models import Invoice
+                    invoice = Invoice.objects.filter(sale=sale).first()
+
+                if invoice and not invoice.voided:
+                    invoice.voided      = True
+                    invoice.voided_by   = request.user
+                    invoice.voided_at   = timezone.now()
                     invoice.void_reason = request.data.get('reason', 'Domicilio cancelado')
                     invoice.save()
-            except Exception:
-                pass
 
-            # 3 — Revertir inventario por cada ítem de la venta
-            try:
-                for item in sale.items.prefetch_related('saleitems_flavors__flavor', 'flavors').all():
-                    item.reverse_inventory()
-            except Exception:
-                pass
+                # 3 — Revertir inventario por cada ítem de la venta
+                note = f'Cancelación domicilio #{delivery.id} — venta #{sale.id}'
+                for item in sale.items.prefetch_related('saleitems_flavors__flavor').all():
+                    item.reverse_inventory(note_prefix=note)
 
         return Response(DeliverySerializer(delivery).data)
