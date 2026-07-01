@@ -406,6 +406,8 @@ export default function Deliveries() {
             </select>
           </div>
 
+          <div className="overflow-x-auto">
+          <div style={{ minWidth: '780px' }}>
           <div className="grid px-4 py-2.5 bg-slate-50 border-b border-gray-100 text-[10px] font-semibold text-gray-400 uppercase tracking-widest gap-2"
             style={{ gridTemplateColumns: '44px 90px 80px 52px 1fr 70px 75px 100px 85px 70px' }}>
             {['#', 'Fecha/Hora', 'Jornada', 'Cliente', 'Dirección', 'Factura', 'Total', 'Pago', 'Repartidor', 'Estado'].map(h => <span key={h}>{h}</span>)}
@@ -522,6 +524,8 @@ export default function Deliveries() {
               )
             })}
           </div>
+          </div>{/* min-width */}
+          </div>{/* overflow-x-auto */}
         </div>
 
         {/* Panel domiciliarios */}
