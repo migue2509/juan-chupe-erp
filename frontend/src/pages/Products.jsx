@@ -22,7 +22,7 @@ const TABS = [
   { key: 'toppings', label: 'Toppings',            icon: 'promotions' },
 ]
 
-const EMPTY_FLAVOR  = { name: '', category: 'water', emoji: '🍓', min_stock_ml: 500 }
+const EMPTY_FLAVOR  = { name: '', category: 'water', emoji: '🍓', min_stock_ml: 500, licores: '' }
 
 function EmojiPicker({ value, onChange }) {
   const [open, setOpen] = useState(false)
@@ -172,7 +172,7 @@ export default function Products() {
   const handleFlavorCreate = async (e) => {
     e.preventDefault(); setSaving(true)
     try {
-      await createFlavor({ name: flavorForm.name, category: flavorForm.category, emoji: flavorForm.emoji, min_stock_ml: flavorForm.min_stock_ml })
+      await createFlavor({ name: flavorForm.name, category: flavorForm.category, emoji: flavorForm.emoji, min_stock_ml: flavorForm.min_stock_ml, licores: flavorForm.licores })
       toast.success(`Bolsa "${flavorForm.name}" creada`)
       setFlavorForm(EMPTY_FLAVOR); setShowCreate(false); load()
     } catch { toast.error('Error al crear bolsa') }
@@ -181,7 +181,7 @@ export default function Products() {
   const handleFlavorSave = async (form) => {
     setSaving(true)
     try {
-      await updateFlavor(editing.id, { name: form.name, category: form.category, emoji: form.emoji })
+      await updateFlavor(editing.id, { name: form.name, category: form.category, emoji: form.emoji, licores: form.licores ?? '' })
       if (editing.bagId && form.min_stock_ml !== undefined) {
         await updateBag(editing.bagId, { min_stock_ml: Number(form.min_stock_ml) })
       }
@@ -311,6 +311,12 @@ export default function Products() {
                 <label className="label">Emoji del sabor</label>
                 <EmojiPicker value={flavorForm.emoji} onChange={v => setFlavorForm(f => ({ ...f, emoji: v }))} />
               </div>
+              <div className="col-span-2">
+                <label className="label">Licores que contiene</label>
+                <input className="input" placeholder="Ej: Ron, Aguardiente, Vodka (separados por coma)"
+                  value={flavorForm.licores} onChange={e => setFlavorForm(f => ({ ...f, licores: e.target.value }))} />
+                <p className="text-xs text-gray-400 mt-1">Aparecen como etiquetas en el POS</p>
+              </div>
               <div>
                 <label className="label">Stock mínimo (ml)</label>
                 <input type="number" className="input" placeholder="500" value={flavorForm.min_stock_ml}
@@ -437,9 +443,10 @@ export default function Products() {
                       { key: 'name',         label: 'Nombre',    width: 160 },
                       { key: 'category',     label: 'Categoría', type: 'select', width: 180, options: FLAVOR_CATS.map(c => ({ value: c.value, label: c.label })) },
                       { key: 'emoji',        label: 'Emoji',     type: 'emoji',  width: 300 },
+                      { key: 'licores',      label: 'Licores',   width: 220, placeholder: 'Ron, Aguardiente...' },
                       { key: 'min_stock_ml', label: 'Mín. ml',  type: 'number', width: 100, placeholder: '500' },
                     ]}
-                    initial={{ name: f.name, category: f.category, emoji: f.emoji ?? '', min_stock_ml: f.bag?.min_stock_ml ?? 500 }}
+                    initial={{ name: f.name, category: f.category, emoji: f.emoji ?? '', licores: f.licores ?? '', min_stock_ml: f.bag?.min_stock_ml ?? 500 }}
                     onSave={handleFlavorSave}
                     onCancel={() => setEditing(null)}
                     saving={saving}
@@ -448,7 +455,16 @@ export default function Products() {
                   <div className={`grid px-5 py-3 items-center gap-3 hover:bg-slate-50 transition-colors ${!f.is_active ? 'opacity-40' : ''}`}
                     style={{ gridTemplateColumns: '2.5rem 1fr 140px 100px 1fr 180px' }}>
                     <span className="text-2xl leading-none">{f.emoji || '❓'}</span>
-                    <span className="font-medium text-sm text-gray-800">{f.name}</span>
+                    <div>
+                      <span className="font-medium text-sm text-gray-800">{f.name}</span>
+                      {f.licores && (
+                        <div className="flex flex-wrap gap-0.5 mt-0.5">
+                          {f.licores.split(',').map(l => l.trim()).filter(Boolean).map(l => (
+                            <span key={l} className="text-[9px] bg-purple-100 text-purple-600 px-1.5 py-0.5 rounded-full">{l}</span>
+                          ))}
+                        </div>
+                      )}
+                    </div>
                     <span className="text-sm text-gray-500">
                       {FLAVOR_CATS.find(c => c.value === f.category)?.label ?? f.category}
                     </span>

@@ -310,6 +310,13 @@ export default function POS() {
                             }`}>
                             <div className="text-2xl leading-none mx-auto mb-1.5">{f.emoji || '🍧'}</div>
                             <div className="text-xs leading-tight">{f.name}</div>
+                            {f.licores && (
+                            <div className="flex flex-wrap gap-0.5 justify-center mt-1">
+                              {f.licores.split(',').map(l => l.trim()).filter(Boolean).map(l => (
+                                <span key={l} className="text-[9px] bg-purple-100 text-purple-600 px-1 py-px rounded-full leading-none">{l}</span>
+                              ))}
+                            </div>
+                          )}
                           </button>
                         )
                       })}
@@ -390,6 +397,13 @@ export default function POS() {
                           }`}>
                           <div className="text-2xl leading-none mx-auto mb-1.5">{f.emoji || '🍧'}</div>
                           <div className="text-xs leading-tight">{f.name}</div>
+                          {f.licores && (
+                            <div className="flex flex-wrap gap-0.5 justify-center mt-1">
+                              {f.licores.split(',').map(l => l.trim()).filter(Boolean).map(l => (
+                                <span key={l} className="text-[9px] bg-purple-100 text-purple-600 px-1 py-px rounded-full leading-none">{l}</span>
+                              ))}
+                            </div>
+                          )}
                         </button>
                       )
                     })}

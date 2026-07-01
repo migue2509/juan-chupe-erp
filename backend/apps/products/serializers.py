@@ -20,7 +20,7 @@ class FlavorSerializer(serializers.ModelSerializer):
     class Meta:
         model = Flavor
         fields = [
-            'id', 'name', 'description', 'category', 'color', 'emoji',
+            'id', 'name', 'description', 'category', 'color', 'emoji', 'licores',
             'is_active', 'created_at', 'updated_at', 'bag',
         ]
         extra_kwargs = {
