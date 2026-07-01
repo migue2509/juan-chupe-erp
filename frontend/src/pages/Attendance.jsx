@@ -201,56 +201,66 @@ function AdminAttendance() {
   )
 }
 
-// ── Vista vendedora: solo su propio ingreso/salida ───────────────────────────
+// ── Vista vendedora: entrada/salida automática ───────────────────────────────
 function SellerAttendance({ user }) {
-  const [status, setStatus] = useState(null)   // { shift_active, record }
+  const [status,  setStatus]  = useState(null)
   const [loading, setLoading] = useState(true)
-  const [busy, setBusy]       = useState(false)
+  const [phase,   setPhase]   = useState('init') // 'init' | 'checking-in' | 'done' | 'error'
+  const [errMsg,  setErrMsg]  = useState('')
 
-  const load = async () => {
-    setLoading(true)
+  const fmtTime = dt => new Date(dt).toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' })
+
+  const refresh = async () => {
     try {
       const res = await myAttendanceStatus()
       setStatus(res.data)
-    } catch {}
-    setLoading(false)
+      return res.data
+    } catch { return null }
   }
-  useEffect(() => { load() }, [])
 
-  const checkin = async () => {
-    setBusy(true)
-    try {
-      await myCheckin()
-      toast.success('¡Entrada registrada!')
-      load()
-    } catch (e) {
-      toast.error(e?.response?.data?.detail || 'Error al registrar entrada')
+  useEffect(() => {
+    const init = async () => {
+      const data = await refresh()
+      setLoading(false)
+      if (!data) return
+
+      if (!data.shift_active) return // sin jornada, nada que hacer
+
+      if (data.record) {
+        // Ya hay registro (entrada previa o ya completado)
+        setPhase('done')
+        return
+      }
+
+      // Jornada activa y sin entrada → registrar automáticamente
+      setPhase('checking-in')
+      try {
+        await myCheckin()
+        await refresh()
+        setPhase('done')
+      } catch (e) {
+        setErrMsg(e?.response?.data?.detail || 'No se pudo registrar la entrada')
+        setPhase('error')
+      }
     }
-    setBusy(false)
-  }
+    init()
+  }, [])
 
-  const checkout = async () => {
-    setBusy(true)
-    try {
-      await myCheckout()
-      toast.success('¡Salida registrada!')
-      load()
-    } catch (e) {
-      toast.error(e?.response?.data?.detail || 'Error al registrar salida')
-    }
-    setBusy(false)
-  }
-
-  if (loading) return (
-    <div className="flex justify-center py-24">
-      <div className="w-8 h-8 border-4 border-brand-navy border-t-transparent rounded-full animate-spin" />
-    </div>
-  )
-
-  const record = status?.record
+  const record      = status?.record
   const shiftActive = status?.shift_active
 
-  const fmtTime = dt => new Date(dt).toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' })
+  if (loading || phase === 'checking-in') return (
+    <div className="max-w-sm mx-auto pt-12 space-y-6">
+      <div className="text-center">
+        <p className="text-sm text-gray-400">Bienvenida,</p>
+        <h1 className="text-2xl font-bold text-brand-navy mt-0.5">{user.full_name}</h1>
+      </div>
+      <div className="card text-center py-10">
+        <div className="w-8 h-8 border-4 border-brand-navy border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+        <p className="text-sm text-gray-500">Registrando tu entrada...</p>
+      </div>
+    </div>
+  )
 
   return (
     <div className="max-w-sm mx-auto pt-8 space-y-6">
@@ -264,56 +274,50 @@ function SellerAttendance({ user }) {
       </div>
 
       {/* Card de estado */}
-      <div className={`card text-center py-8 border-2 ${
-        !shiftActive ? 'border-gray-100' :
-        record?.check_out ? 'border-green-200 bg-green-50' :
-        record ? 'border-brand-navy/20 bg-blue-50' :
-        'border-gray-100'
-      }`}>
-        {!shiftActive ? (
-          <>
-            <p className="font-semibold text-gray-600">Sin jornada activa</p>
-            <p className="text-sm text-gray-400 mt-1">Espera a que el admin abra la jornada</p>
-          </>
-        ) : record?.check_out ? (
-          <>
-            <p className="font-bold text-green-700 text-lg">Jornada completada</p>
-            <div className="mt-3 space-y-1 text-sm text-gray-500">
-              <p>Entrada: <span className="font-semibold text-gray-700">{fmtTime(record.check_in)}</span></p>
-              <p>Salida: <span className="font-semibold text-gray-700">{fmtTime(record.check_out)}</span></p>
-              {record.hours_worked && (
-                <p className="text-brand-navy font-bold mt-2">{record.hours_worked}h trabajadas</p>
-              )}
-            </div>
-          </>
-        ) : record ? (
-          <>
-            <p className="font-bold text-brand-navy text-lg">En jornada</p>
-            <p className="text-sm text-gray-500 mt-1">
-              Entrada a las <span className="font-semibold">{fmtTime(record.check_in)}</span>
-            </p>
-          </>
-        ) : (
-          <>
-            <p className="font-bold text-gray-700 text-lg">Aún no has marcado entrada</p>
-            <p className="text-sm text-gray-400 mt-1">Pulsa el botón para iniciar tu jornada</p>
-          </>
-        )}
-      </div>
-
-      {/* Botón de acción */}
-      {shiftActive && !record?.check_out && (
-        <button
-          onClick={record ? checkout : checkin}
-          disabled={busy}
-          className={`w-full py-4 rounded-2xl text-white font-bold text-lg transition-all shadow-lg ${
-            record
-              ? 'bg-red-500 hover:bg-red-600 active:scale-95'
-              : 'bg-brand-navy hover:opacity-90 active:scale-95'
-          }`}
-          style={!record ? { background: 'linear-gradient(135deg, #FF0099, #7B2FFF)' } : {}}>
-          {busy ? '...' : record ? 'Registrar Salida' : 'Registrar Entrada'}
-        </button>
+      {phase === 'error' ? (
+        <div className="card text-center py-8 border-2 border-red-200 bg-red-50">
+          <p className="font-bold text-red-600 text-lg">Error al registrar entrada</p>
+          <p className="text-sm text-red-400 mt-1">{errMsg}</p>
+          <button
+            onClick={async () => {
+              setPhase('checking-in')
+              try {
+                await myCheckin(); await refresh(); setPhase('done')
+              } catch (e) {
+                setErrMsg(e?.response?.data?.detail || 'Error'); setPhase('error')
+              }
+            }}
+            className="mt-4 btn-primary text-sm">
+            Reintentar
+          </button>
+        </div>
+      ) : !shiftActive ? (
+        <div className="card text-center py-8 border-2 border-gray-100">
+          <p className="font-semibold text-gray-600">Sin jornada activa</p>
+          <p className="text-sm text-gray-400 mt-1">Espera a que el admin abra la jornada</p>
+        </div>
+      ) : record?.check_out ? (
+        <div className="card text-center py-8 border-2 border-green-200 bg-green-50">
+          <p className="font-bold text-green-700 text-lg">Jornada completada</p>
+          <div className="mt-3 space-y-1 text-sm text-gray-500">
+            <p>Entrada: <span className="font-semibold text-gray-700">{fmtTime(record.check_in)}</span></p>
+            <p>Salida: <span className="font-semibold text-gray-700">{fmtTime(record.check_out)}</span></p>
+            {record.hours_worked && (
+              <p className="text-brand-navy font-bold mt-2">{record.hours_worked}h trabajadas</p>
+            )}
+          </div>
+        </div>
+      ) : record ? (
+        <div className="card text-center py-8 border-2 border-brand-navy/20 bg-blue-50">
+          <p className="text-xs font-semibold text-brand-navy uppercase tracking-widest mb-2">Entrada registrada</p>
+          <p className="text-4xl font-bold text-brand-navy">{fmtTime(record.check_in)}</p>
+          <p className="text-sm text-gray-500 mt-3">Tu salida se registrará automáticamente al cerrar la jornada.</p>
+        </div>
+      ) : (
+        <div className="card text-center py-8 border-2 border-gray-100">
+          <p className="font-semibold text-gray-600">Sin jornada activa</p>
+          <p className="text-sm text-gray-400 mt-1">Espera a que el admin abra la jornada</p>
+        </div>
       )}
     </div>
   )

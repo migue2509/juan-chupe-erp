@@ -27,6 +27,17 @@ class ShiftViewSet(viewsets.ReadOnlyModelViewSet):
         if not shift:
             return Response({'detail': 'No hay jornada activa.'}, status=status.HTTP_400_BAD_REQUEST)
         shift.close(user=request.user)
+        # Cerrar automáticamente todas las asistencias abiertas de esta jornada
+        try:
+            from apps.attendance.models import AttendanceRecord
+            from django.utils import timezone
+            open_records = AttendanceRecord.objects.filter(shift=shift, check_out__isnull=True)
+            now = timezone.now()
+            for rec in open_records:
+                rec.check_out = now
+                rec.save(update_fields=['check_out'])
+        except Exception as e:
+            print(f'[close shift] error cerrando asistencias: {e}')
         return Response(ShiftSerializer(shift).data)
 
     @action(detail=False, methods=['get'], permission_classes=[IsOperative])
