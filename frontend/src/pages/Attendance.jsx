@@ -272,13 +272,11 @@ function SellerAttendance({ user }) {
       }`}>
         {!shiftActive ? (
           <>
-            <div className="text-5xl mb-4">🕐</div>
             <p className="font-semibold text-gray-600">Sin jornada activa</p>
             <p className="text-sm text-gray-400 mt-1">Espera a que el admin abra la jornada</p>
           </>
         ) : record?.check_out ? (
           <>
-            <div className="text-5xl mb-4">✅</div>
             <p className="font-bold text-green-700 text-lg">Jornada completada</p>
             <div className="mt-3 space-y-1 text-sm text-gray-500">
               <p>Entrada: <span className="font-semibold text-gray-700">{fmtTime(record.check_in)}</span></p>
@@ -290,7 +288,6 @@ function SellerAttendance({ user }) {
           </>
         ) : record ? (
           <>
-            <div className="text-5xl mb-4">⏱️</div>
             <p className="font-bold text-brand-navy text-lg">En jornada</p>
             <p className="text-sm text-gray-500 mt-1">
               Entrada a las <span className="font-semibold">{fmtTime(record.check_in)}</span>
@@ -298,7 +295,6 @@ function SellerAttendance({ user }) {
           </>
         ) : (
           <>
-            <div className="text-5xl mb-4">👋</div>
             <p className="font-bold text-gray-700 text-lg">Aún no has marcado entrada</p>
             <p className="text-sm text-gray-400 mt-1">Pulsa el botón para iniciar tu jornada</p>
           </>
@@ -316,7 +312,7 @@ function SellerAttendance({ user }) {
               : 'bg-brand-navy hover:opacity-90 active:scale-95'
           }`}
           style={!record ? { background: 'linear-gradient(135deg, #FF0099, #7B2FFF)' } : {}}>
-          {busy ? '...' : record ? '🚪 Registrar Salida' : '✅ Registrar Entrada'}
+          {busy ? '...' : record ? 'Registrar Salida' : 'Registrar Entrada'}
         </button>
       )}
     </div>

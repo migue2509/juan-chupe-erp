@@ -105,7 +105,7 @@ function POSResumenModal({ shiftId, onClose }) {
                 <h3 className="text-sm font-semibold text-gray-700">Liquidación por producto</h3>
               </div>
               <div className="grid text-[10px] font-semibold text-gray-400 uppercase tracking-widest px-4 py-2 bg-gray-50 border-b border-gray-100"
-                style={{ gridTemplateColumns: COL }}>
+                style={{ gridTemplateColumns: COL, minWidth: '600px' }}>
                 <span>Producto / Tipo</span>
                 <span className="text-center">Precio unit.</span>
                 <span className="text-center">Uds</span>
@@ -130,7 +130,7 @@ function POSResumenModal({ shiftId, onClose }) {
                         {/* Sub-fila Regular */}
                         {hasRegular && (
                           <div className="grid items-center px-4 py-1.5 border-b border-gray-50 bg-white"
-                            style={{ gridTemplateColumns: COL }}>
+                            style={{ gridTemplateColumns: COL, minWidth: '600px' }}>
                             <span className="text-xs text-gray-500 pl-3">Precio regular</span>
                             <span className="text-center text-xs text-gray-500">{fmt(row.unit_price)}</span>
                             <span className="text-center text-sm font-semibold text-gray-700">{row.regular_qty}</span>
@@ -140,7 +140,7 @@ function POSResumenModal({ shiftId, onClose }) {
                         {/* Sub-fila Promo */}
                         {hasPromo && (
                           <div className="grid items-center px-4 py-1.5 border-b border-gray-100 bg-amber-50/50"
-                            style={{ gridTemplateColumns: COL }}>
+                            style={{ gridTemplateColumns: COL, minWidth: '600px' }}>
                             <span className="text-xs text-amber-700 pl-3">Promoción</span>
                             <span className="text-center text-xs text-amber-600">{row.promo_unit ? fmt(row.promo_unit) : '—'}</span>
                             <span className="text-center text-sm font-semibold text-amber-700">{row.promo_qty}</span>
@@ -150,7 +150,7 @@ function POSResumenModal({ shiftId, onClose }) {
                         {/* Sub-total del tamaño */}
                         {hasRegular && hasPromo && (
                           <div className="grid items-center px-4 py-1.5 border-b border-gray-200 bg-gray-50"
-                            style={{ gridTemplateColumns: COL }}>
+                            style={{ gridTemplateColumns: COL, minWidth: '600px' }}>
                             <span className="text-xs font-semibold text-gray-600 pl-3">Subtotal {row.product_name}</span>
                             <span />
                             <span className="text-center text-sm font-bold text-gray-700">{row.sales_qty}</span>
@@ -170,7 +170,7 @@ function POSResumenModal({ shiftId, onClose }) {
                   </div>
                   {toppings.filter(t => t.sales_qty > 0).map(row => (
                     <div key={row.product_name} className="grid items-center px-4 py-3 border-b border-gray-50"
-                      style={{ gridTemplateColumns: COL }}>
+                      style={{ gridTemplateColumns: COL, minWidth: '600px' }}>
                       <p className="text-sm font-medium text-gray-800">{row.product_name}</p>
                       <span className="text-center text-sm text-gray-500">{fmt(row.unit_price)}</span>
                       <span className="text-center text-sm font-semibold text-gray-700">{row.sales_qty}</span>
@@ -181,7 +181,7 @@ function POSResumenModal({ shiftId, onClose }) {
               )}
 
               <div className="grid px-4 py-3 bg-emerald-50 border-t-2 border-emerald-200 font-bold text-emerald-800"
-                style={{ gridTemplateColumns: COL }}>
+                style={{ gridTemplateColumns: COL, minWidth: '600px' }}>
                 <span className="text-sm">TOTAL LIQUIDACIÓN POS</span>
                 <span /><span />
                 <span className="text-center text-base">{fmt(totalLiq)}</span>
@@ -520,7 +520,7 @@ function ArqueoModal({ shiftId, onClose, onSaved }) {
 
               {/* Headers */}
               <div className="grid text-[10px] font-semibold text-gray-400 uppercase tracking-widest px-4 py-2 bg-gray-50 border-b border-gray-100"
-                style={{ gridTemplateColumns: '2fr 80px 80px 80px 80px 80px 110px' }}>
+                style={{ gridTemplateColumns: '2fr 80px 80px 80px 80px 80px 110px', minWidth: '850px' }}>
                 <span>Producto</span>
                 <span className="text-center">Anterior</span>
                 <span className="text-center">Entrada</span>
@@ -542,7 +542,7 @@ function ArqueoModal({ shiftId, onClose, onSaved }) {
                     const sold  = getSold(row)
                     return (
                       <div key={idx} className="grid items-center px-4 py-2.5 border-b border-gray-50 hover:bg-gray-50"
-                        style={{ gridTemplateColumns: '2fr 80px 80px 80px 80px 80px 110px' }}>
+                        style={{ gridTemplateColumns: '2fr 80px 80px 80px 80px 80px 110px', minWidth: '850px' }}>
                         <div>
                           <p className="text-sm font-medium text-gray-800">{row.product_name}</p>
                           {row.unit_price > 0 && <p className="text-[11px] text-gray-400">{fmt(row.unit_price)} c/u regular</p>}
@@ -578,7 +578,7 @@ function ArqueoModal({ shiftId, onClose, onSaved }) {
                     )
                   })}
                   <div className="grid px-4 py-2 bg-blue-50 border-b border-blue-100 text-sm font-semibold text-blue-700"
-                    style={{ gridTemplateColumns: '2fr 80px 80px 80px 80px 80px 110px' }}>
+                    style={{ gridTemplateColumns: '2fr 80px 80px 80px 80px 80px 110px', minWidth: '850px' }}>
                     <span>Total vasos vendidos</span>
                     <span /><span /><span /><span />
                     <span className="text-center text-base">{totalByType('cup')}</span>
@@ -601,7 +601,7 @@ function ArqueoModal({ shiftId, onClose, onSaved }) {
                     const sold  = getSold(row)
                     return (
                       <div key={idx} className="grid items-center px-4 py-2.5 border-b border-gray-50 hover:bg-gray-50"
-                        style={{ gridTemplateColumns: '2fr 80px 80px 80px 80px 80px 110px' }}>
+                        style={{ gridTemplateColumns: '2fr 80px 80px 80px 80px 80px 110px', minWidth: '850px' }}>
                         <p className="text-sm font-medium text-gray-800">{row.product_name}</p>
                         <input type="number" min="0" value={row.opening_stock}
                           onChange={e => updateRow(realIdx, 'opening_stock', e.target.value)}
@@ -638,7 +638,7 @@ function ArqueoModal({ shiftId, onClose, onSaved }) {
                 const totalLiq = rows.reduce((s, r) => s + (r.sales_revenue || 0), 0)
                 return totalLiq > 0 ? (
                   <div className="grid px-4 py-3 bg-emerald-50 border-t-2 border-emerald-200 text-sm font-bold text-emerald-800"
-                    style={{ gridTemplateColumns: '2fr 80px 80px 80px 80px 80px 110px' }}>
+                    style={{ gridTemplateColumns: '2fr 80px 80px 80px 80px 80px 110px', minWidth: '850px' }}>
                     <span>TOTAL LIQUIDACIÓN JORNADA</span>
                     <span /><span /><span /><span /><span />
                     <span className="text-center text-base">{fmt(totalLiq)}</span>
@@ -846,7 +846,7 @@ function ViewArqueoModal({ arqueoId, shiftId, onClose }) {
               </div>
               {/* Headers */}
               <div className="grid text-[10px] font-semibold text-gray-400 uppercase tracking-widest px-4 py-2 bg-gray-50 border-b border-gray-100"
-                style={{ gridTemplateColumns: COL }}>
+                style={{ gridTemplateColumns: COL, minWidth: '600px' }}>
                 <span>Producto</span>
                 <span className="text-center">Anterior</span>
                 <span className="text-center">Entrada</span>
@@ -866,7 +866,7 @@ function ViewArqueoModal({ arqueoId, shiftId, onClose }) {
                     const p = prefillMap[row.product_name] || {}
                     return (
                       <div key={row.id} className="grid items-center px-4 py-2.5 border-b border-gray-50"
-                        style={{ gridTemplateColumns: COL }}>
+                        style={{ gridTemplateColumns: COL, minWidth: '600px' }}>
                         <div>
                           <p className="text-sm font-medium text-gray-800">{row.product_name}</p>
                           {row.unit_price > 0 && <p className="text-[11px] text-gray-400">{fmt(row.unit_price)} c/u</p>}
@@ -888,7 +888,7 @@ function ViewArqueoModal({ arqueoId, shiftId, onClose }) {
                     )
                   })}
                   <div className="grid px-4 py-2 bg-blue-50 border-b border-blue-100 text-sm font-semibold text-blue-700"
-                    style={{ gridTemplateColumns: COL }}>
+                    style={{ gridTemplateColumns: COL, minWidth: '600px' }}>
                     <span>Total vasos vendidos</span>
                     <span /><span /><span /><span />
                     <span className="text-center">{cups.reduce((s, r) => s + r.sold, 0)}</span>
@@ -907,7 +907,7 @@ function ViewArqueoModal({ arqueoId, shiftId, onClose }) {
                     const p = prefillMap[row.product_name] || {}
                     return (
                       <div key={row.id} className="grid items-center px-4 py-2.5 border-b border-gray-50"
-                        style={{ gridTemplateColumns: COL }}>
+                        style={{ gridTemplateColumns: COL, minWidth: '600px' }}>
                         <p className="text-sm font-medium text-gray-800">{row.product_name}</p>
                         <span className="text-center text-sm text-gray-700">{row.opening_stock}</span>
                         <span className="text-center text-sm text-gray-700">{row.entries}</span>
@@ -931,7 +931,7 @@ function ViewArqueoModal({ arqueoId, shiftId, onClose }) {
               {/* Total general */}
               {totalLiq > 0 && (
                 <div className="grid px-4 py-3 bg-emerald-50 border-t-2 border-emerald-200 text-sm font-bold text-emerald-800"
-                  style={{ gridTemplateColumns: COL }}>
+                  style={{ gridTemplateColumns: COL, minWidth: '600px' }}>
                   <span>TOTAL LIQUIDACIÓN JORNADA</span>
                   <span /><span /><span /><span /><span />
                   <span className="text-center text-base">{fmt(totalLiq)}</span>
@@ -1182,7 +1182,7 @@ function ShiftDetail({ shift, onBack, onShiftUpdate }) {
             {/* Header tabla — mismo estilo que Billing */}
             {detail.sales.length > 0 && (
               <div className="grid px-5 py-3 bg-slate-50 border-b border-gray-100 text-[10px] font-semibold text-gray-400 uppercase tracking-widest gap-3"
-                style={{ gridTemplateColumns: '40px 130px 60px minmax(0,1fr) 100px 90px 90px 24px' }}>
+                style={{ gridTemplateColumns: '40px 130px 60px minmax(0,1fr) 100px 90px 90px 24px', minWidth: '900px' }}>
                 {['#', 'Factura', 'Hora', 'Vendedora', 'Total', 'Canal', 'Pago', ''].map(h => <span key={h}>{h}</span>)}
               </div>
             )}
@@ -1200,7 +1200,7 @@ function ShiftDetail({ shift, onBack, onShiftUpdate }) {
                           type="button"
                           onClick={() => setExpandedSale(isOpen ? null : s.id)}
                           className="w-full grid px-5 py-3.5 items-center gap-3 hover:bg-slate-50 text-left transition-colors"
-                          style={{ gridTemplateColumns: '40px 130px 60px minmax(0,1fr) 100px 90px 90px 24px' }}
+                          style={{ gridTemplateColumns: '40px 130px 60px minmax(0,1fr) 100px 90px 90px 24px', minWidth: '900px' }}
                         >
                           <span className="text-sm font-semibold text-gray-500">#{saleNum}</span>
                           <span className="font-mono font-semibold text-brand-navy text-sm">
@@ -1345,7 +1345,7 @@ function ShiftDetail({ shift, onBack, onShiftUpdate }) {
 
               {/* Header — mismo estilo que Expenses.jsx */}
               <div className="grid px-5 py-2.5 bg-slate-50 border-b border-gray-100 text-[10px] font-semibold text-gray-400 uppercase tracking-widest gap-3"
-                style={{ gridTemplateColumns: '60px 130px 80px minmax(0,1fr) 90px 90px 80px' }}>
+                style={{ gridTemplateColumns: '60px 130px 80px minmax(0,1fr) 90px 90px 80px', minWidth: '900px' }}>
                 {['Hora', 'Categoría', 'Canal', 'Descripción', 'Caja', 'Método', 'Monto'].map(h => (
                   <span key={h}>{h}</span>
                 ))}
@@ -1367,7 +1367,7 @@ function ShiftDetail({ shift, onBack, onShiftUpdate }) {
                   return (
                     <div key={e.id}
                       className="grid px-5 py-3 items-center gap-3 hover:bg-slate-50 transition-colors"
-                      style={{ gridTemplateColumns: '60px 130px 80px minmax(0,1fr) 90px 90px 80px' }}>
+                      style={{ gridTemplateColumns: '60px 130px 80px minmax(0,1fr) 90px 90px 80px', minWidth: '900px' }}>
                       <span className="text-sm tabular-nums text-gray-500">{fmtHr(e.created_at)}</span>
                       <span className={`text-xs font-medium px-2 py-0.5 rounded-full w-fit ${CAT_BADGE[e.category] ?? 'bg-gray-100 text-gray-600'}`}>
                         {CAT_LABEL[e.category] ?? e.category}
@@ -1506,7 +1506,7 @@ export default function Shifts() {
         </div>
         {/* Header */}
         <div className="grid px-5 py-2 bg-gray-50 border-b border-gray-100 text-[10px] font-semibold text-gray-400 uppercase tracking-widest"
-          style={{ gridTemplateColumns: '60px minmax(0,1fr) minmax(0,1fr) 90px 90px' }}>
+          style={{ gridTemplateColumns: '60px minmax(0,1fr) minmax(0,1fr) 90px 90px', minWidth: '650px' }}>
           <span>#</span>
           <span>Apertura</span>
           <span>Cierre</span>
@@ -1519,7 +1519,7 @@ export default function Shifts() {
               key={s.id}
               onClick={() => setSelected(s)}
               className="grid px-5 py-3.5 items-center cursor-pointer hover:bg-gray-50 transition-colors"
-              style={{ gridTemplateColumns: '60px minmax(0,1fr) minmax(0,1fr) 90px 90px' }}
+              style={{ gridTemplateColumns: '60px minmax(0,1fr) minmax(0,1fr) 90px 90px', minWidth: '650px' }}
             >
               <span className="text-sm font-semibold text-gray-700">#{s.id}</span>
               <span className="text-sm text-gray-600">{fmtDt(s.opened_at)}</span>
