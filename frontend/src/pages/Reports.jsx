@@ -414,7 +414,7 @@ export default function Reports() {
           <div className="grid lg:grid-cols-2 gap-5">
 
             {/* Domicilios */}
-            <div className="card p-0 overflow-hidden">
+            <div className="card p-0 overflow-hidden overflow-x-auto">
               <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
                 <h2>Domicilios</h2>
                 <span className="text-sm font-bold text-brand-cyan">{fmt(data.deliveries.revenue)}</span>
@@ -434,7 +434,7 @@ export default function Reports() {
             </div>
 
             {/* Gastos por categoría */}
-            <div className="card p-0 overflow-hidden">
+            <div className="card p-0 overflow-hidden overflow-x-auto">
               <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
                 <h2>Gastos</h2>
                 <span className="text-sm font-bold text-red-500">{fmt(data.total_expenses)}</span>

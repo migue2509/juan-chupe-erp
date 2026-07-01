@@ -9,6 +9,7 @@ export default function Layout() {
   const { user, logout } = useAuth()
   const navigate = useNavigate()
   const isOperative = user?.role === 'operative'
+  const [sidebarOpen, setSidebarOpen] = useState(false)
 
   const [activeShift, setActiveShift] = useState(null)
   const [checkingShift, setCheckingShift] = useState(isOperative)
@@ -69,10 +70,10 @@ export default function Layout() {
 
   return (
     <div className="flex h-screen bg-slate-50 overflow-hidden">
-      <Sidebar />
+      <Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
       <div className="flex-1 flex flex-col overflow-hidden min-w-0">
-        <Topbar />
-        <main className="flex-1 overflow-y-auto p-6">
+        <Topbar onMenuToggle={() => setSidebarOpen(o => !o)} />
+        <main className="flex-1 overflow-y-auto p-3 sm:p-4 md:p-6">
           <Outlet />
         </main>
       </div>

@@ -222,7 +222,7 @@ export default function Deliveries() {
       </div>
 
       {/* Cards estado */}
-      <div className="grid grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         {Object.entries(STATUS).map(([key, s]) => (
           <button key={key}
             onClick={() => setStatusFilter(statusFilter === key ? 'all' : key)}

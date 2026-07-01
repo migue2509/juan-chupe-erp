@@ -223,7 +223,7 @@ export default function POS() {
 
   return (
     <>
-    <div className="flex flex-col lg:flex-row gap-5 h-full max-h-full">
+    <div className="flex flex-col md:flex-row gap-4 md:gap-5 h-full max-h-full">
 
       {/* ── Left panel ── */}
       <div className="flex-1 space-y-4 overflow-y-auto min-w-0">
@@ -457,7 +457,7 @@ export default function POS() {
       </div>
 
       {/* ── Right: order panel ── */}
-      <div className="lg:w-80 flex-shrink-0">
+      <div className="md:w-72 lg:w-80 flex-shrink-0">
         <div className="card h-full flex flex-col">
           <h2 className="text-gray-900 mb-4">Resumen del Pedido</h2>
 

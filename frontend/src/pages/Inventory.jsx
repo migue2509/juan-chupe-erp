@@ -227,7 +227,7 @@ export default function Inventory() {
       <div className="flex flex-col gap-5">
 
         {/* Stock Actual */}
-        <div className="card p-0 overflow-hidden">
+        <div className="card p-0 overflow-hidden overflow-x-auto">
           <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
             <div className="flex items-center gap-2">
               <Icon name="inventory" className="w-4 h-4 text-brand-cyan" />
@@ -283,7 +283,7 @@ export default function Inventory() {
         </div>
 
         {/* Movimientos */}
-        <div className="card p-0 overflow-hidden">
+        <div className="card p-0 overflow-hidden overflow-x-auto">
           <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
             <div className="flex items-center gap-2">
               <Icon name="reports" className="w-4 h-4 text-brand-purple" />

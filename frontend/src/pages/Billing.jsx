@@ -274,7 +274,7 @@ export default function Billing() {
         )}
       </div>
 
-      <div className="card p-0 overflow-hidden">
+      <div className="card p-0 overflow-hidden overflow-x-auto">
         {/* Header */}
         <div className="grid px-5 py-3 bg-slate-50 border-b border-gray-100 text-[10px] font-semibold text-gray-400 uppercase tracking-widest gap-3"
           style={{ gridTemplateColumns: '130px 70px 70px 90px 1fr 110px 90px 90px 80px 50px' }}>

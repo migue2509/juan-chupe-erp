@@ -420,7 +420,7 @@ export default function Products() {
 
       {/* ══ BOLSAS ══ */}
       {tab === 'bags' && (
-        <div className="card p-0 overflow-hidden">
+        <div className="card p-0 overflow-hidden overflow-x-auto">
           <div className="flex items-center justify-between px-5 py-3 border-b border-gray-100">
             <input className="input py-1.5 text-sm w-52" placeholder="Buscar bolsa..."
               value={search} onChange={e => setSearch(e.target.value)} />
@@ -489,7 +489,7 @@ export default function Products() {
 
       {/* ══ VASOS ══ */}
       {tab === 'cups' && (
-        <div className="card p-0 overflow-hidden">
+        <div className="card p-0 overflow-hidden overflow-x-auto">
           <div className="flex items-center justify-between px-5 py-3 border-b border-gray-100">
             <input className="input py-1.5 text-sm w-52" placeholder="Buscar vaso..."
               value={search} onChange={e => setSearch(e.target.value)} />
@@ -546,7 +546,7 @@ export default function Products() {
 
       {/* ══ TOPPINGS ══ */}
       {tab === 'toppings' && (
-        <div className="card p-0 overflow-hidden">
+        <div className="card p-0 overflow-hidden overflow-x-auto">
           <div className="flex items-center justify-between px-5 py-3 border-b border-gray-100">
             <input className="input py-1.5 text-sm w-52" placeholder="Buscar topping..."
               value={search} onChange={e => setSearch(e.target.value)} />

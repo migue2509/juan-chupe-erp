@@ -340,7 +340,7 @@ export default function Expenses() {
       </div>
 
       {/* Tabla */}
-      <div className="card p-0 overflow-hidden">
+      <div className="card p-0 overflow-hidden overflow-x-auto">
         <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
           <h2>Historial <span className="text-sm font-normal text-gray-400">({filtered.length})</span></h2>
           <div className="flex gap-1 p-1 bg-gray-100 rounded-xl">

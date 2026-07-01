@@ -100,7 +100,7 @@ function POSResumenModal({ shiftId, onClose }) {
 
           {/* Tabla liquidación */}
           {(cups.length > 0 || toppings.length > 0) && (
-            <div className="card p-0 overflow-hidden">
+            <div className="card p-0 overflow-hidden overflow-x-auto">
               <div className="px-5 py-3 border-b border-gray-100">
                 <h3 className="text-sm font-semibold text-gray-700">Liquidación por producto</h3>
               </div>
@@ -513,7 +513,7 @@ function ArqueoModal({ shiftId, onClose, onSaved }) {
 
           {/* Tabla de inventario */}
           {rows.length > 0 && (
-            <div className="card p-0 overflow-hidden">
+            <div className="card p-0 overflow-hidden overflow-x-auto">
               <div className="px-5 py-3 border-b border-gray-100">
                 <h3 className="text-sm font-semibold text-gray-700">Inventario Físico</h3>
               </div>
@@ -840,7 +840,7 @@ function ViewArqueoModal({ arqueoId, shiftId, onClose }) {
 
           {/* Tabla inventario */}
           {audit.items?.length > 0 && (
-            <div className="card p-0 overflow-hidden">
+            <div className="card p-0 overflow-hidden overflow-x-auto">
               <div className="px-5 py-3 border-b border-gray-100">
                 <h3 className="text-sm font-semibold text-gray-700">Inventario Físico</h3>
               </div>
@@ -1169,7 +1169,7 @@ function ShiftDetail({ shift, onBack, onShiftUpdate }) {
           })()}
 
           {/* Ventas */}
-          <div className="card p-0 overflow-hidden">
+          <div className="card p-0 overflow-hidden overflow-x-auto">
             <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <h2>Ventas</h2>
@@ -1332,7 +1332,7 @@ function ShiftDetail({ shift, onBack, onShiftUpdate }) {
 
           {/* Gastos */}
           {detail.expenses.length > 0 && (
-            <div className="card p-0 overflow-hidden">
+            <div className="card p-0 overflow-hidden overflow-x-auto">
               <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   <h2>Gastos de la jornada</h2>
@@ -1500,7 +1500,7 @@ export default function Shifts() {
         </div>
       )}
 
-      <div className="card p-0 overflow-hidden">
+      <div className="card p-0 overflow-hidden overflow-x-auto">
         <div className="px-5 py-4 border-b border-gray-100">
           <h2>Historial de jornadas</h2>
         </div>

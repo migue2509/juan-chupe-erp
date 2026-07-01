@@ -30,21 +30,17 @@ const NAV_ADMIN = [
   { to: '/config-pos', label: 'Config Pagos',   icon: 'config' },
 ]
 
-export default function Sidebar() {
+export default function Sidebar({ open, onClose }) {
   const { isAdmin, user } = useAuth()
   const isSeller = user?.role === 'operative'
   const navItems = isSeller ? NAV_SELLER : NAV_OPERATIVE
 
-  return (
-    <aside className="hidden md:flex flex-col w-60 flex-shrink-0" style={{ background: '#0F1035' }}>
+  const inner = (
+    <aside className="flex flex-col w-60 flex-shrink-0 h-full" style={{ background: '#0F1035' }}>
       {/* Logo */}
       <div className="px-5 py-5 border-b border-white/8">
         <div className="flex items-center gap-3">
-          <img
-            src="/logo-neon.png"
-            alt="Juan Chupe"
-            className="w-9 h-9 object-contain flex-shrink-0"
-          />
+          <img src="/logo-neon.png" alt="Juan Chupe" className="w-9 h-9 object-contain flex-shrink-0" />
           <div>
             <p className="font-bold text-white text-sm leading-tight">Juan Chupe</p>
             <p className="text-[11px] text-slate-400 leading-tight">Granizados ERP</p>
@@ -55,12 +51,8 @@ export default function Sidebar() {
       {/* Navigation */}
       <nav className="flex-1 px-3 py-4 overflow-y-auto space-y-0.5">
         {navItems.map(({ to, label, icon }) => (
-          <NavLink
-            key={to}
-            to={to}
-            end={to === '/'}
-            className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}`}
-          >
+          <NavLink key={to} to={to} end={to === '/'} onClick={onClose}
+            className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}`}>
             <Icon name={icon} className="w-4 h-4 flex-shrink-0" />
             <span>{label}</span>
           </NavLink>
@@ -69,16 +61,11 @@ export default function Sidebar() {
         {isAdmin && (
           <>
             <div className="pt-5 pb-2 px-3">
-              <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-widest">
-                Administración
-              </p>
+              <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-widest">Administración</p>
             </div>
             {NAV_ADMIN.map(({ to, label, icon }) => (
-              <NavLink
-                key={to}
-                to={to}
-                className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}`}
-              >
+              <NavLink key={to} to={to} onClick={onClose}
+                className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}`}>
                 <Icon name={icon} className="w-4 h-4 flex-shrink-0" />
                 <span>{label}</span>
               </NavLink>
@@ -87,10 +74,24 @@ export default function Sidebar() {
         )}
       </nav>
 
-      {/* Version footer */}
       <div className="px-5 py-4 border-t border-white/8">
         <p className="text-[10px] text-slate-500">OPIA SYSTEMS · v1.0</p>
       </div>
     </aside>
+  )
+
+  return (
+    <>
+      {/* Desktop sidebar */}
+      <div className="hidden md:flex h-full">{inner}</div>
+
+      {/* Mobile overlay */}
+      {open && (
+        <div className="md:hidden fixed inset-0 z-50 flex">
+          <div className="absolute inset-0 bg-black/50" onClick={onClose} />
+          <div className="relative z-10 h-full">{inner}</div>
+        </div>
+      )}
+    </>
   )
 }
