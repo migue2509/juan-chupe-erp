@@ -55,6 +55,7 @@ export default function POS() {
   const [submitting,        setSubmitting]        = useState(false)
   const [transferMethods,   setTransferMethods]   = useState([])
   const [qrZoom,            setQrZoom]            = useState(null) // { url, name }
+  const [cartOpen,          setCartOpen]          = useState(false)
 
   useEffect(() => {
     const get = async (fn, set, label) => {
@@ -195,6 +196,7 @@ export default function POS() {
       })
 
       toast.success('Venta registrada')
+      setCartOpen(false)
       setItems([])
       setCurrent(emptyItem())
       setPromoConfig(null)
@@ -457,9 +459,26 @@ export default function POS() {
       </div>
 
       {/* ── Right: order panel ── */}
-      <div className="md:w-72 lg:w-80 flex-shrink-0">
-        <div className="card h-full flex flex-col">
-          <h2 className="text-gray-900 mb-4">Resumen del Pedido</h2>
+
+      {/* Backdrop móvil */}
+      {cartOpen && (
+        <div className="fixed inset-0 bg-black/40 z-40 md:hidden" onClick={() => setCartOpen(false)} />
+      )}
+
+      <div className={`md:w-72 lg:w-80 md:flex-shrink-0 md:relative md:translate-y-0
+        fixed inset-x-0 bottom-0 z-50 md:z-auto transition-transform duration-300 ease-in-out
+        ${cartOpen ? 'translate-y-0' : 'translate-y-full md:translate-y-0'}`}>
+        <div className="card md:h-full flex flex-col max-h-[88vh] md:max-h-full overflow-y-auto rounded-b-none md:rounded-2xl">
+
+          {/* Handle — solo móvil */}
+          <div className="md:hidden flex items-center justify-between mb-3">
+            <h2 className="text-gray-900">Carrito</h2>
+            <button onClick={() => setCartOpen(false)}
+              className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-100 text-gray-400">
+              <Icon name="x" className="w-4 h-4" />
+            </button>
+          </div>
+          <h2 className="hidden md:block text-gray-900 mb-4">Resumen del Pedido</h2>
 
           {/* Items list */}
           <div className="flex-1 overflow-y-auto space-y-1.5 min-h-0 mb-4">
@@ -709,6 +728,18 @@ export default function POS() {
         </div>
       </div>
     </div>
+
+      {/* Botón flotante carrito — solo móvil */}
+      <button
+        onClick={() => setCartOpen(true)}
+        className={`md:hidden fixed bottom-5 right-4 z-40 flex items-center gap-2 px-4 py-3 rounded-full shadow-lg text-white font-semibold text-sm transition-all duration-300 ${
+          cartOpen ? 'opacity-0 pointer-events-none' : 'opacity-100'
+        }`}
+        style={{ background: 'linear-gradient(135deg, #FF0099, #7B2FFF)' }}>
+        <Icon name="cup" className="w-4 h-4" />
+        <span>{items.length} ítem{items.length !== 1 ? 's' : ''}</span>
+        <span className="font-bold">{fmt(orderTotal)}</span>
+      </button>
 
       {/* Modal QR fullscreen */}
       {qrZoom && (
