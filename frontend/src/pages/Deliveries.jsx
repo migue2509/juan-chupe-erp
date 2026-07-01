@@ -595,4 +595,32 @@ export default function Deliveries() {
                   onChange={e => setEditForm(f => ({ ...f, four_digits: e.target.value }))} />
               </div>
               <div>
-                <label cl
+                <label className="label">Domiciliario</label>
+                <select className="input" value={editForm.delivery_person}
+                  onChange={e => setEditForm(f => ({ ...f, delivery_person: e.target.value }))}>
+                  <option value="">Sin asignar</option>
+                  {activeDomiciliarios.map(p => (
+                    <option key={p.id} value={p.id}>{p.name}</option>
+                  ))}
+                  {editForm.delivery_person && !activeDomiciliarios.find(p => p.id === Number(editForm.delivery_person)) && (() => {
+                    const inactivo = domiciliarios.find(p => p.id === Number(editForm.delivery_person))
+                    return inactivo ? <option key={inactivo.id} value={inactivo.id}>{inactivo.name} (inactivo)</option> : null
+                  })()}
+                </select>
+              </div>
+              <div>
+                <label className="label">Notas</label>
+                <input className="input" value={editForm.notes}
+                  onChange={e => setEditForm(f => ({ ...f, notes: e.target.value }))} />
+              </div>
+            </div>
+            <div className="flex justify-end gap-3 px-6 py-4 border-t border-gray-100">
+              <button onClick={() => setEditing(null)} className="btn-secondary text-sm">Cancelar</button>
+              <button onClick={saveEdit} className="btn-primary text-sm">Guardar</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}

@@ -586,4 +586,34 @@ export default function Dashboard() {
                       <p className="text-sm font-medium text-gray-800 truncate">{e.description}</p>
                       <p className="text-xs text-gray-400 mt-0.5">{e.category_label || e.category}</p>
                     </div>
-                    <span className="text-sm font-semibold text-red-500 
+                    <span className="text-sm font-semibold text-red-500 tabular-nums flex-shrink-0">
+                      -{fmt(e.amount)}
+                    </span>
+                  </div>
+                ))
+              )}
+            </div>
+            {filteredExpenses.length > 0 && (
+              <div className="border-t border-gray-100 bg-slate-50 divide-y divide-gray-100">
+                <div className="flex items-center justify-between px-5 py-2">
+                  <span className="text-xs text-gray-400">Afecta caja</span>
+                  <span className="text-xs font-semibold text-orange-500 tabular-nums">-{fmt(gastosAfectaCaja)}</span>
+                </div>
+                <div className="flex items-center justify-between px-5 py-2">
+                  <span className="text-xs text-gray-400">No afecta caja</span>
+                  <span className="text-xs font-semibold text-gray-400 tabular-nums">-{fmt(gastosNoAfectaCaja)}</span>
+                </div>
+                <div className="flex items-center justify-between px-5 py-2.5">
+                  <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Total</span>
+                  <span className="text-sm font-bold text-red-500 tabular-nums">-{fmt(gastosTotalAll)}</span>
+                </div>
+              </div>
+            )}
+          </div>
+
+        </div>
+
+      </div>
+    </div>
+  )
+}

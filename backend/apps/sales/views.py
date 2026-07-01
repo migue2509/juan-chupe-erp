@@ -347,4 +347,20 @@ class SaleViewSet(viewsets.ReadOnlyModelViewSet):
         # Incluir todas las ventas (incluyendo anuladas) para mostrar estado en dashboard
         sales = Sale.objects.filter(shift=shift).select_related('invoice', 'delivery__delivery_person')
         # Solo contar en el total las no anuladas
-        active_sales = [s for s in sales if not self._is_vo
+        active_sales = [s for s in sales if not self._is_voided(s)]
+        total = sum(
+            (s.courtesy_paid if s.is_courtesy else s.total)
+            for s in active_sales
+        )
+        return Response({
+            'sales': SaleSerializer(sales, many=True).data,
+            'total': float(total),
+            'count': len(active_sales)
+        })
+
+    @staticmethod
+    def _is_voided(sale):
+        try:
+            return sale.invoice.voided
+        except Exception:
+            return False

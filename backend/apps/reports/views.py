@@ -275,3 +275,6 @@ class RangeReportView(APIView):
             'deliveries':     delivery_stats,
             'payment_pct': {
                 'cash':     round(total_cash     / total_money * 100) if total_money else 0,
+                'transfer': round(total_transfer / total_money * 100) if total_money else 0,
+            },
+        })

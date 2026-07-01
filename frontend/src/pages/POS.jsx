@@ -708,3 +708,13 @@ export default function POS() {
           >
             <p className="font-bold text-gray-800 text-lg">{qrZoom.name}</p>
             <img src={qrZoom.url} alt={qrZoom.name} className="w-full object-contain rounded-xl" />
+            <p className="text-xs text-gray-400">Apunta la cámara al código para transferir</p>
+            <button onClick={() => setQrZoom(null)} className="btn-ghost w-full justify-center">
+              Cerrar
+            </button>
+          </div>
+        </div>
+      )}
+    </>
+  )
+}

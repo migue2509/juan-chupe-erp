@@ -66,6 +66,9 @@ export default function Billing() {
         setShifts((x(s)).sort((a, b) => b.id - a.id))
         setPromotions(x(p))
       }).catch(() => {})
+    const onFocus = () => load()
+    window.addEventListener('focus', onFocus)
+    return () => window.removeEventListener('focus', onFocus)
   }, [])
 
   const openDetail = (inv) => {

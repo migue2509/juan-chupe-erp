@@ -28,4 +28,10 @@ class ExpenseViewSet(viewsets.ModelViewSet):
             try:
                 shift = Shift.objects.get(id=shift_id)
             except Shift.DoesNotExist:
-                
+                return Response([], status=200)
+        else:
+            shift = Shift.get_active()
+        if not shift:
+            return Response([], status=200)
+        expenses = Expense.objects.filter(shift=shift).select_related('registered_by')
+        return Response(ExpenseSerializer(expenses, many=True).data)
