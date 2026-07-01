@@ -1182,7 +1182,7 @@ function ShiftDetail({ shift, onBack, onShiftUpdate }) {
             {/* Header tabla — mismo estilo que Billing */}
             {detail.sales.length > 0 && (
               <div className="grid px-5 py-3 bg-slate-50 border-b border-gray-100 text-[10px] font-semibold text-gray-400 uppercase tracking-widest gap-3"
-                style={{ gridTemplateColumns: '40px 130px 60px minmax(0,1fr) 100px 90px 90px 24px' }}>
+                style={{ gridTemplateColumns: '40px 130px 60px 1fr 100px 90px 90px 24px' }}>
                 {['#', 'Factura', 'Hora', 'Vendedora', 'Total', 'Canal', 'Pago', ''].map(h => <span key={h}>{h}</span>)}
               </div>
             )}
@@ -1200,14 +1200,14 @@ function ShiftDetail({ shift, onBack, onShiftUpdate }) {
                           type="button"
                           onClick={() => setExpandedSale(isOpen ? null : s.id)}
                           className="w-full grid px-5 py-3.5 items-center gap-3 hover:bg-slate-50 text-left transition-colors"
-                          style={{ gridTemplateColumns: '40px 130px 60px minmax(0,1fr) 100px 90px 90px 24px' }}
+                          style={{ gridTemplateColumns: '40px 130px 60px 1fr 100px 90px 90px 24px' }}
                         >
                           <span className="text-sm font-semibold text-gray-500">#{saleNum}</span>
                           <span className="font-mono font-semibold text-brand-navy text-sm">
                             {s.invoice_number || '—'}
                           </span>
                           <span className="text-sm tabular-nums text-gray-500">{fmtHr(s.created_at)}</span>
-                          <span className="text-sm text-gray-700">{s.seller}</span>
+                          <span className="text-sm text-gray-700 truncate">{s.seller}</span>
                           <span className="text-sm font-bold text-brand-pink tabular-nums">{fmt(s.total)}</span>
                           <span className={`badge text-xs w-fit ${
                             s.is_courtesy ? 'bg-pink-100 text-pink-600' :
@@ -1345,7 +1345,7 @@ function ShiftDetail({ shift, onBack, onShiftUpdate }) {
 
               {/* Header — mismo estilo que Expenses.jsx */}
               <div className="grid px-5 py-2.5 bg-slate-50 border-b border-gray-100 text-[10px] font-semibold text-gray-400 uppercase tracking-widest gap-3"
-                style={{ gridTemplateColumns: '60px 130px 80px minmax(0,1fr) 90px 90px 80px' }}>
+                style={{ gridTemplateColumns: '60px 130px 80px 1fr 90px 90px 80px' }}>
                 {['Hora', 'Categoría', 'Canal', 'Descripción', 'Caja', 'Método', 'Monto'].map(h => (
                   <span key={h}>{h}</span>
                 ))}
@@ -1367,7 +1367,7 @@ function ShiftDetail({ shift, onBack, onShiftUpdate }) {
                   return (
                     <div key={e.id}
                       className="grid px-5 py-3 items-center gap-3 hover:bg-slate-50 transition-colors"
-                      style={{ gridTemplateColumns: '60px 130px 80px minmax(0,1fr) 90px 90px 80px' }}>
+                      style={{ gridTemplateColumns: '60px 130px 80px 1fr 90px 90px 80px' }}>
                       <span className="text-sm tabular-nums text-gray-500">{fmtHr(e.created_at)}</span>
                       <span className={`text-xs font-medium px-2 py-0.5 rounded-full w-fit ${CAT_BADGE[e.category] ?? 'bg-gray-100 text-gray-600'}`}>
                         {CAT_LABEL[e.category] ?? e.category}
@@ -1376,7 +1376,7 @@ function ShiftDetail({ shift, onBack, onShiftUpdate }) {
                         {e.origin === 'delivery' ? 'Domicilios' : 'POS'}
                       </span>
                       <div>
-                        <p className="text-sm font-medium text-gray-800">{e.description}</p>
+                        <p className="text-sm font-medium text-gray-800 truncate">{e.description}</p>
                       </div>
                       <span className={`text-xs font-semibold px-2 py-0.5 rounded-full w-fit ${e.from_daily_cash ? 'bg-green-50 text-green-700' : 'bg-gray-100 text-gray-400'}`}>
                         {e.from_daily_cash ? 'Sí' : 'No'}
@@ -1506,7 +1506,7 @@ export default function Shifts() {
         </div>
         {/* Header */}
         <div className="grid px-5 py-2 bg-gray-50 border-b border-gray-100 text-[10px] font-semibold text-gray-400 uppercase tracking-widest"
-          style={{ gridTemplateColumns: '60px minmax(0,1fr) minmax(0,1fr) 90px 90px' }}>
+          style={{ gridTemplateColumns: '60px 1fr 1fr 90px 90px' }}>
           <span>#</span>
           <span>Apertura</span>
           <span>Cierre</span>
@@ -1519,7 +1519,7 @@ export default function Shifts() {
               key={s.id}
               onClick={() => setSelected(s)}
               className="grid px-5 py-3.5 items-center cursor-pointer hover:bg-gray-50 transition-colors"
-              style={{ gridTemplateColumns: '60px minmax(0,1fr) minmax(0,1fr) 90px 90px' }}
+              style={{ gridTemplateColumns: '60px 1fr 1fr 90px 90px' }}
             >
               <span className="text-sm font-semibold text-gray-700">#{s.id}</span>
               <span className="text-sm text-gray-600">{fmtDt(s.opened_at)}</span>

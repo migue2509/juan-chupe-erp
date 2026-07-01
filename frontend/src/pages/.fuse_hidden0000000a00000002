@@ -277,7 +277,7 @@ export default function Billing() {
       <div className="card p-0 overflow-hidden overflow-x-auto">
         {/* Header */}
         <div className="grid px-5 py-3 bg-slate-50 border-b border-gray-100 text-[10px] font-semibold text-gray-400 uppercase tracking-widest gap-3"
-          style={{ gridTemplateColumns: '130px 70px 70px 90px minmax(0,1fr) 110px 90px 90px 80px 50px', minWidth: '1200px' }}>
+          style={{ gridTemplateColumns: '130px 70px 70px 90px minmax(0,1fr) 110px 90px 90px 80px 50px' }}>
           {['Número', 'Hora', 'Fecha', 'Jornada', 'Vendedora', 'Total', 'Canal', 'Pago', 'Estado', ''].map(h => <span key={h}>{h}</span>)}
         </div>
 
@@ -291,11 +291,11 @@ export default function Billing() {
             <div key={inv.id}
               onClick={() => openDetail(inv)}
               className="grid px-5 py-3.5 items-center gap-3 hover:bg-slate-50 transition-colors cursor-pointer"
-              style={{ gridTemplateColumns: '130px 70px 70px 90px minmax(0,1fr) 110px 90px 90px 80px 50px', minWidth: '1200px' }}>
+              style={{ gridTemplateColumns: '130px 70px 70px 90px minmax(0,1fr) 110px 90px 90px 80px 50px' }}>
               <span className="font-mono font-semibold text-brand-navy text-sm">{inv.invoice_number}</span>
               <span className="text-sm tabular-nums text-gray-500">{fmtTime(inv.created_at)}</span>
               <span className="text-sm tabular-nums text-gray-400">{fmtDate(inv.created_at)}</span>
-              <span className="text-xs font-medium text-brand-navy bg-blue-50 px-2 py-0.5 rounded-full">{inv.shift_label}</span>
+              <span className="text-xs font-medium text-brand-navy bg-blue-50 px-2 py-0.5 rounded-full truncate">{inv.shift_label}</span>
               <span className="text-sm text-gray-700">{inv.sale_detail?.seller_name || '—'}</span>
               <span className="tabular-nums">
                 <span className="text-sm font-bold text-brand-pink">

@@ -245,7 +245,7 @@ export default function Inventory() {
 
           {/* Tabla */}
           <div className="grid px-5 py-2.5 bg-slate-50 border-b border-gray-100 text-[10px] font-semibold text-gray-400 uppercase tracking-widest gap-3"
-            style={{ gridTemplateColumns: 'minmax(0,1fr) 110px 80px 90px 36px', minWidth: '700px' }}>
+            style={{ gridTemplateColumns: '1fr 110px 80px 90px 36px' }}>
             {['Insumo', 'Actual', 'Mínimo', 'Estado', ''].map(h => <span key={h}>{h}</span>)}
           </div>
 
@@ -255,7 +255,7 @@ export default function Inventory() {
             ) : filteredStock.map(item => (
               <div key={`${item.type}-${item.id}`}
                 className="grid px-5 py-3 items-center gap-3 hover:bg-slate-50 transition-colors"
-                style={{ gridTemplateColumns: 'minmax(0,1fr) 110px 80px 90px 36px', minWidth: '700px' }}>
+                style={{ gridTemplateColumns: '1fr 110px 80px 90px 36px' }}>
                 <span className="text-sm font-medium text-gray-800">{item.name}</span>
                 <div className="flex items-center gap-1.5">
                   <span className="text-sm tabular-nums text-gray-700">{item.current.toLocaleString('es-CO')}</span>
@@ -318,7 +318,7 @@ export default function Inventory() {
           </div>
 
           <div className="grid px-5 py-2.5 bg-slate-50 border-b border-gray-100 text-[10px] font-semibold text-gray-400 uppercase tracking-widest gap-3"
-            style={{ gridTemplateColumns: '110px 80px minmax(0,1fr) 80px 90px 100px', minWidth: '800px' }}>
+            style={{ gridTemplateColumns: '110px 80px 1fr 80px 90px 100px' }}>
             {['Fecha', 'Tipo', 'Insumo', 'Cant.', 'Factura', 'Valor'].map(h => <span key={h}>{h}</span>)}
           </div>
 
@@ -335,10 +335,10 @@ export default function Inventory() {
               const isNeg = ['out','sale'].includes(m.movement_type)
               return (
                 <div key={m.id} className="grid px-5 py-3 items-center gap-3 hover:bg-slate-50 transition-colors"
-                  style={{ gridTemplateColumns: '110px 80px minmax(0,1fr) 80px 90px 100px', minWidth: '800px' }}>
+                  style={{ gridTemplateColumns: '110px 80px 1fr 80px 90px 100px' }}>
                   <span className="text-xs text-gray-500 tabular-nums">{fmtDate(m.created_at)}</span>
                   <span className={`text-xs font-medium px-2 py-0.5 rounded-full w-fit ${mv.cls}`}>{mv.label}</span>
-                  <span className="text-sm font-medium text-gray-800">{m.item_name}</span>
+                  <span className="text-sm font-medium text-gray-800 truncate">{m.item_name}</span>
                   <span className={`text-sm font-semibold tabular-nums ${isNeg ? 'text-red-500' : 'text-green-600'}`}>
                     {qty}
                   </span>

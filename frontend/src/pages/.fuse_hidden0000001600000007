@@ -356,7 +356,7 @@ export default function Expenses() {
         </div>
 
         <div className="overflow-x-auto">
-        <div style={{ minWidth: '1350px' }}>
+        <div style={{ minWidth: '1100px' }}>
         {/* Table header */}
         <div className="grid px-5 py-2.5 bg-slate-50 border-b border-gray-100 text-[10px] font-semibold text-gray-400 uppercase tracking-widest gap-3"
           style={{ gridTemplateColumns: '60px 80px 90px 130px 80px minmax(0,1fr) 120px 90px 90px 80px 64px' }}>
@@ -377,7 +377,7 @@ export default function Expenses() {
               style={{ gridTemplateColumns: '60px 80px 90px 130px 80px minmax(0,1fr) 120px 90px 90px 80px 64px' }}>
               <span className="text-sm tabular-nums text-gray-500">{fmtTime(e.created_at)}</span>
               <span className="text-sm tabular-nums text-gray-500">{fmtDate(e.created_at)}</span>
-              <span className="text-xs font-medium text-brand-navy bg-blue-50 px-2 py-0.5 rounded-full">{e.shift_label}</span>
+              <span className="text-xs font-medium text-brand-navy bg-blue-50 px-2 py-0.5 rounded-full truncate">{e.shift_label}</span>
               <span className={`text-xs font-medium px-2 py-0.5 rounded-full w-fit ${CAT_BADGE[e.category] ?? 'bg-gray-100 text-gray-600'}`}>
                 {e.category_label}
               </span>
@@ -385,15 +385,15 @@ export default function Expenses() {
                 {e.origin_label}
               </span>
               <div>
-                <p className="text-sm font-medium text-gray-800">{e.description}</p>
-                {e.notes && <p className="text-xs text-gray-400">{e.notes}</p>}
+                <p className="text-sm font-medium text-gray-800 truncate">{e.description}</p>
+                {e.notes && <p className="text-xs text-gray-400 truncate">{e.notes}</p>}
               </div>
               <div className="flex items-center gap-2">
                 <div className="w-6 h-6 rounded-full flex-shrink-0 flex items-center justify-center text-[10px] font-bold text-white"
                   style={{ background: 'linear-gradient(135deg,#FF0099,#7B2FFF)' }}>
                   {(e.registered_by_name || '?')[0].toUpperCase()}
                 </div>
-                <span className="text-xs text-gray-700 font-medium">{e.registered_by_name}</span>
+                <span className="text-xs text-gray-700 font-medium truncate">{e.registered_by_name}</span>
               </div>
               {/* Columna Caja */}
               <span className={`text-xs font-semibold px-2 py-0.5 rounded-full w-fit ${e.from_daily_cash ? 'bg-green-50 text-green-700' : 'bg-gray-100 text-gray-400'}`}>

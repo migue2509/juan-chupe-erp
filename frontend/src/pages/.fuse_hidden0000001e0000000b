@@ -416,7 +416,7 @@ export default function Payroll() {
 
             {/* Header */}
             <div className="grid px-5 py-2.5 bg-slate-50 border-b border-gray-100 text-[10px] font-semibold text-gray-400 uppercase tracking-widest gap-4"
-              style={{ gridTemplateColumns: 'minmax(0,1fr) 80px 80px 100px 120px 100px' }}>
+              style={{ gridTemplateColumns: '1fr 80px 80px 100px 120px 100px' }}>
               {['Empleada', 'Días total', 'Esta semana', 'Pendiente días', 'Por pagar', 'Acción'].map(h =>
                 <span key={h}>{h}</span>
               )}
@@ -426,7 +426,7 @@ export default function Payroll() {
               {summary.map(emp => (
                 <div key={emp.user_id}
                   className="grid px-5 py-4 items-center gap-4"
-                  style={{ gridTemplateColumns: 'minmax(0,1fr) 80px 80px 100px 120px 100px' }}>
+                  style={{ gridTemplateColumns: '1fr 80px 80px 100px 120px 100px' }}>
                   <div>
                     <p className="text-sm font-semibold text-gray-800">{emp.user_name}</p>
                     {emp.days_unpaid > 0 && (
@@ -496,7 +496,7 @@ export default function Payroll() {
 
           {/* Header */}
           <div className="grid px-5 py-2.5 bg-slate-50 border-b border-gray-100 text-[10px] font-semibold text-gray-400 uppercase tracking-widest gap-4"
-            style={{ gridTemplateColumns: 'minmax(0,1fr) auto auto auto auto' }}>
+            style={{ gridTemplateColumns: '1fr auto auto auto auto' }}>
             <span>Empleada</span>
             <span>Días que trabaja</span>
             <span>Seguridad</span>
@@ -508,7 +508,7 @@ export default function Payroll() {
             {schedules.map(emp => (
               <div key={emp.user}
                 className="grid px-5 py-4 items-center gap-4"
-                style={{ gridTemplateColumns: 'minmax(0,1fr) auto auto auto auto' }}>
+                style={{ gridTemplateColumns: '1fr auto auto auto auto' }}>
                 <p className="text-sm font-semibold text-gray-800">{emp.user_name}</p>
                 <div className="flex gap-1">
                   {DAYS.map(({ key, label }) => (
@@ -582,7 +582,7 @@ export default function Payroll() {
           </div>
 
           <div className="grid px-5 py-2.5 bg-slate-50 border-b border-gray-100 text-[10px] font-semibold text-gray-400 uppercase tracking-widest gap-4"
-            style={{ gridTemplateColumns: '48px minmax(0,1fr) 130px 60px 100px 110px' }}>
+            style={{ gridTemplateColumns: '48px 1fr 130px 60px 100px 110px' }}>
             {['#', 'Empleada', 'Período', 'Días', 'Total', 'Fecha pago'].map(h =>
               <span key={h}>{h}</span>
             )}
@@ -597,7 +597,7 @@ export default function Payroll() {
               <div key={p.id}
                 onClick={() => setPaymentDetail(p)}
                 className="grid px-5 py-3 items-center gap-4 hover:bg-slate-50 cursor-pointer transition-colors"
-                style={{ gridTemplateColumns: '48px minmax(0,1fr) 130px 60px 100px 110px' }}>
+                style={{ gridTemplateColumns: '48px 1fr 130px 60px 100px 110px' }}>
                 <span className="text-xs font-bold text-gray-300 tabular-nums">#{p.id}</span>
                 <span className="text-sm font-medium text-gray-800">{p.user_name}</span>
                 <span className="text-xs text-gray-500 tabular-nums">

@@ -130,7 +130,7 @@ function AdminAttendance() {
             <h2>Resumen por empleada</h2>
           </div>
           <div className="grid px-5 py-2.5 bg-slate-50 border-b border-gray-100 text-[10px] font-semibold text-gray-400 uppercase tracking-widest gap-4"
-            style={{ gridTemplateColumns: 'minmax(0,1fr) 70px 70px 80px 80px 90px' }}>
+            style={{ gridTemplateColumns: '1fr 70px 70px 80px 80px 90px' }}>
             {['Empleada', 'Días', 'Entradas', 'Horas', 'Prom/día', 'Último día'].map(h => <span key={h}>{h}</span>)}
           </div>
           <div className="divide-y divide-gray-50">
@@ -138,7 +138,7 @@ function AdminAttendance() {
               const pct = metrics.total_hours > 0 ? (emp.hours / metrics.total_hours) * 100 : 0
               return (
                 <div key={emp.user_id} className="px-5 py-3 gap-4 grid items-center"
-                  style={{ gridTemplateColumns: 'minmax(0,1fr) 70px 70px 80px 80px 90px' }}>
+                  style={{ gridTemplateColumns: '1fr 70px 70px 80px 80px 90px' }}>
                   <div>
                     <p className="text-sm font-semibold text-gray-800">{emp.user_name}</p>
                     <div className="h-1.5 bg-gray-100 rounded-full mt-1.5 overflow-hidden w-32">

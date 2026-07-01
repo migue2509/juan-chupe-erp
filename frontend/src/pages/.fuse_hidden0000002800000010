@@ -166,7 +166,7 @@ export default function Users() {
       {/* Tabla */}
       <div className="card p-0 overflow-hidden">
         <div className="grid px-5 py-3 bg-slate-50 border-b border-gray-100 text-[10px] font-semibold text-gray-400 uppercase tracking-widest gap-3"
-          style={{ gridTemplateColumns: 'minmax(0,1fr) 130px 120px 80px 90px 200px' }}>
+          style={{ gridTemplateColumns: '1fr 130px 120px 80px 90px 200px' }}>
           {['Nombre', 'Username', 'Rol', 'Estado', 'Creado', 'Acciones'].map(h => <span key={h}>{h}</span>)}
         </div>
 
@@ -210,7 +210,7 @@ export default function Users() {
               ) : (
                 /* Fila normal */
                 <div className={`grid px-5 py-3.5 items-center gap-3 hover:bg-slate-50 transition-colors ${!u.is_active ? 'opacity-40' : ''}`}
-                  style={{ gridTemplateColumns: 'minmax(0,1fr) 130px 120px 80px 90px 200px' }}>
+                  style={{ gridTemplateColumns: '1fr 130px 120px 80px 90px 200px' }}>
                   <span className="font-medium text-sm text-gray-800">{u.full_name}</span>
                   <span className="text-sm text-gray-500 font-mono">@{u.username}</span>
                   <span className={`text-xs font-semibold px-2.5 py-1 rounded-full w-fit ${ROLE_BADGE[u.role] ?? 'bg-gray-100 text-gray-600'}`}>

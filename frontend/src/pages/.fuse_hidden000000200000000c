@@ -426,7 +426,7 @@ export default function Products() {
               value={search} onChange={e => setSearch(e.target.value)} />
           </div>
           <div className="grid px-5 py-3 bg-slate-50 border-b border-gray-100 text-[10px] font-semibold text-gray-400 uppercase tracking-widest gap-3"
-            style={{ gridTemplateColumns: '2.5rem minmax(0,1fr) 140px 100px minmax(0,1fr) 180px' }}>
+            style={{ gridTemplateColumns: '2.5rem 1fr 140px 100px 1fr 180px' }}>
             {['', 'Nombre', 'Categoría', 'Mín. ml', 'Fechas', 'Acciones'].map(h => <span key={h}>{h}</span>)}
           </div>
           <div className="divide-y divide-gray-50">
@@ -453,7 +453,7 @@ export default function Products() {
                   />
                 ) : (
                   <div className={`grid px-5 py-3 items-center gap-3 hover:bg-slate-50 transition-colors ${!f.is_active ? 'opacity-40' : ''}`}
-                    style={{ gridTemplateColumns: '2.5rem minmax(0,1fr) 140px 100px minmax(0,1fr) 180px' }}>
+                    style={{ gridTemplateColumns: '2.5rem 1fr 140px 100px 1fr 180px' }}>
                     <span className="text-2xl leading-none">{f.emoji || '❓'}</span>
                     <div>
                       <span className="font-medium text-sm text-gray-800">{f.name}</span>
@@ -495,7 +495,7 @@ export default function Products() {
               value={search} onChange={e => setSearch(e.target.value)} />
           </div>
           <div className="grid px-5 py-3 bg-slate-50 border-b border-gray-100 text-[10px] font-semibold text-gray-400 uppercase tracking-widest gap-3"
-            style={{ gridTemplateColumns: 'minmax(0,1fr) 100px 130px 110px minmax(0,1fr) 180px' }}>
+            style={{ gridTemplateColumns: '1fr 100px 130px 110px 1fr 180px' }}>
             {['Nombre', 'ml', 'Precio', 'Mín. uds.', 'Fechas', 'Acciones'].map(h => <span key={h}>{h}</span>)}
           </div>
           <div className="divide-y divide-gray-50">
@@ -521,7 +521,7 @@ export default function Products() {
                   />
                 ) : (
                   <div className={`grid px-5 py-3.5 items-center gap-3 hover:bg-slate-50 transition-colors ${!c.is_active ? 'opacity-40' : ''}`}
-                    style={{ gridTemplateColumns: 'minmax(0,1fr) 100px 130px 110px minmax(0,1fr) 180px' }}>
+                    style={{ gridTemplateColumns: '1fr 100px 130px 110px 1fr 180px' }}>
                     <span className="font-semibold text-sm text-gray-800">{c.size}</span>
                     <span className="text-sm text-gray-500">{Number(c.ml).toFixed(0)} ml</span>
                     <span className="text-sm font-semibold text-gray-900">{fmt(c.price)}</span>
@@ -552,7 +552,7 @@ export default function Products() {
               value={search} onChange={e => setSearch(e.target.value)} />
           </div>
           <div className="grid px-5 py-3 bg-slate-50 border-b border-gray-100 text-[10px] font-semibold text-gray-400 uppercase tracking-widest gap-3"
-            style={{ gridTemplateColumns: 'minmax(0,1fr) 90px 100px 160px minmax(0,1fr) 180px' }}>
+            style={{ gridTemplateColumns: '1fr 90px 100px 160px 1fr 180px' }}>
             {['Nombre', 'Precio', 'Mín. uds.', 'Bolsa auto', 'Fechas', 'Acciones'].map(h => <span key={h}>{h}</span>)}
           </div>
           <div className="divide-y divide-gray-50">
@@ -579,7 +579,7 @@ export default function Products() {
                   />
                 ) : (
                   <div className={`grid px-5 py-3.5 items-center gap-3 hover:bg-slate-50 transition-colors ${!t.is_active ? 'opacity-40' : ''}`}
-                    style={{ gridTemplateColumns: 'minmax(0,1fr) 90px 100px 160px minmax(0,1fr) 180px' }}>
+                    style={{ gridTemplateColumns: '1fr 90px 100px 160px 1fr 180px' }}>
                     <span className="font-semibold text-sm text-gray-800">{t.name}</span>
                     <span className="text-sm font-semibold text-brand-pink">{fmt(t.price ?? 2000)}</span>
                     <span className="text-sm text-gray-600">{t.min_stock ?? 0} uds.</span>
