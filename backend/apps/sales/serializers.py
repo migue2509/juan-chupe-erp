@@ -26,6 +26,8 @@ class SaleCreateSerializer(serializers.Serializer):
     delivery_address = serializers.CharField(required=False, allow_blank=True, default='')
     delivery_client  = serializers.CharField(required=False, allow_blank=True, default='')
     delivery_notes   = serializers.CharField(required=False, allow_blank=True, default='')
+    delivery_lat     = serializers.DecimalField(max_digits=10, decimal_places=7, required=False, allow_null=True, default=None)
+    delivery_lng     = serializers.DecimalField(max_digits=10, decimal_places=7, required=False, allow_null=True, default=None)
     is_courtesy      = serializers.BooleanField(default=False)
     courtesy_paid = serializers.DecimalField(max_digits=10, decimal_places=0, default=Decimal('0'), required=False)
     notes = serializers.CharField(required=False, allow_blank=True)

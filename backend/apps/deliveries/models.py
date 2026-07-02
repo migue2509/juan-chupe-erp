@@ -30,7 +30,9 @@ class Delivery(models.Model):
         related_name='deliveries'
     )
     four_digits = models.CharField(max_length=100, blank=True, default='', help_text='Nombre o identificador del cliente')
-    address = models.CharField(max_length=300)
+    address   = models.CharField(max_length=300)
+    latitude  = models.DecimalField(max_digits=10, decimal_places=7, null=True, blank=True)
+    longitude = models.DecimalField(max_digits=10, decimal_places=7, null=True, blank=True)
     status = models.CharField(max_length=15, choices=STATUS_CHOICES, default='pending')
     notes = models.TextField(blank=True)
     created_at = models.DateTimeField(auto_now_add=True)

@@ -198,6 +198,8 @@ class SaleViewSet(viewsets.ReadOnlyModelViewSet):
                     address=data.get('delivery_address', '').strip() or 'Sin dirección',
                     four_digits=data.get('delivery_client', '').strip(),
                     notes=data.get('delivery_notes', '').strip(),
+                    latitude=data.get('delivery_lat'),
+                    longitude=data.get('delivery_lng'),
                 )
 
         return Response(SaleSerializer(sale).data, status=status.HTTP_201_CREATED)

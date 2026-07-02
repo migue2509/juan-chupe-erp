@@ -59,6 +59,30 @@ class DeliveryViewSet(viewsets.ModelViewSet):
         if instance.status == 'cancelled' and old_status != 'cancelled':
             self._void_invoice_and_reverse_inventory(instance, self.request.user)
 
+    @action(detail=False, methods=['get'], url_path='heatmap', permission_classes=[IsAdmin])
+    def heatmap(self, request):
+        """
+        Devuelve coordenadas de todos los domicilios con ubicación para el mapa de calor.
+        Query params opcionales: date_from, date_to (YYYY-MM-DD)
+        """
+        qs = Delivery.objects.exclude(latitude__isnull=True).exclude(longitude__isnull=True)
+        date_from = request.query_params.get('date_from')
+        date_to   = request.query_params.get('date_to')
+        if date_from:
+            qs = qs.filter(created_at__date__gte=date_from)
+        if date_to:
+            qs = qs.filter(created_at__date__lte=date_to)
+
+        points = list(qs.values('id', 'latitude', 'longitude', 'address', 'status', 'four_digits', 'created_at'))
+        total_with_coords = qs.count()
+        total_deliveries  = Delivery.objects.count()
+
+        return Response({
+            'points': points,
+            'total_with_coords': total_with_coords,
+            'total_deliveries':  total_deliveries,
+        })
+
     @action(detail=True, methods=['post'], permission_classes=[IsOperative])
     def cancel(self, request, pk=None):
         delivery = self.get_object()

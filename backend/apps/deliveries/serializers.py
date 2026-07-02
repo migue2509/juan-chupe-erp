@@ -34,7 +34,7 @@ class DeliverySerializer(serializers.ModelSerializer):
         fields = [
             'id', 'sale', 'sale_detail', 'invoice_number', 'shift', 'shift_label',
             'delivery_person', 'delivery_person_name',
-            'four_digits', 'address', 'status', 'notes',
+            'four_digits', 'address', 'latitude', 'longitude', 'status', 'notes',
             'created_at', 'delivered_at',
         ]
         read_only_fields = ['id', 'created_at', 'shift']

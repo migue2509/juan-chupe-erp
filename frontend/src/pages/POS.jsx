@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { getFlavors, getCupSizes, getToppings, getActivePromotions, createSale, getTransferMethods } from '../api/index'
 import { Icon } from '../components/Icons'
 import { useAuth } from '../context/AuthContext'
+import MapPickerModal from '../components/MapPickerModal'
 import toast from 'react-hot-toast'
 
 const fmt = (n) => `$${Number(n).toLocaleString('es-CO')}`
@@ -46,6 +47,9 @@ export default function POS() {
   const [transferRef,    setTransferRef]    = useState('')
   const [isDelivery,        setIsDelivery]        = useState(false)
   const [deliveryAddress,   setDeliveryAddress]   = useState('')
+  const [deliveryLat,       setDeliveryLat]       = useState(null)
+  const [deliveryLng,       setDeliveryLng]       = useState(null)
+  const [showMapPicker,     setShowMapPicker]     = useState(false)
   const [deliveryFourDigits, setDeliveryFourDigits] = useState('')
   const [deliveryNotes,     setDeliveryNotes]     = useState('')
   const [isCourtesy,        setIsCourtesy]        = useState(false)
@@ -166,7 +170,7 @@ export default function POS() {
   // ─── Submit ───────────────────────────────────────────────────────────────
   const handleSubmit = async () => {
     if (items.length === 0) { toast.error('Agrega al menos un producto'); return }
-    if (isDelivery && !deliveryAddress.trim()) { toast.error('Ingresa la dirección del domicilio'); return }
+    if (isDelivery && !deliveryLat) { toast.error('Selecciona la ubicación del domicilio en el mapa'); return }
     setSubmitting(true)
     try {
       const promoIds = [...new Set(items.map(i => i.promoId).filter(Boolean))]
@@ -184,6 +188,8 @@ export default function POS() {
         delivery_address: isDelivery ? deliveryAddress.trim() : '',
         delivery_client:  isDelivery ? deliveryFourDigits.trim() : '',
         delivery_notes:   isDelivery ? deliveryNotes.trim() : '',
+        delivery_lat:     isDelivery ? deliveryLat : null,
+        delivery_lng:     isDelivery ? deliveryLng : null,
         is_courtesy: isCourtesy,
         courtesy_paid: courtesyAmount,
         items: items.map(i => ({
@@ -206,6 +212,8 @@ export default function POS() {
       setTransferRef('')
       setIsDelivery(false)
       setDeliveryAddress('')
+      setDeliveryLat(null)
+      setDeliveryLng(null)
       setDeliveryFourDigits('')
       setDeliveryNotes('')
       setIsCourtesy(false)
@@ -651,11 +659,36 @@ export default function POS() {
           {/* Campos domicilio */}
           {isDelivery && (
             <div className="space-y-2 p-3 bg-cyan-50 border border-cyan-100 rounded-xl">
+              {/* Selector de ubicación */}
+              <div>
+                <label className="label">Ubicación <span className="text-red-400">*</span></label>
+                {deliveryLat ? (
+                  <div className="flex items-center gap-2">
+                    <div className="flex-1 flex items-center gap-2 bg-white border border-cyan-200 rounded-xl px-3 py-2">
+                      <svg className="w-3.5 h-3.5 text-brand-pink flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/>
+                      </svg>
+                      <span className="text-sm text-gray-700 truncate flex-1">{deliveryAddress}</span>
+                    </div>
+                    <button onClick={() => setShowMapPicker(true)}
+                      className="text-xs text-cyan-600 hover:text-cyan-800 font-medium whitespace-nowrap px-2 py-1 hover:bg-cyan-100 rounded-lg transition-all">
+                      Cambiar
+                    </button>
+                  </div>
+                ) : (
+                  <button onClick={() => setShowMapPicker(true)}
+                    className="w-full flex items-center justify-center gap-2 bg-white border-2 border-dashed border-cyan-300 rounded-xl py-2.5 text-sm text-cyan-600 hover:bg-cyan-50 hover:border-cyan-400 transition-all">
+                    <Icon name="pin" className="w-4 h-4" />
+                    Seleccionar en mapa
+                  </button>
+                )}
+              </div>
+
               <div className="flex gap-2">
                 <div className="flex-1">
-                  <label className="label">Dirección <span className="text-red-400">*</span></label>
-                  <input className="input text-sm" placeholder="Calle, barrio..."
-                    value={deliveryAddress} onChange={e => setDeliveryAddress(e.target.value)} />
+                  <label className="label">Referencia / Indicaciones</label>
+                  <input className="input text-sm" placeholder="Apto, piso, color de puerta..."
+                    value={deliveryNotes} onChange={e => setDeliveryNotes(e.target.value)} />
                 </div>
                 <div className="w-28">
                   <label className="label">Cliente</label>
@@ -664,12 +697,23 @@ export default function POS() {
                     onChange={e => setDeliveryFourDigits(e.target.value)} />
                 </div>
               </div>
-              <div>
-                <label className="label">Notas del pedido</label>
-                <input className="input text-sm" placeholder="Indicaciones adicionales..."
-                  value={deliveryNotes} onChange={e => setDeliveryNotes(e.target.value)} />
-              </div>
             </div>
+          )}
+
+          {/* Modal mapa */}
+          {showMapPicker && (
+            <MapPickerModal
+              initialLat={deliveryLat}
+              initialLng={deliveryLng}
+              initialAddress={deliveryAddress}
+              onConfirm={({ lat, lng, address }) => {
+                setDeliveryLat(lat)
+                setDeliveryLng(lng)
+                setDeliveryAddress(address)
+                setShowMapPicker(false)
+              }}
+              onClose={() => setShowMapPicker(false)}
+            />
           )}
 
           {/* Cortesía toggle */}
