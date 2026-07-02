@@ -243,5 +243,5 @@ class StockMovementViewSet(viewsets.ReadOnlyModelViewSet):
         'created_by', 'sale__invoice'
     ).all()
     serializer_class = StockMovementSerializer
-    permission_classes = [IsAdmin]
+    permission_classes = [IsAdminOrReadOnly]
     filterset_fields = ['movement_type', 'shift']

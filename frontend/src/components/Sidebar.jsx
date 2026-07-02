@@ -17,6 +17,7 @@ const NAV_SELLER = [
   { to: '/billing',     label: 'Facturas',       icon: 'billing' },
   { to: '/deliveries',  label: 'Domicilios',     icon: 'deliveries' },
   { to: '/expenses',    label: 'Gastos',         icon: 'expenses' },
+  { to: '/inventory',   label: 'Inventario',     icon: 'inventory' },
 ]
 
 const NAV_ADMIN = [

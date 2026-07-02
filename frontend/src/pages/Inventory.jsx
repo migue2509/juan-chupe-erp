@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { getBags, getCupStocks, getToppingStocks, addBagStock, addCupStock, addToppingStock, adjustBagStock, adjustCupStock, adjustToppingStock, getMovements } from '../api'
 import { Icon } from '../components/Icons'
+import { useAuth } from '../context/AuthContext'
 import toast from 'react-hot-toast'
 
 const MOVEMENT_TYPE = {
@@ -28,6 +29,7 @@ function StockBar({ current, min, isCritical }) {
 }
 
 export default function Inventory() {
+  const { isAdmin } = useAuth()
   const [bags,      setBags]      = useState([])
   const [cups,      setCups]      = useState([])
   const [toppings,  setToppings]  = useState([])
@@ -236,10 +238,12 @@ export default function Inventory() {
             <div className="flex items-center gap-2">
               <input className="input py-1.5 text-xs w-36" placeholder="Buscar insumo..."
                 value={stockSearch} onChange={e => setStockSearch(e.target.value)} />
-              <button onClick={openModal} className="btn-primary py-1.5 text-xs">
-                <Icon name="plus" className="w-3.5 h-3.5" />
-                Registrar Entrada
-              </button>
+              {isAdmin && (
+                <button onClick={openModal} className="btn-primary py-1.5 text-xs">
+                  <Icon name="plus" className="w-3.5 h-3.5" />
+                  Registrar Entrada
+                </button>
+              )}
             </div>
           </div>
 
@@ -268,14 +272,16 @@ export default function Inventory() {
                     {item.isCritical ? 'Crítico' : 'OK'}
                   </span>
                 </div>
-                <button
-                  onClick={() => openAdjModal(item)}
-                  title="Ajustar stock"
-                  className="w-7 h-7 flex items-center justify-center rounded-lg text-gray-400 hover:bg-amber-50 hover:text-amber-600 transition-all">
-                  <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"/>
-                  </svg>
-                </button>
+                {isAdmin && (
+                  <button
+                    onClick={() => openAdjModal(item)}
+                    title="Ajustar stock"
+                    className="w-7 h-7 flex items-center justify-center rounded-lg text-gray-400 hover:bg-amber-50 hover:text-amber-600 transition-all">
+                    <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"/>
+                    </svg>
+                  </button>
+                )}
               </div>
             ))
             }

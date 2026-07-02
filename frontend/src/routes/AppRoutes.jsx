@@ -37,7 +37,7 @@ export default function AppRoutes() {
         <Route path="deliveries" element={<Deliveries />} />
         <Route path="expenses" element={<Expenses />} />
         <Route path="products" element={<PrivateRoute adminOnly><Products /></PrivateRoute>} />
-        <Route path="inventory" element={<PrivateRoute adminOnly><Inventory /></PrivateRoute>} />
+        <Route path="inventory" element={<PrivateRoute><Inventory /></PrivateRoute>} />
         <Route path="promotions" element={<PrivateRoute adminOnly><Promotions /></PrivateRoute>} />
         <Route path="shifts" element={<PrivateRoute adminOnly><Shifts /></PrivateRoute>} />
         <Route path="reports" element={<PrivateRoute adminOnly><Reports /></PrivateRoute>} />
