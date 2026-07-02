@@ -58,20 +58,35 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
             except Exception:
                 pass
 
+        request = self.context.get('request')
+        avatar_url = None
+        if user.avatar:
+            avatar_url = request.build_absolute_uri(user.avatar.url) if request else f'http://localhost:8000{user.avatar.url}'
         data['user'] = {
             'id': user.id,
             'username': user.username,
             'full_name': user.full_name,
             'role': user.role,
+            'avatar_url': avatar_url,
         }
         return data
 
 
 class UserSerializer(serializers.ModelSerializer):
+    avatar_url = serializers.SerializerMethodField()
+
     class Meta:
         model = User
-        fields = ['id', 'username', 'full_name', 'role', 'is_active', 'created_at']
-        read_only_fields = ['id', 'created_at']
+        fields = ['id', 'username', 'full_name', 'role', 'is_active', 'created_at', 'avatar_url']
+        read_only_fields = ['id', 'created_at', 'avatar_url']
+
+    def get_avatar_url(self, obj):
+        if obj.avatar:
+            request = self.context.get('request')
+            if request:
+                return request.build_absolute_uri(obj.avatar.url)
+            return f'http://localhost:8000{obj.avatar.url}'
+        return None
 
 
 class UserCreateSerializer(serializers.ModelSerializer):

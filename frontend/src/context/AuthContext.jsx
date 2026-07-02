@@ -29,8 +29,16 @@ export function AuthProvider({ children }) {
     setUser(null)
   }, [])
 
+  const updateUser = useCallback((patch) => {
+    setUser(prev => {
+      const updated = { ...prev, ...patch }
+      localStorage.setItem('user', JSON.stringify(updated))
+      return updated
+    })
+  }, [])
+
   return (
-    <AuthContext.Provider value={{ user, login, logout, loading, isAdmin: user?.role === 'admin' }}>
+    <AuthContext.Provider value={{ user, login, logout, loading, updateUser, isAdmin: user?.role === 'admin' }}>
       {children}
     </AuthContext.Provider>
   )

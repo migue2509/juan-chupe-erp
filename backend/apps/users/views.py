@@ -44,6 +44,33 @@ class UserViewSet(viewsets.ModelViewSet):
         serializer = UserSerializer(users, many=True)
         return Response(serializer.data)
 
+    @action(detail=True, methods=['post'], url_path='upload-avatar', permission_classes=[IsOperative])
+    def upload_avatar(self, request, pk=None):
+        user = self.get_object()
+        # Solo el propio usuario o un admin puede cambiar el avatar
+        if not request.user.is_admin and request.user.id != user.id:
+            return Response({'detail': 'No autorizado.'}, status=status.HTTP_403_FORBIDDEN)
+        if 'avatar' not in request.FILES:
+            return Response({'detail': 'No se encontró imagen.'}, status=status.HTTP_400_BAD_REQUEST)
+        if user.avatar:
+            user.avatar.delete(save=False)
+        user.avatar = request.FILES['avatar']
+        user.save()
+        serializer = UserSerializer(user, context={'request': request})
+        return Response(serializer.data)
+
+    @action(detail=True, methods=['post'], url_path='remove-avatar', permission_classes=[IsOperative])
+    def remove_avatar(self, request, pk=None):
+        user = self.get_object()
+        if not request.user.is_admin and request.user.id != user.id:
+            return Response({'detail': 'No autorizado.'}, status=status.HTTP_403_FORBIDDEN)
+        if user.avatar:
+            user.avatar.delete(save=False)
+            user.avatar = None
+            user.save()
+        serializer = UserSerializer(user, context={'request': request})
+        return Response(serializer.data)
+
     def destroy(self, request, *args, **kwargs):
         return Response(
             {'detail': 'La eliminación de usuarios no está permitida. Usa desactivar en su lugar.'},

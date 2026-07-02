@@ -11,3 +11,11 @@ export const changePassword = (data) => api.post('/auth/users/change-password/',
 export const deleteUser = (id) => api.delete(`/auth/users/${id}/`)
 export const getOperatives = () => api.get('/auth/users/operatives/')
 export const getDeliveryPeople = () => api.get('/auth/users/?role=delivery')
+export const uploadAvatar = (userId, file) => {
+  const form = new FormData()
+  form.append('avatar', file)
+  return api.post(`/auth/users/${userId}/upload-avatar/`, form, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  })
+}
+export const removeAvatar = (userId) => api.post(`/auth/users/${userId}/remove-avatar/`)
