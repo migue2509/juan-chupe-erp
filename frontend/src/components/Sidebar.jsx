@@ -11,6 +11,7 @@ const NAV_OPERATIVE = [
 ]
 
 const NAV_SELLER = [
+  { to: '/',            label: 'Dashboard',      icon: 'dashboard' },
   { to: '/attendance',  label: 'Asistencia',     icon: 'attendance' },
   { to: '/pos',         label: 'Punto de Venta', icon: 'pos' },
   { to: '/billing',     label: 'Facturas',       icon: 'billing' },
@@ -32,7 +33,7 @@ const NAV_ADMIN = [
 
 export default function Sidebar({ open, onClose }) {
   const { isAdmin, user } = useAuth()
-  const isSeller = user?.role === 'operative'
+  const isSeller = user?.role === 'operative' || user?.role === 'delivery'
   const navItems = isSeller ? NAV_SELLER : NAV_OPERATIVE
 
   const inner = (

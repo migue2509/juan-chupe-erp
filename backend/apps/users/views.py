@@ -3,7 +3,7 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.permissions import AllowAny
 from rest_framework_simplejwt.views import TokenObtainPairView
-from core.permissions import IsAdmin
+from core.permissions import IsAdmin, IsOperative
 from .models import User
 from .serializers import (
     UserSerializer, UserCreateSerializer,
@@ -37,7 +37,7 @@ class UserViewSet(viewsets.ModelViewSet):
         except User.DoesNotExist:
             return Response({'detail': 'Usuario no encontrado.'}, status=status.HTTP_404_NOT_FOUND)
 
-    @action(detail=False, methods=['get'], url_path='operatives')
+    @action(detail=False, methods=['get'], url_path='operatives', permission_classes=[IsOperative])
     def operatives(self, request):
         """Vendedoras activas para selección en POS"""
         users = User.objects.filter(role='operative', is_active=True)

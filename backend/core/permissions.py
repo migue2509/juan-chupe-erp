@@ -38,7 +38,7 @@ class IsAdminOrReadOnly(BasePermission):
 
 class IsOperative(BasePermission):
     def has_permission(self, request, view):
-        return request.user.is_authenticated and request.user.role in ('admin', 'operative')
+        return request.user.is_authenticated and request.user.role in ('admin', 'operative', 'delivery')
 
 class IsDelivery(BasePermission):
     def has_permission(self, request, view):

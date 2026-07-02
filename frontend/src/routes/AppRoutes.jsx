@@ -31,7 +31,7 @@ export default function AppRoutes() {
     <Routes>
       <Route path="/login" element={user ? <Navigate to="/" /> : <Login />} />
       <Route path="/" element={<PrivateRoute><Layout /></PrivateRoute>}>
-        <Route index element={user?.role === 'operative' ? <Navigate to="/attendance" replace /> : <Dashboard />} />
+        <Route index element={<Dashboard />} />
         <Route path="pos" element={<POS />} />
         <Route path="billing" element={<Billing />} />
         <Route path="deliveries" element={<Deliveries />} />
