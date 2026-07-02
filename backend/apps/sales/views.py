@@ -169,7 +169,7 @@ class SaleViewSet(viewsets.ReadOnlyModelViewSet):
 
             sale.calculate_total()
 
-            # Auto-gasto por cortesía
+            # Auto-gasto por cortesía (no afecta caja)
             if is_courtesy:
                 expense_amount = sale.total - courtesy_paid
                 if expense_amount > 0:
@@ -181,7 +181,7 @@ class SaleViewSet(viewsets.ReadOnlyModelViewSet):
                         origin='delivery' if data.get('is_delivery') else 'pos',
                         description=f'Cortesía #{sale.id}',
                         amount=expense_amount,
-                        from_daily_cash=True,
+                        from_daily_cash=False,
                         notes=data.get('notes', ''),
                     )
 

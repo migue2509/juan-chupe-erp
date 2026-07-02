@@ -101,10 +101,11 @@ class ShiftViewSet(viewsets.ReadOnlyModelViewSet):
         expenses_list         = list(expenses_qs)
         expenses_pos          = sum(e.amount for e in expenses_list if e.origin == 'pos')
         expenses_dom          = sum(e.amount for e in expenses_list if e.origin == 'delivery')
-        expenses_pos_cash     = sum(e.amount for e in expenses_list if e.origin == 'pos'      and e.payment_method == 'cash')
-        expenses_pos_transfer = sum(e.amount for e in expenses_list if e.origin == 'pos'      and e.payment_method == 'transfer')
-        expenses_dom_cash     = sum(e.amount for e in expenses_list if e.origin == 'delivery' and e.payment_method == 'cash')
-        expenses_dom_transfer = sum(e.amount for e in expenses_list if e.origin == 'delivery' and e.payment_method == 'transfer')
+        # Solo gastos que afectan caja (from_daily_cash=True) se descuentan del efectivo
+        expenses_pos_cash     = sum(e.amount for e in expenses_list if e.origin == 'pos'      and e.payment_method == 'cash'     and e.from_daily_cash)
+        expenses_pos_transfer = sum(e.amount for e in expenses_list if e.origin == 'pos'      and e.payment_method == 'transfer' and e.from_daily_cash)
+        expenses_dom_cash     = sum(e.amount for e in expenses_list if e.origin == 'delivery' and e.payment_method == 'cash'     and e.from_daily_cash)
+        expenses_dom_transfer = sum(e.amount for e in expenses_list if e.origin == 'delivery' and e.payment_method == 'transfer' and e.from_daily_cash)
 
         # ── Ventas serializadas ligeramente ──
         sales_data = []
