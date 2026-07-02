@@ -402,7 +402,10 @@ export default function POS() {
                   <div className="grid grid-cols-3 md:grid-cols-4 gap-2">
                     {catFlavors.map(f => {
                       const sel = current.flavorIds.includes(f.id)
-                      const agotado = !f.bag || Number(f.bag.stock_ml) <= 0
+                      const stock = Number(f.bag?.stock_ml ?? 0)
+                      const minStock = Number(f.bag?.min_stock_ml ?? 0)
+                      const agotado = stock <= 0
+                      const bajo = !agotado && f.bag && stock < minStock
                       return (
                         <button key={f.id} onClick={() => toggleFlavor(f.id)}
                           className={`p-3 rounded-xl text-center border-2 transition-all text-sm font-medium ${
@@ -412,6 +415,9 @@ export default function POS() {
                           <div className="text-xs leading-tight">{f.name}</div>
                           {agotado && (
                             <div className="text-[9px] font-bold text-red-400 uppercase tracking-wide mt-1">Agotado</div>
+                          )}
+                          {bajo && (
+                            <div className="text-[9px] font-bold text-amber-500 uppercase tracking-wide mt-1">Stock bajo</div>
                           )}
                           {f.licores && (
                             <div className="flex flex-wrap gap-0.5 justify-center mt-1">
