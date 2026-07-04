@@ -2,11 +2,12 @@ from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from decimal import Decimal
+from collections import defaultdict
 from django.db.models import Sum
 from core.permissions import IsAdmin
 from apps.shifts.models import Shift
 from apps.sales.models import Sale, SaleItem
-from .models import CashAudit
+from .models import CashAudit, SellerCashDelivery
 from .serializers import CashAuditSerializer
 
 
@@ -23,6 +24,60 @@ class CashAuditViewSet(viewsets.ModelViewSet):
         if channel:
             qs = qs.filter(channel=channel)
         return qs
+
+    @action(detail=False, methods=['post'], url_path='save-seller-deliveries')
+    def save_seller_deliveries(self, request):
+        """Guarda el monto entregado por cada vendedora (canal POS)."""
+        shift_id   = request.data.get('shift_id')
+        deliveries = request.data.get('deliveries', [])
+        try:
+            shift = Shift.objects.get(pk=shift_id)
+        except Shift.DoesNotExist:
+            return Response({'detail': 'Jornada no encontrada.'}, status=status.HTTP_404_NOT_FOUND)
+
+        for d in deliveries:
+            sid = d.get('seller_id')  # puede ser None
+            if sid is None:
+                obj = SellerCashDelivery.objects.filter(shift=shift, seller_id__isnull=True).first()
+            else:
+                obj = SellerCashDelivery.objects.filter(shift=shift, seller_id=sid).first()
+
+            if obj:
+                obj.net_delivered = d.get('net_delivered', 0)
+                obj.seller_name   = d.get('seller_name', '')
+                obj.save(update_fields=['net_delivered', 'seller_name', 'updated_at'])
+            else:
+                SellerCashDelivery.objects.create(
+                    shift=shift,
+                    seller_id=sid,
+                    seller_name=d.get('seller_name', ''),
+                    net_delivered=d.get('net_delivered', 0),
+                )
+        return Response({'ok': True})
+
+    @action(detail=False, methods=['post'], url_path='save-delivery-amount')
+    def save_delivery_amount(self, request):
+        """Guarda el monto entregado del canal domicilios (seller_id=None)."""
+        shift_id      = request.data.get('shift_id')
+        net_delivered = request.data.get('net_delivered', 0)
+        try:
+            shift = Shift.objects.get(pk=shift_id)
+        except Shift.DoesNotExist:
+            return Response({'detail': 'Jornada no encontrada.'}, status=status.HTTP_404_NOT_FOUND)
+
+        obj = SellerCashDelivery.objects.filter(shift=shift, seller_id__isnull=True).first()
+        if obj:
+            obj.net_delivered = net_delivered
+            obj.seller_name   = 'Domicilios'
+            obj.save(update_fields=['net_delivered', 'seller_name', 'updated_at'])
+        else:
+            SellerCashDelivery.objects.create(
+                shift=shift,
+                seller_id=None,
+                seller_name='Domicilios',
+                net_delivered=net_delivered,
+            )
+        return Response({'ok': True})
 
     def perform_create(self, serializer):
         obj = serializer.save(audited_by=self.request.user)
@@ -105,6 +160,35 @@ class CashAuditViewSet(viewsets.ModelViewSet):
                 'actual_cash':   int(a.actual_cash),
                 'cash_difference': int(a.cash_difference),
             }
+
+        # ── Cuadre por vendedora (solo canal POS) ──
+        seller_groups = defaultdict(lambda: {'name': 'Sin vendedora', 'cash': Decimal('0'), 'transfer': Decimal('0')})
+        for s in pos_sales:
+            key = s.seller_id
+            if key is not None:
+                seller_groups[key]['name'] = s.seller_name or '—'
+            seller_groups[key]['cash']     += s.total - s.transfer_amount
+            seller_groups[key]['transfer'] += s.transfer_amount
+
+        # Cargar montos guardados
+        saved_map = {}
+        for d in SellerCashDelivery.objects.filter(shift=shift):
+            saved_map[d.seller_id] = d.net_delivered
+
+        sellers_breakdown = sorted([
+            {
+                'seller_id':    sid,
+                'seller_name':  info['name'],
+                'pos_cash':     int(info['cash']),
+                'pos_transfer': int(info['transfer']),
+                'net_delivered': int(saved_map[sid]) if sid in saved_map and saved_map[sid] is not None else None,
+            }
+            for sid, info in seller_groups.items()
+        ], key=lambda x: x['seller_name'] or '')
+
+        # Monto entregado del canal domicilios
+        dom_saved = saved_map.get(None)
+        delivery_net_delivered = int(dom_saved) if dom_saved is not None else None
 
         # ── Cierre de la jornada anterior ──
         prev_shift = Shift.objects.filter(opened_at__lt=shift.opened_at).order_by('-opened_at').first()
@@ -215,6 +299,9 @@ class CashAuditViewSet(viewsets.ModelViewSet):
             'delivery_expenses_transfer': expenses_dom_transfer, # gastos transferencia domicilios
             'delivery_expenses_no_cash':  expenses_dom_no_cash,  # gastos que no afectan caja dom
             'delivery_net_cash':        delivery_cash - expenses_dom_cash,
+            'delivery_net_delivered':   delivery_net_delivered,
+            # Cuadre por vendedora
+            'sellers_breakdown': sellers_breakdown,
             # Catálogo (liquidación solo POS)
             'catalog': catalog,
             # Estado de arqueos

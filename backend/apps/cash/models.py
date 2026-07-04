@@ -80,3 +80,22 @@ class ShiftAuditItem(models.Model):
 
     def __str__(self):
         return f'{self.product_name} — vendido: {self.sold}'
+
+
+class SellerCashDelivery(models.Model):
+    """Cuánto entregó cada vendedora en efectivo al cerrar la jornada.
+    seller_id=None representa el canal de domicilios."""
+    shift         = models.ForeignKey(
+        'shifts.Shift', on_delete=models.CASCADE, related_name='seller_cash_deliveries'
+    )
+    seller_id     = models.PositiveIntegerField(null=True, blank=True)
+    seller_name   = models.CharField(max_length=200, blank=True)
+    net_delivered = models.DecimalField(max_digits=12, decimal_places=0, null=True, blank=True)
+    updated_at    = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name          = 'Entrega de caja por vendedora'
+        verbose_name_plural   = 'Entregas de caja por vendedora'
+
+    def __str__(self):
+        return f'Jornada #{self.shift_id} — {self.seller_name or "Domicilios"}: {self.net_delivered}'

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { getShifts, openShift, closeShift, getActiveShift, getShiftDetail, getCashAuditPrefill, createCashAudit } from '../api'
+import { getShifts, openShift, closeShift, getActiveShift, getShiftDetail, getCashAuditPrefill, createCashAudit, getCashAudit, saveSellerDeliveries, saveDeliveryAmount } from '../api'
 import toast from 'react-hot-toast'
 
 const fmt    = n => `$${Number(n || 0).toLocaleString('es-CO')}`
@@ -29,7 +29,21 @@ function usePrefill(shiftId) {
 // ─────────────────────────────────────────────────────────────────────────────
 function POSResumenModal({ shiftId, onClose }) {
   const { data: p, loading, reload } = usePrefill(shiftId)
-  const [saving, setSaving] = useState(false)
+  const [saving, setSaving]                 = useState(false)
+  const [savingDeliveries, setSavingDeliveries] = useState(false)
+  const [sellerFilter, setSellerFilter]     = useState('all')
+  const [deliveries, setDeliveries]         = useState({})
+
+  // Pre-carga montos guardados cuando llegan los datos
+  useEffect(() => {
+    if (!p?.sellers_breakdown) return
+    const init = {}
+    p.sellers_breakdown.forEach(s => {
+      const key = String(s.seller_id ?? 'null')
+      init[key] = s.net_delivered != null ? String(s.net_delivered) : ''
+    })
+    setDeliveries(init)
+  }, [p])
 
   if (loading) return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
@@ -45,6 +59,39 @@ function POSResumenModal({ shiftId, onClose }) {
   const toppings = (p.catalog || []).filter(r => r.product_type === 'topping')
   const totalLiq = (p.catalog || []).reduce((s, r) => s + (r.sales_revenue || 0), 0)
   const COL = '2fr 110px 70px 110px'
+
+  const sellers = p.sellers_breakdown || []
+
+  // Badge de estado por cuadre
+  const StatusBadge = ({ expected, delivered }) => {
+    if (delivered === '' || delivered == null)
+      return <span className="text-gray-300 text-xs">—</span>
+    const diff = (parseInt(delivered) || 0) - (Number(expected) || 0)
+    if (diff === 0) return <span className="text-xs font-semibold text-green-600 bg-green-50 px-2 py-0.5 rounded-full">✅ Correcto</span>
+    if (diff < 0)  return <span className="text-xs font-semibold text-red-600 bg-red-50 px-2 py-0.5 rounded-full">❌ Faltante {fmt(Math.abs(diff))}</span>
+    return              <span className="text-xs font-semibold text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full">⚠️ Sobrante {fmt(diff)}</span>
+  }
+
+  const currentSeller = sellerFilter !== 'all'
+    ? sellers.find(s => String(s.seller_id ?? 'null') === sellerFilter)
+    : null
+
+  const handleSaveDeliveries = async () => {
+    setSavingDeliveries(true)
+    try {
+      const payload = sellers.map(s => ({
+        seller_id:     s.seller_id,
+        seller_name:   s.seller_name,
+        net_delivered: parseInt(deliveries[String(s.seller_id ?? 'null')] || '0') || 0,
+      }))
+      await saveSellerDeliveries({ shift_id: shiftId, deliveries: payload })
+      toast.success('Entregas guardadas')
+      reload()
+    } catch (e) {
+      toast.error(e?.response?.data?.detail || 'Error al guardar')
+    }
+    setSavingDeliveries(false)
+  }
 
   return (
     <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center bg-black/40 p-4">
@@ -97,6 +144,115 @@ function POSResumenModal({ shiftId, onClose }) {
               </div>
             </div>
           </div>
+
+          {/* ── Cuadre por vendedora ── */}
+          {sellers.length > 0 && (
+            <div className="card p-0 overflow-hidden border-l-4 border-blue-300">
+              <div className="px-5 py-3 border-b border-gray-100 flex items-center justify-between">
+                <p className="text-[10px] font-bold text-blue-500 uppercase tracking-widest">Cuadre por trabajadora</p>
+                {/* Tabs de filtro */}
+                <div className="flex gap-1">
+                  <button onClick={() => setSellerFilter('all')}
+                    className={`px-3 py-1 rounded-lg text-xs font-medium transition-all ${sellerFilter === 'all' ? 'bg-blue-100 text-blue-700' : 'text-gray-400 hover:text-gray-600'}`}>
+                    Todas
+                  </button>
+                  {sellers.map(s => (
+                    <button key={s.seller_id ?? 'null'}
+                      onClick={() => setSellerFilter(String(s.seller_id ?? 'null'))}
+                      className={`px-3 py-1 rounded-lg text-xs font-medium transition-all ${sellerFilter === String(s.seller_id ?? 'null') ? 'bg-blue-100 text-blue-700' : 'text-gray-400 hover:text-gray-600'}`}>
+                      {s.seller_name}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Vista "Todas" — tabla resumen */}
+              {sellerFilter === 'all' && (
+                <div className="overflow-x-auto">
+                  <div className="grid text-[10px] font-semibold text-gray-400 uppercase tracking-widest px-4 py-2 bg-gray-50 border-b border-gray-100"
+                    style={{ gridTemplateColumns: '1fr 110px 90px 130px 110px', minWidth: '560px' }}>
+                    <span>Trabajadora</span>
+                    <span className="text-center">Esperado</span>
+                    <span className="text-center">Transfer.</span>
+                    <span className="text-center">Neto entregado</span>
+                    <span className="text-center">Estado</span>
+                  </div>
+                  {sellers.map(s => {
+                    const key = String(s.seller_id ?? 'null')
+                    return (
+                      <div key={key} className="grid items-center px-4 py-2.5 border-b border-gray-50"
+                        style={{ gridTemplateColumns: '1fr 110px 90px 130px 110px', minWidth: '560px' }}>
+                        <span className="text-sm font-medium text-gray-800">{s.seller_name}</span>
+                        <span className="text-center text-sm font-semibold text-blue-700">{fmt(s.pos_cash)}</span>
+                        <span className="text-center text-sm text-cyan-600">{s.pos_transfer > 0 ? fmt(s.pos_transfer) : '—'}</span>
+                        <div className="flex justify-center">
+                          <input type="number" placeholder="0"
+                            className="input text-center py-1 text-sm w-28"
+                            value={deliveries[key] ?? ''}
+                            onChange={e => setDeliveries(prev => ({ ...prev, [key]: e.target.value }))} />
+                        </div>
+                        <div className="flex justify-center">
+                          <StatusBadge expected={s.pos_cash} delivered={deliveries[key]} />
+                        </div>
+                      </div>
+                    )
+                  })}
+                  {/* Totales */}
+                  <div className="grid px-4 py-2.5 bg-blue-50 border-t-2 border-blue-100 font-semibold"
+                    style={{ gridTemplateColumns: '1fr 110px 90px 130px 110px', minWidth: '560px' }}>
+                    <span className="text-xs font-bold text-blue-700 uppercase tracking-wide">Total</span>
+                    <span className="text-center text-sm text-blue-700">{fmt(sellers.reduce((s, r) => s + r.pos_cash, 0))}</span>
+                    <span className="text-center text-sm text-cyan-600">{fmt(sellers.reduce((s, r) => s + r.pos_transfer, 0))}</span>
+                    <span className="text-center text-sm text-gray-500">
+                      {fmt(Object.values(deliveries).reduce((s, v) => s + (parseInt(v) || 0), 0))}
+                    </span>
+                    <span />
+                  </div>
+                </div>
+              )}
+
+              {/* Vista individual por vendedora */}
+              {sellerFilter !== 'all' && currentSeller && (() => {
+                const key = String(currentSeller.seller_id ?? 'null')
+                return (
+                  <div className="p-5 space-y-4">
+                    <div className="grid grid-cols-3 gap-4">
+                      <div className="card p-3 text-center">
+                        <p className="text-xs text-gray-400 uppercase tracking-wide mb-1">Ventas en efectivo</p>
+                        <p className="text-lg font-bold text-blue-700">{fmt(currentSeller.pos_cash)}</p>
+                      </div>
+                      <div className="card p-3 text-center">
+                        <p className="text-xs text-gray-400 uppercase tracking-wide mb-1">Transferencia</p>
+                        <p className="text-lg font-bold text-cyan-600">{fmt(currentSeller.pos_transfer)}</p>
+                      </div>
+                      <div className="card p-3 text-center border-2 border-blue-200">
+                        <p className="text-xs text-gray-400 uppercase tracking-wide mb-1">Total vendido</p>
+                        <p className="text-lg font-bold text-gray-800">{fmt(currentSeller.pos_cash + currentSeller.pos_transfer)}</p>
+                      </div>
+                    </div>
+                    <div className="flex items-end gap-4">
+                      <div className="flex-1">
+                        <label className="label">Neto entregado</label>
+                        <input type="number" className="input" placeholder="0"
+                          value={deliveries[key] ?? ''}
+                          onChange={e => setDeliveries(prev => ({ ...prev, [key]: e.target.value }))} />
+                      </div>
+                      <div className="pb-1">
+                        <StatusBadge expected={currentSeller.pos_cash} delivered={deliveries[key]} />
+                      </div>
+                    </div>
+                  </div>
+                )
+              })()}
+
+              <div className="px-5 py-3 border-t border-gray-100 flex justify-end">
+                <button disabled={savingDeliveries} onClick={handleSaveDeliveries}
+                  className="btn-primary text-sm py-1.5">
+                  {savingDeliveries ? 'Guardando...' : 'Guardar entregas'}
+                </button>
+              </div>
+            </div>
+          )}
 
           {/* Tabla liquidación */}
           {(cups.length > 0 || toppings.length > 0) && (
@@ -238,7 +394,13 @@ function POSResumenModal({ shiftId, onClose }) {
 // ─────────────────────────────────────────────────────────────────────────────
 function DomiciliosResumenModal({ shiftId, onClose }) {
   const { data: p, loading, reload } = usePrefill(shiftId)
-  const [saving, setSaving] = useState(false)
+  const [saving, setSaving]           = useState(false)
+  const [netDelivered, setNetDelivered] = useState('')
+  const [savingAmount, setSavingAmount] = useState(false)
+
+  useEffect(() => {
+    if (p?.delivery_net_delivered != null) setNetDelivered(String(p.delivery_net_delivered))
+  }, [p])
 
   if (loading) return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
@@ -300,6 +462,43 @@ function DomiciliosResumenModal({ shiftId, onClose }) {
                   <p className="text-xs text-gray-400 uppercase tracking-wide mb-1">Transferencia</p>
                   <p className="text-base font-bold text-cyan-600">- {fmt(p.delivery_expenses_transfer || 0)}</p>
                 </div>
+              </div>
+            </div>
+            {/* Cuadre de domicilios */}
+            <div className="card p-4 mt-3 border-l-4 border-orange-300">
+              <p className="text-[10px] font-bold text-orange-500 uppercase tracking-widest mb-3">Cuadre de domicilios</p>
+              <div className="grid grid-cols-3 gap-4 items-end">
+                <div>
+                  <p className="text-xs text-gray-400 uppercase tracking-wide mb-1">Neto a entregar</p>
+                  <p className="text-lg font-bold text-orange-600">{fmt(p.delivery_net_cash)}</p>
+                </div>
+                <div>
+                  <label className="label">Neto entregado</label>
+                  <input type="number" className="input" placeholder="0"
+                    value={netDelivered}
+                    onChange={e => setNetDelivered(e.target.value)} />
+                </div>
+                <div className="pb-1">
+                  {netDelivered !== '' && (() => {
+                    const diff = (parseInt(netDelivered) || 0) - (Number(p.delivery_net_cash) || 0)
+                    if (diff === 0) return <span className="text-xs font-semibold text-green-600 bg-green-50 px-2 py-0.5 rounded-full">✅ Correcto</span>
+                    if (diff < 0)  return <span className="text-xs font-semibold text-red-600 bg-red-50 px-2 py-0.5 rounded-full">❌ Faltante {fmt(Math.abs(diff))}</span>
+                    return              <span className="text-xs font-semibold text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full">⚠️ Sobrante {fmt(diff)}</span>
+                  })()}
+                </div>
+              </div>
+              <div className="flex justify-end mt-3">
+                <button disabled={savingAmount} onClick={async () => {
+                  setSavingAmount(true)
+                  try {
+                    await saveDeliveryAmount({ shift_id: shiftId, net_delivered: parseInt(netDelivered) || 0 })
+                    toast.success('Monto guardado')
+                    reload()
+                  } catch (e) { toast.error(e?.response?.data?.detail || 'Error') }
+                  setSavingAmount(false)
+                }} className="btn-primary text-sm py-1.5">
+                  {savingAmount ? 'Guardando...' : 'Guardar monto'}
+                </button>
               </div>
             </div>
             </>
