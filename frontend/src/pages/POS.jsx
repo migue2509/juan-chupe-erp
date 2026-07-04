@@ -188,8 +188,8 @@ export default function POS() {
         delivery_address: isDelivery ? deliveryAddress.trim() : '',
         delivery_client:  isDelivery ? deliveryFourDigits.trim() : '',
         delivery_notes:   isDelivery ? deliveryNotes.trim() : '',
-        delivery_lat:     isDelivery ? deliveryLat : null,
-        delivery_lng:     isDelivery ? deliveryLng : null,
+        delivery_lat:     isDelivery && deliveryLat != null ? parseFloat(Number(deliveryLat).toFixed(6)) : null,
+        delivery_lng:     isDelivery && deliveryLng != null ? parseFloat(Number(deliveryLng).toFixed(6)) : null,
         is_courtesy: isCourtesy,
         courtesy_paid: courtesyAmount,
         items: items.map(i => ({
