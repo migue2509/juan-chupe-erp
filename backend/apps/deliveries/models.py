@@ -45,3 +45,18 @@ class Delivery(models.Model):
 
     def __str__(self):
         return f'Domicilio #{self.id} — {self.address} — {self.get_status_display()}'
+
+
+class HeatmapPoint(models.Model):
+    """Punto histórico para el mapa de calor (sin venta asociada)."""
+    address    = models.CharField(max_length=300)
+    latitude   = models.DecimalField(max_digits=10, decimal_places=7)
+    longitude  = models.DecimalField(max_digits=10, decimal_places=7)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = 'Punto de calor histórico'
+        verbose_name_plural = 'Puntos de calor históricos'
+
+    def __str__(self):
+        return f'HeatmapPoint {self.address} ({self.latitude}, {self.longitude})'

@@ -45,6 +45,7 @@ export default function Mapa() {
   const [dateFrom, setDateFrom] = useState('')
   const [dateTo,   setDateTo]   = useState('')
   const [selected, setSelected] = useState(null) // punto seleccionado en el mapa
+  const [legendOpen, setLegendOpen] = useState(false)
 
   const fetchData = async () => {
     setLoading(true)
@@ -123,11 +124,12 @@ export default function Mapa() {
     mapObjRef.current._markerLayer = markerLayer
 
     data.points.forEach(p => {
+      const isHistorical = p.status === 'historical'
       const circle = L.circleMarker([parseFloat(p.latitude), parseFloat(p.longitude)], {
-        radius: 5,
-        color: '#FF0099',
-        fillColor: '#FF0099',
-        fillOpacity: 0.6,
+        radius: isHistorical ? 4 : 5,
+        color:       isHistorical ? '#64748b' : '#FF0099',
+        fillColor:   isHistorical ? '#94a3b8' : '#FF0099',
+        fillOpacity: isHistorical ? 0.5 : 0.7,
         weight: 1.5,
       })
       circle.on('click', () => setSelected(p))
@@ -147,16 +149,18 @@ export default function Mapa() {
     : 0
 
   const statusColor = {
-    pending:   'text-amber-600 bg-amber-50',
-    on_way:    'text-blue-600 bg-blue-50',
-    delivered: 'text-green-600 bg-green-50',
-    cancelled: 'text-red-500 bg-red-50',
+    pending:    'text-amber-600 bg-amber-50',
+    on_way:     'text-blue-600 bg-blue-50',
+    delivered:  'text-green-600 bg-green-50',
+    cancelled:  'text-red-500 bg-red-50',
+    historical: 'text-slate-500 bg-slate-100',
   }
   const statusLabel = {
-    pending:   'Pendiente',
-    on_way:    'En camino',
-    delivered: 'Entregado',
-    cancelled: 'Cancelado',
+    pending:    'Pendiente',
+    on_way:     'En camino',
+    delivered:  'Entregado',
+    cancelled:  'Cancelado',
+    historical: 'Histórico',
   }
 
   return (
@@ -216,18 +220,74 @@ export default function Mapa() {
         <div className="flex-1 relative">
           <div ref={mapRef} className="w-full h-full" />
 
-          {/* Leyenda de calor */}
-          <div className="absolute bottom-6 left-4 bg-white/90 backdrop-blur-sm rounded-xl px-4 py-3 shadow text-xs">
-            <p className="font-semibold text-gray-600 mb-2 uppercase tracking-wide text-[10px]">Densidad</p>
-            <div className="flex items-center gap-1">
-              <div className="h-3 w-28 rounded-full" style={{
-                background: 'linear-gradient(to right, #3b82f6, #8b5cf6, #f59e0b, #ef4444, #FF0099)'
-              }} />
-            </div>
-            <div className="flex justify-between mt-0.5">
-              <span className="text-gray-400">Baja</span>
-              <span className="text-gray-400">Alta</span>
-            </div>
+          {/* Leyenda colapsable */}
+          <div className="absolute bottom-6 left-4 text-xs" style={{ zIndex: 1000 }}>
+            {legendOpen ? (
+              <div className="bg-white/95 backdrop-blur-sm rounded-xl shadow-lg overflow-hidden" style={{ minWidth: 170 }}>
+                {/* Header con botón cerrar */}
+                <div className="flex items-center justify-between px-3 py-2 border-b border-gray-100">
+                  <p className="font-bold text-gray-600 uppercase tracking-wide text-[10px]">Leyenda</p>
+                  <button
+                    onClick={() => setLegendOpen(false)}
+                    className="text-gray-400 hover:text-gray-600 text-base leading-none ml-2"
+                    title="Cerrar leyenda"
+                  >✕</button>
+                </div>
+
+                <div className="px-3 py-2.5 space-y-3">
+                  {/* Densidad de calor */}
+                  <div>
+                    <p className="font-bold text-gray-400 uppercase tracking-wide text-[10px] mb-1.5">Densidad de zona</p>
+                    <div className="space-y-1">
+                      {[
+                        { color: '#3b82f6', label: 'Muy pocas entregas' },
+                        { color: '#8b5cf6', label: 'Pocas entregas' },
+                        { color: '#f59e0b', label: 'Zona media' },
+                        { color: '#ef4444', label: 'Zona frecuente' },
+                        { color: '#FF0099', label: 'Zona muy frecuente' },
+                      ].map(({ color, label }) => (
+                        <div key={color} className="flex items-center gap-2">
+                          <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ background: color }} />
+                          <span className="text-gray-600">{label}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Tipo de punto */}
+                  <div className="border-t border-gray-100 pt-2.5">
+                    <p className="font-bold text-gray-400 uppercase tracking-wide text-[10px] mb-1.5">Tipo de punto</p>
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2">
+                        <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ background: '#FF0099' }} />
+                        <span className="text-gray-600">Domicilio real</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ background: '#94a3b8' }} />
+                        <span className="text-gray-600">Histórico</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <button
+                onClick={() => setLegendOpen(true)}
+                className="bg-white/95 backdrop-blur-sm rounded-xl shadow-lg px-3 py-2 flex items-center gap-2 hover:bg-white transition-colors"
+                title="Ver leyenda"
+              >
+                {/* Mini chips de colores */}
+                <div className="flex gap-0.5">
+                  {['#3b82f6','#8b5cf6','#f59e0b','#ef4444','#FF0099'].map(c => (
+                    <div key={c} className="w-2.5 h-2.5 rounded-full" style={{ background: c }} />
+                  ))}
+                </div>
+                <span className="text-gray-600 font-medium">Leyenda</span>
+                <svg className="w-3.5 h-3.5 text-gray-400" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clipRule="evenodd"/>
+                </svg>
+              </button>
+            )}
           </div>
 
           {/* Loading overlay */}

@@ -5,7 +5,7 @@ from django.utils import timezone
 from django.db import transaction
 from core.permissions import IsOperative, IsAdmin
 from apps.shifts.models import Shift
-from .models import Delivery, Domiciliario
+from .models import Delivery, Domiciliario, HeatmapPoint
 from .serializers import DeliverySerializer, DomiciliarioSerializer
 
 
@@ -73,13 +73,34 @@ class DeliveryViewSet(viewsets.ModelViewSet):
         if date_to:
             qs = qs.filter(created_at__date__lte=date_to)
 
-        points = list(qs.values('id', 'latitude', 'longitude', 'address', 'status', 'four_digits', 'created_at'))
+        delivery_points = list(qs.values('id', 'latitude', 'longitude', 'address', 'status', 'four_digits', 'created_at'))
         total_with_coords = qs.count()
         total_deliveries  = Delivery.objects.count()
 
+        # Incluir puntos históricos del mapa de calor
+        historical_qs = HeatmapPoint.objects.all()
+        if date_from:
+            historical_qs = historical_qs.filter(created_at__date__gte=date_from)
+        if date_to:
+            historical_qs = historical_qs.filter(created_at__date__lte=date_to)
+        historical_points = [
+            {
+                'id': f'h{p["id"]}',
+                'latitude': p['latitude'],
+                'longitude': p['longitude'],
+                'address': p['address'],
+                'status': 'historical',
+                'four_digits': '',
+                'created_at': p['created_at'],
+            }
+            for p in historical_qs.values('id', 'latitude', 'longitude', 'address', 'created_at')
+        ]
+
+        points = delivery_points + historical_points
+
         return Response({
             'points': points,
-            'total_with_coords': total_with_coords,
+            'total_with_coords': total_with_coords + len(historical_points),
             'total_deliveries':  total_deliveries,
         })
 
