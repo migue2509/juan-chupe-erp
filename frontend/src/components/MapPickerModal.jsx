@@ -25,12 +25,29 @@ function loadLeaflet() {
   return leafletReady
 }
 
+// ── Coordinate detector ──────────────────────────────────────────────────────
+const COORD_RE = /^\s*(-?\d{1,3}(?:\.\d+)?)\s*,\s*(-?\d{1,3}(?:\.\d+)?)\s*$/
+function parseCoords(val) {
+  const m = val.match(COORD_RE)
+  if (!m) return null
+  const lat = parseFloat(m[1])
+  const lng = parseFloat(m[2])
+  if (lat < -90 || lat > 90 || lng < -180 || lng > 180) return null
+  return { lat, lng }
+}
+
 // ── Nominatim search ─────────────────────────────────────────────────────────
 async function searchAddress(query) {
   if (!query.trim()) return []
-  const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query + ', Medellín, Colombia')}&countrycodes=co&limit=6&addressdetails=1`
-  const res = await fetch(url, { headers: { 'Accept-Language': 'es' } })
-  return res.ok ? await res.json() : []
+  // Don't append Medellín if it's already in the query
+  const q = /medell/i.test(query) ? query : query + ', Medellín, Colombia'
+  const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(q)}&countrycodes=co&limit=6&addressdetails=1&viewbox=-75.7,-75.4,6.1,6.4&bounded=0`
+  try {
+    const res = await fetch(url, { headers: { 'Accept-Language': 'es', 'User-Agent': 'JuanChupeERP/1.0' } })
+    return res.ok ? await res.json() : []
+  } catch {
+    return []
+  }
 }
 
 async function reverseGeocode(lat, lng) {
@@ -50,6 +67,7 @@ export default function MapPickerModal({ onConfirm, onClose, initialLat, initial
   const [search,   setSearch]         = useState(initialAddress || '')
   const [results,  setResults]        = useState([])
   const [searching, setSearching]     = useState(false)
+  const [noResults, setNoResults]     = useState(false)
   const [selected, setSelected]       = useState(
     initialLat && initialLng
       ? { lat: parseFloat(initialLat), lng: parseFloat(initialLng), address: initialAddress || '' }
@@ -134,15 +152,41 @@ export default function MapPickerModal({ onConfirm, onClose, initialLat, initial
     setResults([])
   }, [])
 
-  // Búsqueda con debounce
+  // Búsqueda con debounce — detecta coordenadas pegadas
   const handleSearchInput = (val) => {
     setSearch(val)
+    setNoResults(false)
     clearTimeout(searchTimer.current)
     if (val.length < 3) { setResults([]); return }
+
+    // ¿Es un par lat,lng?
+    const coords = parseCoords(val)
+    if (coords) {
+      const L = window.L
+      if (L && mapObjRef.current) {
+        const pinIcon = L.divIcon({
+          className: '',
+          html: `<div style="width:32px;height:40px;background:linear-gradient(135deg,#FF0099,#ff5cc8);border-radius:50% 50% 50% 0;transform:rotate(-45deg);box-shadow:0 3px 10px rgba(255,0,153,0.5);border:2px solid white;"></div>`,
+          iconSize: [32, 40], iconAnchor: [16, 40],
+        })
+        if (markerRef.current) {
+          markerRef.current.setLatLng([coords.lat, coords.lng])
+        } else {
+          markerRef.current = L.marker([coords.lat, coords.lng], { icon: pinIcon, draggable: true }).addTo(mapObjRef.current)
+          markerRef.current.on('dragend', () => handleMarkerMove(L, markerRef.current.getLatLng()))
+        }
+        mapObjRef.current.flyTo([coords.lat, coords.lng], 17, { duration: 1 })
+        handleMarkerMove(L, coords)
+        setResults([])
+      }
+      return
+    }
+
     searchTimer.current = setTimeout(async () => {
       setSearching(true)
       const res = await searchAddress(val)
       setResults(res)
+      setNoResults(res.length === 0)
       setSearching(false)
     }, 500)
   }
@@ -220,11 +264,11 @@ export default function MapPickerModal({ onConfirm, onClose, initialLat, initial
             )}
           </div>
 
-          {/* Resultados */}
+          {/* Resultados — z-[9999] para aparecer sobre las capas de Leaflet */}
           {results.length > 0 && (
-            <div className="absolute left-4 right-4 mt-1 bg-white rounded-xl shadow-xl border border-gray-100 z-10 overflow-hidden">
+            <div className="absolute left-4 right-4 mt-1 bg-white rounded-xl shadow-xl border border-gray-100 z-[9999] overflow-hidden">
               {results.map((r, i) => (
-                <button key={i} onClick={() => selectResult(r)}
+                <button key={i} onClick={() => { selectResult(r); setNoResults(false) }}
                   className="w-full text-left px-4 py-2.5 text-sm hover:bg-gray-50 border-b border-gray-50 last:border-0 flex items-start gap-2">
                   <svg className="w-3.5 h-3.5 text-brand-pink mt-0.5 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                     <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/>
@@ -232,6 +276,11 @@ export default function MapPickerModal({ onConfirm, onClose, initialLat, initial
                   <span className="line-clamp-2 text-gray-700">{r.display_name}</span>
                 </button>
               ))}
+            </div>
+          )}
+          {noResults && !searching && search.length >= 3 && (
+            <div className="absolute left-4 right-4 mt-1 bg-white rounded-xl shadow border border-gray-100 z-[9999] px-4 py-3 text-sm text-gray-400">
+              No se encontraron resultados. Prueba con otra dirección o haz clic en el mapa.
             </div>
           )}
         </div>
