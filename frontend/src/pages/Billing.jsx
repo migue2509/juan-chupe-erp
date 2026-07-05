@@ -305,12 +305,18 @@ export default function Billing() {
                   <span className="block text-[10px] text-gray-400 leading-none">factura {fmt(inv.sale_detail?.total || 0)}</span>
                 )}
               </span>
-              <span className={`badge text-xs w-fit ${
-                inv.sale_detail?.is_courtesy ? 'bg-pink-100 text-pink-600' :
-                inv.sale_detail?.is_delivery ? 'badge-cyan' : 'badge-pink'}`}>
-                {inv.sale_detail?.is_courtesy ? 'Cortesía' :
-                 inv.sale_detail?.is_delivery ? 'Domicilio' : 'POS'}
-              </span>
+              {inv.sale_detail?.promotion_category === 'rappi' ? (
+                <span className="badge text-xs w-fit text-white" style={{ background: '#FF424D' }}>Rappi</span>
+              ) : inv.sale_detail?.promotion_category === 'didi' ? (
+                <span className="badge text-xs w-fit text-white" style={{ background: '#FF6600' }}>DiDi</span>
+              ) : (
+                <span className={`badge text-xs w-fit ${
+                  inv.sale_detail?.is_courtesy ? 'bg-pink-100 text-pink-600' :
+                  inv.sale_detail?.is_delivery ? 'badge-cyan' : 'badge-pink'}`}>
+                  {inv.sale_detail?.is_courtesy ? 'Cortesía' :
+                   inv.sale_detail?.is_delivery ? 'Domicilio' : 'POS'}
+                </span>
+              )}
               <span className={`badge text-xs w-fit ${PAYMENT_BADGE[inv.sale_detail?.payment_method] ?? 'badge-gray'}`}>
                 {PAYMENT_LABELS[inv.sale_detail?.payment_method] ?? inv.sale_detail?.payment_method}
               </span>
@@ -800,9 +806,15 @@ export default function Billing() {
                   )}
                   <div>
                     <p className="text-xs text-gray-400 mb-0.5">Canal</p>
-                    <span className={`badge ${sale.is_delivery ? 'badge-cyan' : 'badge-pink'}`}>
-                      {sale.is_delivery ? 'Domicilio' : 'Punto de Venta'}
-                    </span>
+                    {sale.promotion_category === 'rappi' ? (
+                      <span className="badge" style={{ background: '#FF424D', color: '#fff' }}>Rappi</span>
+                    ) : sale.promotion_category === 'didi' ? (
+                      <span className="badge" style={{ background: '#FF6600', color: '#fff' }}>DiDi</span>
+                    ) : (
+                      <span className={`badge ${sale.is_delivery ? 'badge-cyan' : 'badge-pink'}`}>
+                        {sale.is_delivery ? 'Domicilio' : 'Punto de Venta'}
+                      </span>
+                    )}
                   </div>
                   {sale.notes && (
                     <div className="col-span-2">

@@ -56,7 +56,11 @@ class SaleItemSerializer(serializers.ModelSerializer):
 class SaleSerializer(serializers.ModelSerializer):
     items          = SaleItemSerializer(many=True, read_only=True)
     seller_name    = serializers.SerializerMethodField()
-    promotion_name = serializers.CharField(source='promotion.name',   read_only=True, default='')
+    promotion_name     = serializers.CharField(source='promotion.name', read_only=True, default='')
+    promotion_category = serializers.SerializerMethodField()
+
+    def get_promotion_category(self, obj):
+        return obj.promotion.category if obj.promotion else ''
 
     def get_seller_name(self, obj):
         # Si el usuario aún existe usa su nombre actual; si fue eliminado usa el snapshot
@@ -96,5 +100,6 @@ class SaleSerializer(serializers.ModelSerializer):
             'id', 'shift', 'seller', 'seller_name', 'promotion', 'promotion_name',
             'payment_method', 'cash_received', 'transfer_amount', 'transfer_reference',
             'total', 'change_given', 'is_delivery', 'is_courtesy', 'courtesy_paid',
-            'notes', 'created_at', 'items', 'is_voided', 'delivery_status', 'delivery_person_name'
+            'notes', 'created_at', 'items', 'is_voided', 'delivery_status', 'delivery_person_name',
+            'promotion_category'
         ]
