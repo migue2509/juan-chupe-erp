@@ -53,7 +53,8 @@ export const getPromotions = () => api.get('/promotions/')
 export const getActivePromotions = () => api.get('/promotions/active/')
 export const createPromotion = (data) => api.post('/promotions/', data)
 export const updatePromotion = (id, data) => api.patch(`/promotions/${id}/`, data)
-export const togglePromotion = (id) => api.patch(`/promotions/${id}/toggle/`)
+export const togglePromotion   = (id) => api.patch(`/promotions/${id}/toggle/`)
+export const setPromotionItems = (id, items) => api.put(`/promotions/${id}/items/`, items)
 
 // Expenses
 export const getExpenses      = (params) => api.get('/expenses/', { params })

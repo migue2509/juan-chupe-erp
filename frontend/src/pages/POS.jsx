@@ -109,11 +109,20 @@ export default function POS() {
 
   // ─── Promo ────────────────────────────────────────────────────────────────
   const startPromo = (promo) => {
-    setPromoConfig({
-      promo,
-      activeCup: 0,
-      cups: Array.from({ length: promo.quantity_included }, () => ({ flavorIds: [] })),
-    })
+    // Platform promos (Rappi/DiDi) define cups via items[]; POS promos use quantity_included
+    let cups
+    if (promo.category !== 'pos' && promo.items?.length > 0) {
+      cups = promo.items.flatMap(item =>
+        Array.from({ length: item.quantity }, () => ({
+          flavorIds: [],
+          cupSizeId: item.cup_size,
+          label: item.cup_size_label || item.custom_name,
+        }))
+      )
+    } else {
+      cups = Array.from({ length: promo.quantity_included }, () => ({ flavorIds: [] }))
+    }
+    setPromoConfig({ promo, activeCup: 0, cups })
     setPromoId(promo.id)
   }
 
@@ -141,7 +150,7 @@ export default function POS() {
       return {
         id: Date.now() + i,
         label: `${promo.name} · Vaso ${i + 1} — ${fNames}`,
-        cupSizeId: promo.cup_size,
+        cupSizeId: cup.cupSizeId ?? promo.cup_size,
         flavorIds: cup.flavorIds,
         toppingId: null,
         qty: 1,
@@ -239,12 +248,46 @@ export default function POS() {
       <div className="flex-1 space-y-4 overflow-y-auto min-w-0">
         <h1>Punto de Venta</h1>
 
-        {/* ── Promociones ── */}
-        {promotions.length > 0 && (
+        {/* ── Promos de plataforma (Rappi / DiDi) ── */}
+        {promotions.some(p => p.category !== 'pos') && (
+          <div className="card border border-orange-200 bg-orange-50/40">
+            <p className="label mb-2 text-orange-600">Pedidos de plataforma</p>
+            <div className="flex gap-2 flex-wrap">
+              {promotions.filter(p => p.category !== 'pos').map(p => {
+                const isRappi  = p.category === 'rappi'
+                const active   = promoConfig?.promo?.id === p.id
+                const bgActive = isRappi ? 'border-[#FF424D] bg-[#FF424D]/10 text-[#FF424D]'
+                                         : 'border-[#FF6600] bg-[#FF6600]/10 text-[#FF6600]'
+                const bgIdle   = 'border-gray-200 text-gray-700 hover:border-orange-300 hover:bg-orange-50'
+                return (
+                  <button key={p.id}
+                    onClick={() => active ? cancelPromo() : startPromo(p)}
+                    className={`flex items-center gap-2 px-4 py-2.5 rounded-xl border-2 font-medium text-sm transition-all ${active ? bgActive : bgIdle}`}>
+                    <span className={`text-[10px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded ${
+                      isRappi ? 'bg-[#FF424D] text-white' : 'bg-[#FF6600] text-white'
+                    }`}>{p.category_label}</span>
+                    <span className="font-bold">{p.name}</span>
+                    {p.items?.length > 0
+                      ? <span className="text-xs opacity-60">{p.items.reduce((s, i) => s + i.quantity, 0)} vasos</span>
+                      : <span className="text-xs opacity-60">{p.quantity_included}×{p.cup_size_label}</span>
+                    }
+                    <span className="font-bold">{fmt(p.promo_price)}</span>
+                    {Number(p.platform_fee_pct) > 0 && (
+                      <span className="text-[10px] text-red-500">-{p.platform_fee_pct}%</span>
+                    )}
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* ── Promociones POS ── */}
+        {promotions.some(p => !p.category || p.category === 'pos') && (
           <div className="card">
             <p className="label mb-2">Promociones</p>
             <div className="flex gap-2 flex-wrap">
-              {promotions.map(p => (
+              {promotions.filter(p => !p.category || p.category === 'pos').map(p => (
                 <button key={p.id}
                   onClick={() => promoConfig?.promo?.id === p.id ? cancelPromo() : startPromo(p)}
                   className={`flex items-center gap-2 px-4 py-2.5 rounded-xl border-2 font-medium text-sm transition-all ${
@@ -267,7 +310,11 @@ export default function POS() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="font-bold text-brand-navy">{promoConfig.promo.name}</p>
-                <p className="text-xs text-gray-400">{promoConfig.promo.cup_size_label} · Elige sabores para cada vaso</p>
+                <p className="text-xs text-gray-400">
+                  {promoConfig.promo.category !== 'pos'
+                    ? `${promoConfig.promo.category_label} · Elige sabores para cada vaso`
+                    : `${promoConfig.promo.cup_size_label} · Elige sabores para cada vaso`}
+                </p>
               </div>
               <button onClick={cancelPromo} className="text-gray-300 hover:text-red-400 transition-colors">
                 <Icon name="x" className="w-5 h-5" />
@@ -286,7 +333,7 @@ export default function POS() {
                         ? 'border-green-300 bg-green-50 text-green-700'
                         : 'border-gray-200 text-gray-500'
                   }`}>
-                  Vaso {i + 1}
+                  {cup.label ? `${cup.label}` : `Vaso ${i + 1}`}
                   {cup.flavorIds.length > 0 && promoConfig.activeCup !== i && (
                     <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
                       <path d="M20 6L9 17l-5-5" strokeLinecap="round" strokeLinejoin="round"/>
