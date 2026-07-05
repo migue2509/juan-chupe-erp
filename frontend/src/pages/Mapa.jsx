@@ -48,6 +48,7 @@ export default function Mapa() {
   const [dateTo,   setDateTo]   = useState('')
   const [selected, setSelected] = useState(null) // punto seleccionado en el mapa
   const [legendOpen, setLegendOpen] = useState(false)
+  const [panelOpen,  setPanelOpen]  = useState(true)
 
   const fetchData = async () => {
     setLoading(true)
@@ -236,7 +237,7 @@ export default function Mapa() {
       </div>
 
       {/* Layout mapa + panel */}
-      <div className="flex-1 flex overflow-hidden">
+      <div className="flex-1 flex overflow-hidden relative">
 
         {/* Mapa */}
         <div className="flex-1 relative">
@@ -327,13 +328,34 @@ export default function Mapa() {
           )}
         </div>
 
+        {/* Botón abrir panel (solo visible cuando está cerrado) */}
+        {!panelOpen && (
+          <button
+            onClick={() => setPanelOpen(true)}
+            className="absolute right-0 top-1/2 -translate-y-1/2 z-[1000] bg-white border border-gray-200 shadow-md rounded-l-xl px-1.5 py-3 flex flex-col items-center gap-1 hover:bg-gray-50 transition-colors"
+            title="Ver domicilios"
+          >
+            <svg className="w-4 h-4 text-gray-500" viewBox="0 0 20 20" fill="currentColor">
+              <path fillRule="evenodd" d="M12.79 5.23a.75.75 0 01-.02 1.06L8.832 10l3.938 3.71a.75.75 0 11-1.04 1.08l-4.5-4.25a.75.75 0 010-1.08l4.5-4.25a.75.75 0 011.06.02z" clipRule="evenodd"/>
+            </svg>
+            <span className="text-[10px] text-gray-400 font-medium" style={{ writingMode: 'vertical-rl', transform: 'rotate(180deg)' }}>Domicilios</span>
+          </button>
+        )}
+
         {/* Panel lateral */}
-        <div className="w-72 flex-shrink-0 border-l border-gray-100 bg-white flex flex-col overflow-hidden">
+        <div className={`flex-shrink-0 border-l border-gray-100 bg-white flex flex-col overflow-hidden transition-all duration-300 ${panelOpen ? 'w-72' : 'w-0'}`}>
           {selected ? (
             <>
               <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
                 <p className="text-sm font-semibold text-gray-700">Detalle del domicilio</p>
-                <button onClick={() => setSelected(null)} className="text-gray-400 hover:text-gray-600 text-lg leading-none">✕</button>
+                <div className="flex items-center gap-2">
+                  <button onClick={() => setSelected(null)} className="text-gray-400 hover:text-gray-600 text-lg leading-none">✕</button>
+                  <button onClick={() => setPanelOpen(false)} className="text-gray-300 hover:text-gray-500 leading-none" title="Cerrar panel">
+                    <svg className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
+                      <path fillRule="evenodd" d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z" clipRule="evenodd"/>
+                    </svg>
+                  </button>
+                </div>
               </div>
               <div className="p-4 space-y-3 overflow-y-auto">
                 <div>
@@ -366,9 +388,16 @@ export default function Mapa() {
             </>
           ) : (
             <div className="flex-1 flex flex-col">
-              <div className="px-4 py-3 border-b border-gray-100">
-                <p className="text-sm font-semibold text-gray-700">Últimos domicilios</p>
-                <p className="text-xs text-gray-400 mt-0.5">Haz clic en un punto del mapa para ver detalles</p>
+              <div className="px-4 py-3 border-b border-gray-100 flex items-start justify-between gap-2">
+                <div>
+                  <p className="text-sm font-semibold text-gray-700">Últimos domicilios</p>
+                  <p className="text-xs text-gray-400 mt-0.5">Haz clic en un punto del mapa para ver detalles</p>
+                </div>
+                <button onClick={() => setPanelOpen(false)} className="text-gray-300 hover:text-gray-500 mt-0.5 flex-shrink-0" title="Cerrar panel">
+                  <svg className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z" clipRule="evenodd"/>
+                  </svg>
+                </button>
               </div>
               <div className="flex-1 overflow-y-auto divide-y divide-gray-50">
                 {data?.points?.slice().reverse().slice(0, 30).map(p => (
