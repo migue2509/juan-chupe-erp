@@ -175,12 +175,19 @@ class CashAuditViewSet(viewsets.ModelViewSet):
         for d in SellerCashDelivery.objects.filter(shift=shift):
             saved_map[d.seller_id] = d.net_delivered
 
+        # Gastos en efectivo POS por vendedora (quien los registró pagó de su caja)
+        seller_expenses_cash = defaultdict(Decimal)
+        for e in shift.expenses.filter(from_daily_cash=True, payment_method='cash', origin='pos'):
+            if e.registered_by_id is not None:
+                seller_expenses_cash[e.registered_by_id] += e.amount
+
         sellers_breakdown = sorted([
             {
                 'seller_id':    sid,
                 'seller_name':  info['name'],
                 'pos_cash':     int(info['cash']),
                 'pos_transfer': int(info['transfer']),
+                'expenses_cash': int(seller_expenses_cash.get(sid, 0)),
                 'net_delivered': int(saved_map[sid]) if sid in saved_map and saved_map[sid] is not None else None,
             }
             for sid, info in seller_groups.items()

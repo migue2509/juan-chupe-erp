@@ -143,7 +143,8 @@ function POSResumenModal({ shiftId, onClose }) {
             {sellers.filter(s => s.seller_id !== null).map(s => {
               const key        = String(s.seller_id)
               const totalVenta = s.pos_cash + s.pos_transfer
-              const expected   = s.pos_cash  // efectivo que debe entregar
+              const expCash    = s.expenses_cash || 0          // gastos que ella pagó de su caja
+              const expected   = s.pos_cash - expCash          // lo que debe entregar = efectivo - sus gastos
               const delivered  = deliveries[key]
               const diff       = delivered !== '' && delivered != null
                 ? (parseInt(delivered) || 0) - expected
@@ -181,8 +182,8 @@ function POSResumenModal({ shiftId, onClose }) {
                         <p className="text-base font-bold text-gray-700">{fmt(s.pos_cash)}</p>
                       </div>
                       <div className="text-center">
-                        <p className="text-[10px] text-gray-400 uppercase tracking-wide mb-1">Gastos turno*</p>
-                        <p className="text-base font-bold text-red-400">{fmt(p.expenses_from_cash || 0)}</p>
+                        <p className="text-[10px] text-gray-400 uppercase tracking-wide mb-1">Gastos registrados</p>
+                        <p className="text-base font-bold text-red-400">{expCash > 0 ? `- ${fmt(expCash)}` : <span className="text-gray-300">—</span>}</p>
                       </div>
                     </div>
 
@@ -192,6 +193,9 @@ function POSResumenModal({ shiftId, onClose }) {
                         <div>
                           <p className="text-[10px] text-gray-400 uppercase tracking-wide">Efectivo a entregar</p>
                           <p className="text-xl font-bold text-blue-700">{fmt(expected)}</p>
+                          {expCash > 0 && (
+                            <p className="text-[10px] text-gray-400 mt-0.5">{fmt(s.pos_cash)} − {fmt(expCash)} gastos</p>
+                          )}
                         </div>
                         <div className="text-right">
                           <p className="text-[10px] text-gray-400 uppercase tracking-wide mb-1">¿Cuánto entregó?</p>
@@ -226,7 +230,6 @@ function POSResumenModal({ shiftId, onClose }) {
 
             {sellers.filter(s => s.seller_id !== null).length > 0 && (
               <div className="flex items-center justify-between pt-1">
-                <p className="text-[10px] text-gray-400">* Los gastos son generales del turno, no por vendedora</p>
                 <button disabled={savingDeliveries} onClick={handleSaveDeliveries}
                   className="btn-primary text-sm py-1.5">
                   {savingDeliveries ? 'Guardando...' : 'Guardar entregas'}
