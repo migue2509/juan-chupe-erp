@@ -282,3 +282,117 @@ class RangeReportView(APIView):
                 'transfer': round(total_transfer / total_money * 100) if total_money else 0,
             },
         })
+
+
+class PlatformReportView(APIView):
+    """Reporte exclusivo de ventas Rappi / DiDi."""
+    permission_classes = [IsAdmin]
+
+    def get(self, request):
+        from django.utils.dateparse import parse_date
+        from django.db.models.functions import TruncDate
+        import datetime
+
+        date_from_str = request.query_params.get('date_from')
+        date_to_str   = request.query_params.get('date_to')
+        channel       = request.query_params.get('channel', 'all')  # all | rappi | didi
+
+        today_local = timezone.localdate()
+        date_from = parse_date(date_from_str) if date_from_str else today_local
+        date_to   = parse_date(date_to_str)   if date_to_str   else today_local
+
+        start_dt = timezone.make_aware(datetime.datetime.combine(date_from, datetime.time.min))
+        end_dt   = timezone.make_aware(datetime.datetime.combine(date_to,   datetime.time.max))
+
+        sales_qs = Sale.objects.filter(
+            created_at__gte=start_dt,
+            created_at__lte=end_dt,
+            promotion__category__in=['rappi', 'didi'],
+        ).exclude(invoice__voided=True).select_related('promotion', 'seller')
+
+        if channel in ('rappi', 'didi'):
+            sales_qs = sales_qs.filter(promotion__category=channel)
+
+        sales = list(sales_qs)
+
+        # ── Resumen general ──
+        total_net   = sum(float(s.total) for s in sales)
+        total_gross = sum(float(s.promotion.promo_price) for s in sales if s.promotion)
+        total_fee   = total_gross - total_net
+
+        # ── Por promoción ──
+        promo_map = {}
+        for s in sales:
+            if not s.promotion:
+                continue
+            key = s.promotion.name
+            if key not in promo_map:
+                promo_map[key] = {
+                    'name': key,
+                    'category': s.promotion.category,
+                    'orders': 0,
+                    'gross': 0.0,
+                    'fee': 0.0,
+                    'net': 0.0,
+                    'fee_pct': float(s.promotion.platform_fee_pct),
+                }
+            gross = float(s.promotion.promo_price)
+            net   = float(s.total)
+            promo_map[key]['orders'] += 1
+            promo_map[key]['gross']  += gross
+            promo_map[key]['fee']    += gross - net
+            promo_map[key]['net']    += net
+        by_promo = sorted(promo_map.values(), key=lambda x: x['orders'], reverse=True)
+
+        # ── Por vendedora ──
+        seller_map = {}
+        for s in sales:
+            name = (s.seller.full_name or s.seller.username) if s.seller else 'Sin asignar'
+            if name not in seller_map:
+                seller_map[name] = {'name': name, 'count': 0, 'net': 0.0}
+            seller_map[name]['count'] += 1
+            seller_map[name]['net']   += float(s.total)
+        by_seller = sorted(seller_map.values(), key=lambda x: x['net'], reverse=True)
+
+        # ── Tendencia diaria ──
+        daily_qs = sales_qs.annotate(day=TruncDate('created_at')).values('day').annotate(
+            orders=Count('id'), net=Sum('total'),
+        ).order_by('day')
+        by_day = [
+            {'date': str(r['day']), 'orders': r['orders'], 'net': float(r['net'] or 0)}
+            for r in daily_qs
+        ]
+
+        # ── Sabores más pedidos ──
+        flavor_qs = SaleItemFlavor.objects.filter(
+            sale_item__sale__in=sales_qs,
+        ).values('flavor__name').annotate(total_ml=Sum('ml_consumed')).order_by('-total_ml')[:10]
+        top_flavors = [{'name': r['flavor__name'], 'ml': float(r['total_ml'] or 0)} for r in flavor_qs]
+
+        # ── Split por plataforma (para vista "Ambas") ──
+        platform_split = {}
+        for s in sales:
+            cat = s.promotion.category if s.promotion else 'unknown'
+            if cat not in platform_split:
+                platform_split[cat] = {'orders': 0, 'net': 0.0, 'gross': 0.0}
+            platform_split[cat]['orders'] += 1
+            platform_split[cat]['net']    += float(s.total)
+            if s.promotion:
+                platform_split[cat]['gross'] += float(s.promotion.promo_price)
+
+        return Response({
+            'date_from':      str(date_from),
+            'date_to':        str(date_to),
+            'channel':        channel,
+            'summary': {
+                'orders': len(sales),
+                'gross':  round(total_gross, 0),
+                'fee':    round(total_fee, 0),
+                'net':    round(total_net, 0),
+            },
+            'platform_split': platform_split,
+            'by_promo':       by_promo,
+            'by_seller':      by_seller,
+            'by_day':         by_day,
+            'top_flavors':    top_flavors,
+        })

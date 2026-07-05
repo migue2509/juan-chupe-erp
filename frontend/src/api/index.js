@@ -122,6 +122,7 @@ export const getWeeklyReport   = () => api.get('/reports/weekly/')
 export const getMonthlyReport  = () => api.get('/reports/monthly/')
 export const getInventoryStatus= () => api.get('/reports/inventory/')
 export const getRangeReport    = (dateFrom, dateTo, channel = 'all') => api.get('/reports/range/', { params: { date_from: dateFrom, date_to: dateTo, channel } })
+export const getPlatformReport = (dateFrom, dateTo, channel = 'all') => api.get('/reports/platform/', { params: { date_from: dateFrom, date_to: dateTo, channel } })
 
 // ── Config POS ──────────────────────────────────────────────────────────────
 export const getTransferMethods    = ()       => api.get('/store-config/transfer-methods/')

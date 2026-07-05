@@ -1,5 +1,5 @@
 from django.urls import path
-from .views import DailySummaryView, WeeklyReportView, MonthlyReportView, InventoryStatusView, RangeReportView
+from .views import DailySummaryView, WeeklyReportView, MonthlyReportView, InventoryStatusView, RangeReportView, PlatformReportView
 
 urlpatterns = [
     path('daily/', DailySummaryView.as_view(), name='daily-report'),
@@ -7,4 +7,5 @@ urlpatterns = [
     path('monthly/', MonthlyReportView.as_view(), name='monthly-report'),
     path('inventory/', InventoryStatusView.as_view(), name='inventory-status'),
     path('range/', RangeReportView.as_view(), name='range-report'),
+    path('platform/', PlatformReportView.as_view(), name='platform-report'),
 ]

@@ -17,6 +17,7 @@ import Attendance from '../pages/Attendance'
 import Payroll from '../pages/Payroll'
 import ConfigPOS from '../pages/ConfigPOS'
 import Mapa from '../pages/Mapa'
+import Platforms from '../pages/Platforms'
 
 function PrivateRoute({ children, adminOnly = false }) {
   const { user, loading } = useAuth()
@@ -47,6 +48,7 @@ export default function AppRoutes() {
         <Route path="payroll"    element={<PrivateRoute adminOnly><Payroll /></PrivateRoute>} />
         <Route path="config-pos" element={<PrivateRoute adminOnly><ConfigPOS /></PrivateRoute>} />
         <Route path="mapa"       element={<PrivateRoute adminOnly><Mapa /></PrivateRoute>} />
+        <Route path="platforms"  element={<PrivateRoute adminOnly><Platforms /></PrivateRoute>} />
       </Route>
     </Routes>
   )
