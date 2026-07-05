@@ -94,8 +94,8 @@ function POSResumenModal({ shiftId, onClose }) {
         {/* ── Tab navigation ── */}
         <div className="px-6 border-b border-gray-100 flex gap-0 flex-shrink-0">
           {[
-            { key: 'sellers',     label: '👩‍💼 Vendedoras' },
-            { key: 'liquidacion', label: '📦 Liquidación' },
+            { key: 'sellers',     label: 'Vendedoras' },
+            { key: 'liquidacion', label: 'Liquidación' },
           ].map(tab => (
             <button key={tab.key} onClick={() => setActiveTab(tab.key)}
               className={`px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
@@ -159,11 +159,11 @@ function POSResumenModal({ shiftId, onClose }) {
                     {diff === null ? (
                       <span className="text-xs text-gray-400">Sin registrar</span>
                     ) : diff === 0 ? (
-                      <span className="text-xs font-semibold text-green-600 bg-green-100 px-2.5 py-1 rounded-full">✅ Cuadrada</span>
+                      <span className="text-xs font-semibold text-green-600 bg-green-100 px-2.5 py-1 rounded-full">Cuadrada</span>
                     ) : diff < 0 ? (
-                      <span className="text-xs font-semibold text-red-600 bg-red-100 px-2.5 py-1 rounded-full">❌ Faltante {fmt(Math.abs(diff))}</span>
+                      <span className="text-xs font-semibold text-red-600 bg-red-100 px-2.5 py-1 rounded-full">Faltante {fmt(Math.abs(diff))}</span>
                     ) : (
-                      <span className="text-xs font-semibold text-amber-600 bg-amber-100 px-2.5 py-1 rounded-full">⚠️ Sobrante {fmt(diff)}</span>
+                      <span className="text-xs font-semibold text-amber-600 bg-amber-100 px-2.5 py-1 rounded-full">Sobrante {fmt(diff)}</span>
                     )}
                   </div>
 
@@ -216,10 +216,10 @@ function POSResumenModal({ shiftId, onClose }) {
                                       'bg-amber-100 text-amber-700'
                         }`}>
                           {diff === 0
-                            ? '✅ Cuadrada — entrega correcta'
+                            ? 'Cuadrada — entrega correcta'
                             : diff < 0
-                              ? `❌ Descuadrada — faltante de ${fmt(Math.abs(diff))}`
-                              : `⚠️ Descuadrada — sobrante de ${fmt(diff)}`
+                              ? `Descuadrada — faltante de ${fmt(Math.abs(diff))}`
+                              : `Descuadrada — sobrante de ${fmt(diff)}`
                           }
                         </div>
                       )}
@@ -428,7 +428,7 @@ function POSResumenModal({ shiftId, onClose }) {
                       {diff === null ? (
                         <span className="text-gray-300 text-sm">—</span>
                       ) : diff === 0 ? (
-                        <span className="text-green-600 font-bold text-sm">✅</span>
+                        <span className="text-green-600 font-bold text-sm">OK</span>
                       ) : diff < 0 ? (
                         <span className="text-red-600 font-bold text-sm">-{Math.abs(diff)}</span>
                       ) : (
@@ -563,6 +563,33 @@ function DomiciliosResumenModal({ shiftId, onClose }) {
                 </div>
               </div>
             </div>
+            {/* Domicilios por domiciliario */}
+            {(p.delivery_breakdown || []).length > 0 && (
+              <div className="card p-0 overflow-hidden mt-3">
+                <div className="px-4 py-2.5 border-b border-gray-100">
+                  <p className="text-[10px] font-bold text-orange-500 uppercase tracking-widest">Domicilios por repartidor</p>
+                </div>
+                <div className="grid text-[10px] font-semibold text-gray-400 uppercase tracking-widest px-4 py-2 bg-gray-50 border-b border-gray-100"
+                  style={{ gridTemplateColumns: '2fr 60px 100px 100px 100px' }}>
+                  <span>Repartidor</span>
+                  <span className="text-center">Pedidos</span>
+                  <span className="text-center">Total</span>
+                  <span className="text-center">Efectivo</span>
+                  <span className="text-center">Transfer.</span>
+                </div>
+                {(p.delivery_breakdown || []).map(d => (
+                  <div key={d.id} className="grid items-center px-4 py-2.5 border-b border-gray-50 last:border-0"
+                    style={{ gridTemplateColumns: '2fr 60px 100px 100px 100px' }}>
+                    <span className="text-sm font-medium text-gray-800">{d.name}</span>
+                    <span className="text-center text-sm font-bold text-orange-600">{d.count}</span>
+                    <span className="text-center text-sm font-semibold text-gray-700">{fmt(d.total)}</span>
+                    <span className="text-center text-sm text-gray-600">{fmt(d.cash)}</span>
+                    <span className="text-center text-sm text-cyan-600">{d.transfer > 0 ? fmt(d.transfer) : <span className="text-gray-300">—</span>}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+
             {/* Cuadre de domicilios */}
             <div className="card p-4 mt-3 border-l-4 border-orange-300">
               <p className="text-[10px] font-bold text-orange-500 uppercase tracking-widest mb-3">Cuadre de domicilios</p>

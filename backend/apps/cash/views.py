@@ -150,6 +150,30 @@ class CashAuditViewSet(viewsets.ModelViewSet):
             )
         )
 
+        # ── Resumen por domiciliario ──
+        from apps.deliveries.models import Delivery
+        dom_groups = defaultdict(lambda: {'name': 'Sin asignar', 'count': 0, 'total': Decimal('0'), 'cash': Decimal('0'), 'transfer': Decimal('0')})
+        for d in Delivery.objects.filter(shift=shift).exclude(status='cancelled').select_related('delivery_person', 'sale'):
+            key = d.delivery_person_id or 0
+            if d.delivery_person:
+                dom_groups[key]['name'] = d.delivery_person.name
+            dom_groups[key]['count']    += 1
+            dom_groups[key]['total']    += d.sale.total
+            dom_groups[key]['cash']     += d.sale.total - d.sale.transfer_amount
+            dom_groups[key]['transfer'] += d.sale.transfer_amount
+
+        delivery_breakdown = sorted([
+            {
+                'id':       did,
+                'name':     info['name'],
+                'count':    info['count'],
+                'total':    int(info['total']),
+                'cash':     int(info['cash']),
+                'transfer': int(info['transfer']),
+            }
+            for did, info in dom_groups.items()
+        ], key=lambda x: -x['count'])
+
         # ── Estado de arqueos existentes ──
         arqueos = {}
         for a in CashAudit.objects.filter(shift=shift).select_related('audited_by'):
@@ -323,6 +347,8 @@ class CashAuditViewSet(viewsets.ModelViewSet):
             'delivery_expenses_no_cash':  expenses_dom_no_cash,  # gastos que no afectan caja dom
             'delivery_net_cash':        delivery_cash - expenses_dom_cash,
             'delivery_net_delivered':   delivery_net_delivered,
+            # Resumen por domiciliario
+            'delivery_breakdown': delivery_breakdown,
             # Cuadre por vendedora
             'sellers_breakdown': sellers_breakdown,
             # Catálogo (liquidación solo POS)
