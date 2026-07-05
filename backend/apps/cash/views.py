@@ -267,24 +267,30 @@ class CashAuditViewSet(viewsets.ModelViewSet):
 
             # Ventas a precio regular (sin promoción)
             reg = base_qs.filter(sale__promotion__isnull=True).aggregate(qty=Sum('quantity'), rev=Sum('subtotal'))
-            # Ventas con promoción (precio diferente)
-            promo_items = base_qs.filter(sale__promotion__isnull=False)
-            promo = promo_items.aggregate(qty=Sum('quantity'), rev=Sum('subtotal'))
+            # Ventas con promoción POS (excluye Rappi/DiDi)
+            pos_promo = base_qs.filter(
+                sale__promotion__isnull=False
+            ).exclude(sale__promotion__category__in=['rappi', 'didi']).aggregate(qty=Sum('quantity'), rev=Sum('subtotal'))
+            # Ventas de plataforma — se muestran en unidades pero liquidan en $0
+            plat = base_qs.filter(
+                sale__promotion__category__in=['rappi', 'didi']
+            ).aggregate(qty=Sum('quantity'))
 
-            # Precio unitario promedio de promo (para mostrar en tabla)
+            # Precio unitario promedio de promo POS (para mostrar en tabla)
             promo_unit = None
-            if int(promo['qty'] or 0) > 0:
-                promo_unit = int(int(promo['rev'] or 0) / int(promo['qty']))
+            if int(pos_promo['qty'] or 0) > 0:
+                promo_unit = int(int(pos_promo['rev'] or 0) / int(pos_promo['qty']))
 
             cup_revenue[name] = {
                 'regular_qty':     int(reg['qty'] or 0),
                 'regular_revenue': int(reg['rev'] or 0),
-                'promo_qty':       int(promo['qty'] or 0),
-                'promo_revenue':   int(promo['rev'] or 0),
+                'promo_qty':       int(pos_promo['qty'] or 0),
+                'promo_revenue':   int(pos_promo['rev'] or 0),
                 'promo_unit':      promo_unit,
-                # totales consolidados
-                'sales_qty':     int((reg['qty'] or 0) + (promo['qty'] or 0)),
-                'sales_revenue': int((reg['rev'] or 0) + (promo['rev'] or 0)),
+                'plat_qty':        int(plat['qty'] or 0),
+                # totales: qty incluye plataformas, revenue NO (se liquidan en $0)
+                'sales_qty':     int((reg['qty'] or 0) + (pos_promo['qty'] or 0) + (plat['qty'] or 0)),
+                'sales_revenue': int((reg['rev'] or 0) + (pos_promo['rev'] or 0)),
             }
 
         # ── Catálogo ──
@@ -305,7 +311,8 @@ class CashAuditViewSet(viewsets.ModelViewSet):
                 'entries':       entries,   # ingresos al inventario durante la jornada
                 **cup_revenue.get(name, {'sales_qty': 0, 'sales_revenue': 0,
                                          'regular_qty': 0, 'regular_revenue': 0,
-                                         'promo_qty': 0, 'promo_revenue': 0, 'promo_unit': None}),
+                                         'promo_qty': 0, 'promo_revenue': 0, 'promo_unit': None,
+                                         'plat_qty': 0}),
             })
 
         for t in Topping.objects.filter(is_active=True).order_by('name'):

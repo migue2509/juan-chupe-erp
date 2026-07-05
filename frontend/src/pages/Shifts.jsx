@@ -303,9 +303,11 @@ function POSResumenModal({ shiftId, onClose }) {
                     <span className="text-[10px] font-bold text-blue-600 uppercase tracking-widest">Vasos</span>
                   </div>
                   {cups.map(row => {
-                    const hasRegular = row.regular_qty > 0
-                    const hasPromo   = row.promo_qty > 0
-                    if (!hasRegular && !hasPromo) return null
+                    const hasRegular  = row.regular_qty > 0
+                    const hasPromo    = row.promo_qty > 0
+                    const hasPlat     = (row.plat_qty || 0) > 0
+                    const rowCount    = [hasRegular, hasPromo, hasPlat].filter(Boolean).length
+                    if (!hasRegular && !hasPromo && !hasPlat) return null
                     return (
                       <div key={row.product_name}>
                         {/* Fila nombre del vaso */}
@@ -322,7 +324,7 @@ function POSResumenModal({ shiftId, onClose }) {
                             <span className="text-center text-sm font-bold text-emerald-700">{fmt(row.regular_revenue)}</span>
                           </div>
                         )}
-                        {/* Sub-fila Promo */}
+                        {/* Sub-fila Promoción POS */}
                         {hasPromo && (
                           <div className="grid items-center px-4 py-1.5 border-b border-gray-100 bg-amber-50/50"
                             style={{ gridTemplateColumns: COL, minWidth: '600px' }}>
@@ -332,8 +334,20 @@ function POSResumenModal({ shiftId, onClose }) {
                             <span className="text-center text-sm font-bold text-amber-700">{fmt(row.promo_revenue)}</span>
                           </div>
                         )}
+                        {/* Sub-fila Plataforma (Rappi/DiDi) — liquidan en $0 */}
+                        {hasPlat && (
+                          <div className="grid items-center px-4 py-1.5 border-b border-gray-100"
+                            style={{ gridTemplateColumns: COL, minWidth: '600px', background: '#FF424D08' }}>
+                            <span className="text-xs font-medium pl-3" style={{ color: '#FF424D' }}>
+                              Rappi / DiDi
+                            </span>
+                            <span className="text-center text-xs text-gray-400">$0</span>
+                            <span className="text-center text-sm font-semibold" style={{ color: '#FF424D' }}>{row.plat_qty}</span>
+                            <span className="text-center text-sm font-bold text-gray-400">$0</span>
+                          </div>
+                        )}
                         {/* Sub-total del tamaño */}
-                        {hasRegular && hasPromo && (
+                        {rowCount > 1 && (
                           <div className="grid items-center px-4 py-1.5 border-b border-gray-200 bg-gray-50"
                             style={{ gridTemplateColumns: COL, minWidth: '600px' }}>
                             <span className="text-xs font-semibold text-gray-600 pl-3">Subtotal {row.product_name}</span>
