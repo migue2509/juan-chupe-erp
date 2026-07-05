@@ -14,6 +14,8 @@ const FILTERS = [
   { key: 'all',      label: 'Todos' },
   { key: 'pos',      label: 'Punto de Venta' },
   { key: 'delivery', label: 'Domicilios' },
+  { key: 'rappi',    label: 'Rappi' },
+  { key: 'didi',     label: 'DiDi' },
 ]
 
 export default function Dashboard() {
@@ -60,12 +62,14 @@ export default function Dashboard() {
   }
 
   // ── Filter sales by jornada activa + categoría ──
-  // Doble filtro: el backend ya filtra por jornada, pero también verificamos el campo shift en frontend
   const shiftId = shift?.id
+  const isPlatformSale = s => s.promotion_category === 'rappi' || s.promotion_category === 'didi'
   const filteredSales = allSales.filter(s => {
-    if (shiftId && s.shift !== shiftId) return false   // solo ventas de la jornada activa
+    if (shiftId && s.shift !== shiftId) return false
     if (filter === 'delivery') return s.is_delivery === true && s.delivery_status !== null
-    if (filter === 'pos')      return !(s.is_delivery === true && s.delivery_status !== null)
+    if (filter === 'pos')      return !s.is_delivery && !isPlatformSale(s)
+    if (filter === 'rappi')    return s.promotion_category === 'rappi'
+    if (filter === 'didi')     return s.promotion_category === 'didi'
     return true
   })
   const activeSales = filteredSales.filter(s => !s.is_voided)
@@ -96,7 +100,8 @@ export default function Dashboard() {
   }, 0)
 
   const filteredExpenses = expenses.filter(e => {
-    if (shiftId && e.shift !== shiftId) return false   // solo gastos de la jornada activa
+    if (shiftId && e.shift !== shiftId) return false
+    if (filter === 'rappi' || filter === 'didi') return false  // plataformas no generan gastos
     if (filter === 'pos')      return e.origin === 'pos'
     if (filter === 'delivery') return e.origin === 'delivery'
     return true
@@ -396,6 +401,63 @@ export default function Dashboard() {
         </div>
       )}
 
+      {/* ── Sección plataforma (Rappi / DiDi) ── */}
+      {(filter === 'rappi' || filter === 'didi') && (() => {
+        const platformColor  = filter === 'rappi' ? '#FF424D' : '#FF6600'
+        const platformLabel  = filter === 'rappi' ? 'Rappi' : 'DiDi'
+        const platformActive = activeSales  // ya filtradas por canal
+        const promoMap = {}
+        platformActive.forEach(s => {
+          const name = s.promotion_name || 'Sin promo'
+          if (!promoMap[name]) promoMap[name] = { count: 0, total: 0 }
+          promoMap[name].count++
+          promoMap[name].total += valorVenta(s)
+        })
+        const promoChart = Object.entries(promoMap)
+          .map(([name, d]) => ({ name, ...d }))
+          .sort((a, b) => b.total - a.total)
+        const maxPromoTotal = Math.max(...promoChart.map(d => d.total), 1)
+        return (
+          <div className="card p-0 overflow-hidden">
+            <div className="flex items-center gap-2 px-5 py-4 border-b border-gray-100">
+              <span className="w-4 h-4 rounded text-white text-[10px] font-bold flex items-center justify-center flex-shrink-0"
+                style={{ background: platformColor }}>{platformLabel[0]}</span>
+              <h2>Pedidos {platformLabel}</h2>
+              <span className="badge ml-auto text-white text-xs" style={{ background: platformColor }}>
+                {platformActive.length} {platformActive.length === 1 ? 'pedido' : 'pedidos'}
+              </span>
+            </div>
+            {promoChart.length === 0 ? (
+              <div className="flex items-center justify-center py-10 text-gray-300 text-sm">Sin pedidos</div>
+            ) : (
+              <div className="px-5 py-4 space-y-3">
+                {promoChart.map(d => (
+                  <div key={d.name}>
+                    <div className="flex items-center justify-between mb-1.5">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span className="text-sm font-medium text-gray-800 truncate">{d.name}</span>
+                        <span className="badge-gray text-[10px] flex-shrink-0">{d.count} {d.count === 1 ? 'pedido' : 'pedidos'}</span>
+                      </div>
+                      <span className="text-sm font-bold text-gray-900 tabular-nums ml-3 flex-shrink-0">{fmt(d.total)}</span>
+                    </div>
+                    <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
+                      <div className="h-full rounded-full transition-all duration-500"
+                        style={{ width: `${(d.total / maxPromoTotal) * 100}%`, background: platformColor }} />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+            {promoChart.length > 0 && (
+              <div className="flex items-center justify-between px-5 py-3 border-t border-gray-100 bg-slate-50">
+                <span className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Total neto</span>
+                <span className="text-base font-bold text-gray-900 tabular-nums">{fmt(totalDinero)}</span>
+              </div>
+            )}
+          </div>
+        )
+      })()}
+
       {/* ── Bottom row ── */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 items-start">
 
@@ -488,11 +550,17 @@ export default function Dashboard() {
                     {sale.seller_name || <span className="text-gray-300">—</span>}
                   </span>
                   <span className="flex flex-col gap-0.5 items-start">
-                    <span className={`badge text-[11px] ${
-                      sale.is_courtesy ? 'bg-pink-100 text-pink-600' :
-                      sale.is_delivery ? 'badge-cyan' : 'badge-pink'}`}>
-                      {sale.is_courtesy ? 'Cortesía' : sale.is_delivery ? 'Domicilio' : 'POS'}
-                    </span>
+                    {sale.promotion_category === 'rappi' ? (
+                      <span className="badge text-[11px] text-white" style={{ background: '#FF424D' }}>Rappi</span>
+                    ) : sale.promotion_category === 'didi' ? (
+                      <span className="badge text-[11px] text-white" style={{ background: '#FF6600' }}>DiDi</span>
+                    ) : (
+                      <span className={`badge text-[11px] ${
+                        sale.is_courtesy ? 'bg-pink-100 text-pink-600' :
+                        sale.is_delivery ? 'badge-cyan' : 'badge-pink'}`}>
+                        {sale.is_courtesy ? 'Cortesía' : sale.is_delivery ? 'Domicilio' : 'POS'}
+                      </span>
+                    )}
                     {delivSt && (
                       <span className={`badge text-[10px] ${delivSt.cls}`}>{delivSt.label}</span>
                     )}
