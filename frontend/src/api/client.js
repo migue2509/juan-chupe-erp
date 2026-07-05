@@ -35,7 +35,11 @@ api.interceptors.response.use(
         window.location.href = '/login'
       }
     }
-    const msg = error.response?.data?.detail || 'Error del servidor'
+    const d = error.response?.data
+    const msg = d?.detail
+      || (Array.isArray(d?.non_field_errors) ? d.non_field_errors[0] : null)
+      || (typeof d === 'string' ? d : null)
+      || 'Error del servidor'
     toast.error(msg)
     return Promise.reject(error)
   }
