@@ -27,6 +27,8 @@ const CHANNELS = [
   { key: 'all',      label: 'Todos' },
   { key: 'pos',      label: 'Punto de Venta' },
   { key: 'delivery', label: 'Domicilios' },
+  { key: 'rappi',    label: 'Rappi' },
+  { key: 'didi',     label: 'DiDi' },
 ]
 
 const PIE_COLORS   = ['#00E5FF', '#7B2FFF']

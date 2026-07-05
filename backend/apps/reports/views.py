@@ -143,7 +143,7 @@ class RangeReportView(APIView):
 
         date_from_str = request.query_params.get('date_from')
         date_to_str   = request.query_params.get('date_to')
-        channel       = request.query_params.get('channel', 'all')  # all | pos | delivery
+        channel       = request.query_params.get('channel', 'all')  # all | pos | delivery | rappi | didi
 
         today_local = timezone.localdate()
         date_from = parse_date(date_from_str) if date_from_str else today_local
@@ -157,9 +157,11 @@ class RangeReportView(APIView):
             created_at__gte=start_dt, created_at__lte=end_dt,
         ).exclude(invoice__voided=True)
         if channel == 'pos':
-            sales_qs = sales_qs.filter(is_delivery=False)
+            sales_qs = sales_qs.filter(is_delivery=False).exclude(promotion__category__in=['rappi', 'didi'])
         elif channel == 'delivery':
             sales_qs = sales_qs.filter(is_delivery=True)
+        elif channel in ('rappi', 'didi'):
+            sales_qs = sales_qs.filter(promotion__category=channel)
         sales = sales_qs.select_related('seller')
 
         expenses_qs = Expense.objects.filter(created_at__gte=start_dt, created_at__lte=end_dt)
@@ -167,6 +169,8 @@ class RangeReportView(APIView):
             expenses_qs = expenses_qs.filter(origin='pos')
         elif channel == 'delivery':
             expenses_qs = expenses_qs.filter(origin='delivery')
+        elif channel in ('rappi', 'didi'):
+            expenses_qs = expenses_qs.none()  # plataformas no generan gastos
 
         # ── Ventas por vendedora ──────────────────────────────────────────────
         seller_map = {}
