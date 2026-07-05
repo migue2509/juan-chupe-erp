@@ -1308,6 +1308,8 @@ function ShiftDetail({ shift, onBack, onShiftUpdate }) {
     { key: 'all',      label: 'Todos' },
     { key: 'pos',      label: 'POS' },
     { key: 'delivery', label: 'Domicilios' },
+    { key: 'rappi',    label: 'Rappi' },
+    { key: 'didi',     label: 'DiDi' },
   ]
 
   const PAYMENT_LABELS = { cash: 'Efectivo', transfer: 'Transferencia', mixed: 'Mixto' }
@@ -1391,6 +1393,61 @@ function ShiftDetail({ shift, onBack, onShiftUpdate }) {
                     <p className="text-xs text-gray-400">Transfer: {fmt(detail.summary.dom_transfer)}</p>
                   </div>
                 </div>
+
+                {/* Sección plataformas — separada, no mezcla con POS/DOM */}
+                {(detail.summary.rappi_count > 0 || detail.summary.didi_count > 0) && (
+                  <div className="card p-4 border-l-4" style={{ borderLeftColor: '#7B2FFF' }}>
+                    <p className="text-[10px] font-bold uppercase tracking-widest mb-3" style={{ color: '#7B2FFF' }}>
+                      Plataformas (Rappi / DiDi) — transferencia independiente
+                    </p>
+                    <div className="grid grid-cols-2 gap-3">
+                      {detail.summary.rappi_count > 0 && (
+                        <div className="rounded-xl p-3 border" style={{ borderColor: '#FF424D40', background: '#FF424D08' }}>
+                          <div className="flex items-center gap-2 mb-2">
+                            <span className="text-xs font-bold px-2 py-0.5 rounded text-white" style={{ background: '#FF424D' }}>Rappi</span>
+                            <span className="text-xs text-gray-500">{detail.summary.rappi_count} pedido{detail.summary.rappi_count !== 1 ? 's' : ''}</span>
+                          </div>
+                          <div className="grid grid-cols-3 gap-2 text-center">
+                            <div>
+                              <p className="text-[10px] text-gray-400 uppercase mb-0.5">Bruto</p>
+                              <p className="text-sm font-bold text-gray-600">{fmt(detail.summary.rappi_gross)}</p>
+                            </div>
+                            <div>
+                              <p className="text-[10px] text-gray-400 uppercase mb-0.5">Comisión</p>
+                              <p className="text-sm font-bold text-red-500">-{fmt(detail.summary.rappi_fee)}</p>
+                            </div>
+                            <div>
+                              <p className="text-[10px] text-gray-400 uppercase mb-0.5">Neto</p>
+                              <p className="text-sm font-bold" style={{ color: '#FF424D' }}>{fmt(detail.summary.rappi_total)}</p>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                      {detail.summary.didi_count > 0 && (
+                        <div className="rounded-xl p-3 border" style={{ borderColor: '#FF660040', background: '#FF660008' }}>
+                          <div className="flex items-center gap-2 mb-2">
+                            <span className="text-xs font-bold px-2 py-0.5 rounded text-white" style={{ background: '#FF6600' }}>DiDi</span>
+                            <span className="text-xs text-gray-500">{detail.summary.didi_count} pedido{detail.summary.didi_count !== 1 ? 's' : ''}</span>
+                          </div>
+                          <div className="grid grid-cols-3 gap-2 text-center">
+                            <div>
+                              <p className="text-[10px] text-gray-400 uppercase mb-0.5">Bruto</p>
+                              <p className="text-sm font-bold text-gray-600">{fmt(detail.summary.didi_gross)}</p>
+                            </div>
+                            <div>
+                              <p className="text-[10px] text-gray-400 uppercase mb-0.5">Comisión</p>
+                              <p className="text-sm font-bold text-red-500">-{fmt(detail.summary.didi_fee)}</p>
+                            </div>
+                            <div>
+                              <p className="text-[10px] text-gray-400 uppercase mb-0.5">Neto</p>
+                              <p className="text-sm font-bold" style={{ color: '#FF6600' }}>{fmt(detail.summary.didi_total)}</p>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
                 {/* Gastos Jornada breakdown */}
                 <div className="card p-4 border-l-4 border-red-300">
                   <p className="text-[10px] font-bold text-red-500 uppercase tracking-widest mb-3">Gastos Jornada</p>
@@ -1491,6 +1548,35 @@ function ShiftDetail({ shift, onBack, onShiftUpdate }) {
             )
           })()}
 
+          {(channel === 'rappi' || channel === 'didi') && (() => {
+            const color = channel === 'rappi' ? '#FF424D' : '#FF6600'
+            const label = channel === 'rappi' ? 'Rappi' : 'DiDi'
+            const gross = channel === 'rappi' ? detail.summary.rappi_gross : detail.summary.didi_gross
+            const fee   = channel === 'rappi' ? detail.summary.rappi_fee   : detail.summary.didi_fee
+            const net   = channel === 'rappi' ? detail.summary.rappi_total : detail.summary.didi_total
+            const count = channel === 'rappi' ? detail.summary.rappi_count : detail.summary.didi_count
+            return (
+              <div className="grid grid-cols-4 gap-3">
+                <div className="stat-card">
+                  <p className="stat-label">Pedidos {label}</p>
+                  <p className="text-xl font-bold tabular-nums" style={{ color }}>{count}</p>
+                </div>
+                <div className="stat-card">
+                  <p className="stat-label">Bruto</p>
+                  <p className="text-xl font-bold text-gray-700 tabular-nums">{fmt(gross)}</p>
+                </div>
+                <div className="stat-card">
+                  <p className="stat-label">Comisión plataforma</p>
+                  <p className="text-xl font-bold text-red-500 tabular-nums">-{fmt(fee)}</p>
+                </div>
+                <div className="stat-card border-2" style={{ borderColor: color + '40' }}>
+                  <p className="stat-label">Neto recibido</p>
+                  <p className="text-xl font-bold tabular-nums" style={{ color }}>{fmt(net)}</p>
+                </div>
+              </div>
+            )
+          })()}
+
           {/* Ventas */}
           <div className="card p-0 overflow-hidden overflow-x-auto">
             <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
@@ -1532,11 +1618,17 @@ function ShiftDetail({ shift, onBack, onShiftUpdate }) {
                           <span className="text-sm tabular-nums text-gray-500">{fmtHr(s.created_at)}</span>
                           <span className="text-sm text-gray-700">{s.seller}</span>
                           <span className="text-sm font-bold text-brand-pink tabular-nums">{fmt(s.total)}</span>
-                          <span className={`badge text-xs w-fit ${
-                            s.is_courtesy ? 'bg-pink-100 text-pink-600' :
-                            s.is_delivery ? 'badge-cyan' : 'badge-pink'}`}>
-                            {s.is_courtesy ? 'Cortesía' : s.is_delivery ? 'Domicilio' : 'POS'}
-                          </span>
+                          {s.promotion_category === 'rappi' ? (
+                            <span className="badge text-xs w-fit text-white" style={{ background: '#FF424D' }}>Rappi</span>
+                          ) : s.promotion_category === 'didi' ? (
+                            <span className="badge text-xs w-fit text-white" style={{ background: '#FF6600' }}>DiDi</span>
+                          ) : (
+                            <span className={`badge text-xs w-fit ${
+                              s.is_courtesy ? 'bg-pink-100 text-pink-600' :
+                              s.is_delivery ? 'badge-cyan' : 'badge-pink'}`}>
+                              {s.is_courtesy ? 'Cortesía' : s.is_delivery ? 'Domicilio' : 'POS'}
+                            </span>
+                          )}
                           <span className={`badge text-xs w-fit ${PAYMENT_BADGE[s.payment_method] ?? 'badge-gray'}`}>
                             {PAYMENT_LABELS[s.payment_method] ?? s.payment_method}
                           </span>

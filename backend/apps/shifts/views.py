@@ -61,17 +61,21 @@ class ShiftViewSet(viewsets.ReadOnlyModelViewSet):
 
         sales_qs = Sale.objects.filter(shift=shift).prefetch_related(
             'items__cup_size', 'items__topping', 'items__saleitems_flavors__flavor'
-        ).select_related('invoice')
+        ).select_related('invoice', 'promotion')
         if channel == 'pos':
-            sales_qs = sales_qs.filter(is_delivery=False)
+            sales_qs = sales_qs.filter(is_delivery=False).exclude(promotion__category__in=['rappi', 'didi'])
         elif channel == 'delivery':
             sales_qs = sales_qs.filter(is_delivery=True)
+        elif channel in ('rappi', 'didi'):
+            sales_qs = sales_qs.filter(promotion__category=channel)
 
         expenses_qs = shift.expenses.all().order_by('-created_at')
         if channel == 'pos':
             expenses_qs = expenses_qs.filter(origin='pos')
         elif channel == 'delivery':
             expenses_qs = expenses_qs.filter(origin='delivery')
+        elif channel in ('rappi', 'didi'):
+            expenses_qs = expenses_qs.none()
 
         # ── Totales del filtro activo ──
         # Nota: cash_received incluye vuelto, así que efectivo real = total - transfer_amount
@@ -81,9 +85,14 @@ class ShiftViewSet(viewsets.ReadOnlyModelViewSet):
         total_expenses = sum(e.amount for e in expenses_qs)
 
         # ── Desglose completo por canal (siempre, independiente del filtro) ──
-        all_sales  = Sale.objects.filter(shift=shift)
-        pos_sales  = list(all_sales.filter(is_delivery=False))
-        dom_sales  = list(all_sales.filter(is_delivery=True))
+        all_sales_qs = Sale.objects.filter(shift=shift).select_related('promotion')
+        all_sales_list = list(all_sales_qs)
+        # POS excluye plataformas
+        pos_sales  = [s for s in all_sales_list if not s.is_delivery and not (s.promotion and s.promotion.category in ('rappi', 'didi'))]
+        dom_sales  = [s for s in all_sales_list if s.is_delivery]
+        plat_sales = [s for s in all_sales_list if s.promotion and s.promotion.category in ('rappi', 'didi')]
+        rappi_sales = [s for s in plat_sales if s.promotion.category == 'rappi']
+        didi_sales  = [s for s in plat_sales if s.promotion.category == 'didi']
 
         # efectivo real = total de la venta - lo que fue por transferencia
         def _transfer(lst): return sum(s.transfer_amount for s in lst)
@@ -96,7 +105,12 @@ class ShiftViewSet(viewsets.ReadOnlyModelViewSet):
         dom_total       = _total(dom_sales)
         dom_cash        = _cash(dom_sales)
         dom_transfer    = _transfer(dom_sales)
-        all_total       = pos_total + dom_total
+        plat_total      = float(_total(plat_sales))
+        rappi_total     = float(_total(rappi_sales))
+        didi_total      = float(_total(didi_sales))
+        rappi_gross     = sum(float(s.promotion.promo_price) for s in rappi_sales)
+        didi_gross      = sum(float(s.promotion.promo_price) for s in didi_sales)
+        all_total       = pos_total + dom_total  # NO incluye plataformas
 
         expenses_list         = list(expenses_qs)
         expenses_pos          = sum(e.amount for e in expenses_list if e.origin == 'pos')
@@ -127,21 +141,22 @@ class ShiftViewSet(viewsets.ReadOnlyModelViewSet):
             except Exception:
                 invoice_number = None
             sales_data.append({
-                'id':             s.id,
-                'invoice_number': invoice_number,
-                'total':          int(s.total),
-                'payment_method': s.payment_method,
-                'cash_received':  int(s.cash_received),
-                'transfer_amount':int(s.transfer_amount),
+                'id':                 s.id,
+                'invoice_number':     invoice_number,
+                'total':              int(s.total),
+                'payment_method':     s.payment_method,
+                'cash_received':      int(s.cash_received),
+                'transfer_amount':    int(s.transfer_amount),
                 'transfer_reference': s.transfer_reference,
-                'is_delivery':    s.is_delivery,
-                'is_courtesy':    s.is_courtesy,
-                'courtesy_paid':  int(s.courtesy_paid),
-                'change_given':   int(s.change_given),
-                'notes':          s.notes,
-                'created_at':     s.created_at,
-                'seller':         s.seller.full_name if s.seller else '—',
-                'items':          items_detail,
+                'is_delivery':        s.is_delivery,
+                'is_courtesy':        s.is_courtesy,
+                'courtesy_paid':      int(s.courtesy_paid),
+                'change_given':       int(s.change_given),
+                'notes':              s.notes,
+                'created_at':         s.created_at,
+                'seller':             s.seller.full_name if s.seller else '—',
+                'promotion_category': s.promotion.category if s.promotion else '',
+                'items':              items_detail,
             })
 
         expenses_data = []
@@ -194,6 +209,16 @@ class ShiftViewSet(viewsets.ReadOnlyModelViewSet):
                 # neto real en efectivo (no descuenta gastos por transferencia)
                 'pos_net_cash':          int(pos_cash - expenses_pos_cash),
                 'dom_net_cash':          int(dom_cash - expenses_dom_cash),
+                # plataformas (separadas, no mezclan con POS/DOM)
+                'plat_total':            int(plat_total),
+                'rappi_total':           int(rappi_total),
+                'rappi_gross':           int(rappi_gross),
+                'rappi_fee':             int(rappi_gross - rappi_total),
+                'rappi_count':           len(rappi_sales),
+                'didi_total':            int(didi_total),
+                'didi_gross':            int(didi_gross),
+                'didi_fee':              int(didi_gross - didi_total),
+                'didi_count':            len(didi_sales),
             },
             'sales':    sales_data,
             'expenses': expenses_data,
