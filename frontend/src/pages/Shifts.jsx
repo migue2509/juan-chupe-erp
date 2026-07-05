@@ -33,6 +33,7 @@ function POSResumenModal({ shiftId, onClose }) {
   const [savingDeliveries, setSavingDeliveries] = useState(false)
   const [deliveries, setDeliveries]         = useState({})
   const [activeTab, setActiveTab]           = useState('sellers')
+  const [cupCounts, setCupCounts]           = useState({})  // product_id → conteo real
 
   // Pre-carga montos guardados cuando llegan los datos
   useEffect(() => {
@@ -370,6 +371,73 @@ function POSResumenModal({ shiftId, onClose }) {
                 <span /><span />
                 <span className="text-center text-base">{fmt(totalLiq)}</span>
               </div>
+            </div>
+          )}
+
+          {/* ── Cuadre de inventario de vasos ── */}
+          {cups.filter(r => r.sales_qty > 0 || r.current_stock > 0).length > 0 && (
+            <div className="card p-0 overflow-hidden overflow-x-auto">
+              <div className="px-5 py-3 border-b border-gray-100 flex items-center gap-2">
+                <h3 className="text-sm font-semibold text-gray-700">Cuadre de inventario — Vasos</h3>
+                <span className="text-[10px] text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">ingresa el conteo real para verificar</span>
+              </div>
+
+              {/* Header */}
+              <div className="grid text-[10px] font-semibold text-gray-400 uppercase tracking-widest px-4 py-2 bg-gray-50 border-b border-gray-100"
+                style={{ gridTemplateColumns: '1.4fr 80px 80px 80px 80px 80px 100px 80px', minWidth: '760px' }}>
+                <span>Vaso</span>
+                <span className="text-center">Cierre inv.</span>
+                <span className="text-center">Ingresos</span>
+                <span className="text-center">Total</span>
+                <span className="text-center">Vendidos</span>
+                <span className="text-center text-blue-500">Esperados</span>
+                <span className="text-center text-purple-500">Conteo real</span>
+                <span className="text-center">Dif.</span>
+              </div>
+
+              {cups.filter(r => r.sales_qty > 0 || r.current_stock > 0).map(row => {
+                const entries  = row.entries || 0
+                const cierre   = row.current_stock || 0
+                const total    = cierre + entries
+                const vendidos = row.sales_qty || 0
+                const esperados = total - vendidos
+                const conteo   = cupCounts[row.product_id]
+                const conteoNum = conteo !== undefined && conteo !== '' ? (parseInt(conteo) || 0) : null
+                const diff     = conteoNum !== null ? conteoNum - esperados : null
+
+                return (
+                  <div key={row.product_name}
+                    className="grid items-center px-4 py-3 border-b border-gray-50 hover:bg-gray-50/50"
+                    style={{ gridTemplateColumns: '1.4fr 80px 80px 80px 80px 80px 100px 80px', minWidth: '760px' }}>
+                    <span className="text-sm font-semibold text-gray-800">{row.product_name}</span>
+                    <span className="text-center text-sm text-gray-600">{cierre}</span>
+                    <span className="text-center text-sm text-emerald-600 font-medium">{entries > 0 ? `+${entries}` : '—'}</span>
+                    <span className="text-center text-sm text-gray-700 font-semibold">{total}</span>
+                    <span className="text-center text-sm text-amber-600 font-semibold">{vendidos}</span>
+                    <span className="text-center text-sm text-blue-700 font-bold">{esperados}</span>
+                    <span className="text-center">
+                      <input
+                        type="number"
+                        placeholder="0"
+                        className="input text-center py-1 text-sm w-20"
+                        value={conteo ?? ''}
+                        onChange={e => setCupCounts(prev => ({ ...prev, [row.product_id]: e.target.value }))}
+                      />
+                    </span>
+                    <span className="text-center">
+                      {diff === null ? (
+                        <span className="text-gray-300 text-sm">—</span>
+                      ) : diff === 0 ? (
+                        <span className="text-green-600 font-bold text-sm">✅</span>
+                      ) : diff < 0 ? (
+                        <span className="text-red-600 font-bold text-sm">-{Math.abs(diff)}</span>
+                      ) : (
+                        <span className="text-amber-600 font-bold text-sm">+{diff}</span>
+                      )}
+                    </span>
+                  </div>
+                )
+              })}
             </div>
           )}
           </div>

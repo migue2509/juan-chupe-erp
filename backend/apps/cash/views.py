@@ -211,6 +211,20 @@ class CashAuditViewSet(viewsets.ModelViewSet):
             except Exception:
                 pass
 
+        # ── Ingresos de inventario en la jornada actual ──
+        # product_id → entries (unidades que entraron al inventario durante el turno)
+        current_entries = {}   # product_id → entries
+        current_entries_name = {}  # product_name → entries (fallback)
+        try:
+            current_audit = shift.cash_audits.filter(channel='pos').first()
+            if current_audit:
+                for item in current_audit.items.all():
+                    if item.product_id:
+                        current_entries[item.product_id] = item.entries
+                    current_entries_name[item.product_name] = item.entries
+        except Exception:
+            pass
+
         # ── Revenue real por vaso — solo POS, separado regular vs promo ──
         from apps.products.models import CupSize, Topping
         from apps.inventory.models import CupStock, ToppingStock
@@ -255,7 +269,8 @@ class CashAuditViewSet(viewsets.ModelViewSet):
             name = f'Vaso {cs.size}'
             try:    stock = cs.stock.quantity
             except: stock = 0
-            prev = prev_closing.get(cs.pk, prev_closing_name.get(name, 0))
+            prev    = prev_closing.get(cs.pk, prev_closing_name.get(name, 0))
+            entries = current_entries.get(cs.pk, current_entries_name.get(name, 0))
             catalog.append({
                 'product_name':  name,
                 'product_type':  'cup',
@@ -263,6 +278,7 @@ class CashAuditViewSet(viewsets.ModelViewSet):
                 'unit_price':    int(cs.price),
                 'current_stock': stock,
                 'prev_closing':  prev,
+                'entries':       entries,   # ingresos al inventario durante la jornada
                 **cup_revenue.get(name, {'sales_qty': 0, 'sales_revenue': 0,
                                          'regular_qty': 0, 'regular_revenue': 0,
                                          'promo_qty': 0, 'promo_revenue': 0, 'promo_unit': None}),
