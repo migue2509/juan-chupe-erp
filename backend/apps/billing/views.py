@@ -26,6 +26,15 @@ class InvoiceViewSet(viewsets.ReadOnlyModelViewSet):
         invoice.voided_at = timezone.now()
         invoice.void_reason = reason
         invoice.save()
+
+        # Devolver stock al inventario
+        note = f'Anulacion factura {invoice.invoice_number}'
+        for item in invoice.sale.items.all():
+            try:
+                item.reverse_inventory(note_prefix=note)
+            except Exception:
+                pass  # No bloquear la anulacion si falla un item
+
         return Response(InvoiceSerializer(invoice).data)
 
     @action(detail=False, methods=['get'], url_path='by-shift/(?P<shift_id>[0-9]+)')

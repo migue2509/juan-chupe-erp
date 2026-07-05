@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { getInvoices, editSale, getAllFlavors, getCupSizes, getToppings, getOperatives, getShifts, getActivePromotions } from '../api'
+import { getInvoices, editSale, voidInvoice, getAllFlavors, getCupSizes, getToppings, getOperatives, getShifts, getActivePromotions } from '../api'
 import { Icon } from '../components/Icons'
 import { useAuth } from '../context/AuthContext'
 import toast from 'react-hot-toast'
@@ -37,6 +37,9 @@ export default function Billing() {
   const [operatives,  setOperatives] = useState([])
   const [promotions,  setPromotions] = useState([])
   const [saving,      setSaving]     = useState(false)
+  const [voidModal,   setVoidModal]  = useState(false)
+  const [voidReason,  setVoidReason] = useState('')
+  const [voiding,     setVoiding]    = useState(false)
 
   // Estado promo configurator (edit mode)
   const [ePromoConfig, setEPromoConfig] = useState(null) // { promo, activeCup, cups:[{flavorIds:[]}] }
@@ -154,6 +157,21 @@ export default function Billing() {
       cash_received:   method === 'transfer' ? '0' : method === 'cash' ? String(total) : f.cash_received,
       transfer_amount: method === 'cash'     ? '0' : method === 'transfer' ? String(total) : f.transfer_amount,
     }))
+  }
+
+  const handleVoid = async () => {
+    setVoiding(true)
+    try {
+      await voidInvoice(selected.id, { reason: voidReason })
+      toast.success('Factura anulada — inventario restaurado')
+      await load()
+      setSelected(null)
+      setVoidModal(false)
+      setVoidReason('')
+    } catch (err) {
+      toast.error(err?.response?.data?.detail || 'Error al anular', { duration: 6000 })
+    }
+    setVoiding(false)
   }
 
   const handleSave = async () => {
@@ -332,6 +350,51 @@ export default function Billing() {
       </div>
 
       {/* ── Modal detalle / edición ── */}
+      {/* ── Modal confirmación de anulación ── */}
+      {voidModal && selected && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-[60] p-4">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm p-6 space-y-4">
+            <div className="flex items-start gap-3">
+              <div className="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center shrink-0">
+                <svg className="w-5 h-5 text-red-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/>
+                </svg>
+              </div>
+              <div>
+                <h3 className="font-bold text-gray-900 text-sm">Anular {selected.invoice_number}</h3>
+                <p className="text-xs text-gray-400 mt-0.5">
+                  El inventario se restaurará automáticamente. Esta acción no se puede deshacer.
+                </p>
+              </div>
+            </div>
+            <div>
+              <label className="label text-xs">Motivo de anulación</label>
+              <input
+                className="input text-sm"
+                placeholder="Ej: Error en los productos registrados"
+                value={voidReason}
+                onChange={e => setVoidReason(e.target.value)}
+                autoFocus
+              />
+            </div>
+            <div className="flex gap-2 pt-1">
+              <button
+                onClick={handleVoid}
+                disabled={voiding || !voidReason.trim()}
+                className="flex-1 py-2 rounded-xl text-sm font-semibold bg-red-500 text-white hover:bg-red-600 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 transition-colors">
+                {voiding && <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />}
+                Confirmar anulación
+              </button>
+              <button
+                onClick={() => setVoidModal(false)}
+                className="flex-1 py-2 rounded-xl text-sm font-medium border border-gray-200 text-gray-600 hover:bg-gray-50 transition-colors">
+                Cancelar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {selected && sale && (
         <div className="fixed inset-0 bg-black/30 flex items-start justify-center z-50 p-4 overflow-y-auto">
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-2xl my-8">
@@ -344,13 +407,22 @@ export default function Billing() {
               </div>
               <div className="flex items-center gap-2">
                 {!selected.voided && !editMode && isAdmin && (
-                  <button onClick={() => setEditMode(true)} className="btn-secondary py-1.5 text-xs">
-                    <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
-                      <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
-                    </svg>
-                    Editar
-                  </button>
+                  <>
+                    <button onClick={() => setEditMode(true)} className="btn-secondary py-1.5 text-xs">
+                      <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+                        <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                      </svg>
+                      Editar
+                    </button>
+                    <button onClick={() => { setVoidReason(''); setVoidModal(true) }}
+                      className="py-1.5 px-3 text-xs font-medium rounded-lg border border-red-200 text-red-500 hover:bg-red-50 transition-colors flex items-center gap-1.5">
+                      <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/>
+                      </svg>
+                      Anular
+                    </button>
+                  </>
                 )}
                 <button onClick={() => { setSelected(null); setEditMode(false) }}
                   className="w-8 h-8 rounded-lg flex items-center justify-center text-gray-400 hover:bg-gray-100">
@@ -778,10 +850,10 @@ export default function Billing() {
                 <div className="grid grid-cols-2 gap-4 text-sm">
                   <div>
                     <p className="text-xs text-gray-400 mb-0.5">Vendedora</p>
-                    <p className="font-medium text-gray-800">{sale.seller_name || '—'}</p>
+                    <p className="font-medium text-gray-800">{sale.seller_name || '\u2014'}</p>
                   </div>
                   <div>
-                    <p className="text-xs text-gray-400 mb-0.5">Método de pago</p>
+                    <p className="text-xs text-gray-400 mb-0.5">M\u00e9todo de pago</p>
                     <span className={`badge ${PAYMENT_BADGE[sale.payment_method] ?? 'badge-gray'}`}>
                       {PAYMENT_LABELS[sale.payment_method] ?? sale.payment_method}
                     </span>
@@ -824,7 +896,7 @@ export default function Billing() {
                   )}
                   {sale.is_courtesy && (
                     <div className="col-span-2 p-3 bg-pink-50 border border-pink-100 rounded-xl space-y-1">
-                      <p className="text-xs font-semibold text-pink-600 uppercase tracking-wide">Cortesía</p>
+                      <p className="text-xs font-semibold text-pink-600 uppercase tracking-wide">Cortes\u00eda</p>
                       <div className="flex justify-between text-sm">
                         <span className="text-gray-500">Valor de la factura</span>
                         <span className="font-medium text-gray-700">{fmt(sale.total)}</span>
@@ -837,6 +909,17 @@ export default function Billing() {
                         <span className="text-gray-500">Gasto generado</span>
                         <span className="font-bold text-red-500">{fmt(Number(sale.total) - Number(sale.courtesy_paid || 0))}</span>
                       </div>
+                    </div>
+                  )}
+                  {selected.voided && (
+                    <div className="col-span-2 p-3 bg-red-50 border border-red-100 rounded-xl space-y-1">
+                      <p className="text-xs font-semibold text-red-500 uppercase tracking-wide">Factura Anulada</p>
+                      {selected.void_reason && (
+                        <p className="text-sm text-gray-600">Motivo: {selected.void_reason}</p>
+                      )}
+                      {selected.voided_by_name && (
+                        <p className="text-xs text-gray-400">Anulada por: {selected.voided_by_name}</p>
+                      )}
                     </div>
                   )}
                   <div className="col-span-2 pt-2 border-t border-gray-100 flex justify-between items-center">
