@@ -145,22 +145,32 @@ export default function POS() {
       toast.error('Cada vaso necesita al menos un sabor')
       return
     }
+    // Para promos de plataforma usar net_price (ya descontado el % de Rappi/DiDi)
+    const isPlatformPromo = promo.category && promo.category !== 'pos'
+    const effectiveUnitPrice = isPlatformPromo
+      ? Number(promo.net_price) / cups.length
+      : Number(promo.unit_price)
+
     const newItems = cups.map((cup, i) => {
       const fNames = cup.flavorIds.map(id => flavors.find(f => f.id === id)?.name).join(' + ')
+      const cupLabel = cup.label ? `${cup.label}` : `Vaso ${i + 1}`
       return {
         id: Date.now() + i,
-        label: `${promo.name} · Vaso ${i + 1} — ${fNames}`,
+        label: `${promo.name} · ${cupLabel} — ${fNames}`,
         cupSizeId: cup.cupSizeId ?? promo.cup_size,
         flavorIds: cup.flavorIds,
         toppingId: null,
         qty: 1,
-        unit_price: Number(promo.unit_price),
+        unit_price: effectiveUnitPrice,
         topping_price: 0,
         promoId: promo.id,
         promoName: promo.name,
+        promoCategory: promo.category || 'pos',
       }
     })
     setItems(prev => [...prev, ...newItems])
+    // Pedidos de plataforma → pago automático a transferencia
+    if (isPlatformPromo) setPaymentMethod('transfer')
     setPromoConfig(null)
     toast.success(`${promo.name} agregada al pedido`)
   }
@@ -169,6 +179,8 @@ export default function POS() {
   const removeItem   = (id) => setItems(prev => prev.filter(i => i.id !== id))
   const itemTotal    = (i) => (i.unit_price + (i.topping_price || 0)) * i.qty
   const orderTotal   = items.reduce((sum, i) => sum + itemTotal(i), 0)
+  // Canal de plataforma activo en el pedido (rappi / didi / null)
+  const platformChannel = items.find(i => i.promoCategory && i.promoCategory !== 'pos')?.promoCategory ?? null
   const change       = paymentMethod === 'cash' && !isCourtesy
     ? Math.max(0, Number(cashReceived) - orderTotal)
     : paymentMethod === 'mixed' && !isCourtesy
@@ -271,9 +283,13 @@ export default function POS() {
                       ? <span className="text-xs opacity-60">{p.items.reduce((s, i) => s + i.quantity, 0)} vasos</span>
                       : <span className="text-xs opacity-60">{p.quantity_included}×{p.cup_size_label}</span>
                     }
-                    <span className="font-bold">{fmt(p.promo_price)}</span>
-                    {Number(p.platform_fee_pct) > 0 && (
-                      <span className="text-[10px] text-red-500">-{p.platform_fee_pct}%</span>
+                    {Number(p.platform_fee_pct) > 0 ? (
+                      <span className="flex flex-col items-end leading-tight">
+                        <span className="text-[10px] line-through text-gray-400">{fmt(p.promo_price)}</span>
+                        <span className="font-bold text-green-700">{fmt(p.net_price)}</span>
+                      </span>
+                    ) : (
+                      <span className="font-bold">{fmt(p.promo_price)}</span>
                     )}
                   </button>
                 )
@@ -590,25 +606,27 @@ export default function POS() {
             )}
           </div>
 
-          {/* Payment method */}
-          <div className="mb-3">
-            <label className="label">Medio de Pago</label>
-            <div className="flex gap-1.5">
-              {PAYMENT_MODES.map(m => (
-                <button key={m.key} onClick={() => setPaymentMethod(m.key)}
-                  className={`flex-1 py-2 text-xs rounded-lg border font-medium flex flex-col items-center gap-1 transition-all ${
-                    paymentMethod === m.key
-                      ? 'bg-brand-navy text-white border-brand-navy'
-                      : 'border-gray-200 text-gray-500 hover:border-gray-300 hover:bg-gray-50'
-                  }`}>
-                  <Icon name={m.icon} className="w-3.5 h-3.5" />
-                  <span>{m.label}</span>
-                </button>
-              ))}
+          {/* Payment method — oculto para pedidos de plataforma */}
+          {!platformChannel && (
+            <div className="mb-3">
+              <label className="label">Medio de Pago</label>
+              <div className="flex gap-1.5">
+                {PAYMENT_MODES.map(m => (
+                  <button key={m.key} onClick={() => setPaymentMethod(m.key)}
+                    className={`flex-1 py-2 text-xs rounded-lg border font-medium flex flex-col items-center gap-1 transition-all ${
+                      paymentMethod === m.key
+                        ? 'bg-brand-navy text-white border-brand-navy'
+                        : 'border-gray-200 text-gray-500 hover:border-gray-300 hover:bg-gray-50'
+                    }`}>
+                    <Icon name={m.icon} className="w-3.5 h-3.5" />
+                    <span>{m.label}</span>
+                  </button>
+                ))}
+              </div>
             </div>
-          </div>
+          )}
 
-          {(paymentMethod === 'cash' || paymentMethod === 'mixed') && (
+          {(paymentMethod === 'cash' || paymentMethod === 'mixed') && !platformChannel && (
             <div className="mb-2">
               <label className="label">Efectivo recibido</label>
               <input type="number" className="input" placeholder="0" value={cashReceived}
@@ -619,7 +637,7 @@ export default function POS() {
             </div>
           )}
 
-          {(paymentMethod === 'transfer' || paymentMethod === 'mixed') && (
+          {(paymentMethod === 'transfer' || paymentMethod === 'mixed') && !platformChannel && (
             <div className="mb-2 space-y-2">
               <div>
                 <label className="label">Monto transferencia</label>
@@ -693,18 +711,20 @@ export default function POS() {
             </div>
           )}
 
-          {/* Delivery toggle */}
-          <label className="flex items-center gap-2.5 cursor-pointer select-none">
-            <input type="checkbox" checked={isDelivery} onChange={e => setIsDelivery(e.target.checked)}
-              className="w-4 h-4 accent-brand-pink" />
-            <span className="text-sm text-gray-600 flex items-center gap-1.5">
-              <Icon name="bike" className="w-4 h-4 text-gray-400" />
-              Es domicilio
-            </span>
-          </label>
+          {/* Delivery toggle — oculto en pedidos de plataforma */}
+          {!platformChannel && (
+            <label className="flex items-center gap-2.5 cursor-pointer select-none">
+              <input type="checkbox" checked={isDelivery} onChange={e => setIsDelivery(e.target.checked)}
+                className="w-4 h-4 accent-brand-pink" />
+              <span className="text-sm text-gray-600 flex items-center gap-1.5">
+                <Icon name="bike" className="w-4 h-4 text-gray-400" />
+                Es domicilio
+              </span>
+            </label>
+          )}
 
           {/* Campos domicilio */}
-          {isDelivery && (
+          {!platformChannel && isDelivery && (
             <div className="space-y-2 p-3 bg-cyan-50 border border-cyan-100 rounded-xl">
               {/* Selector de ubicación */}
               <div>
@@ -763,21 +783,41 @@ export default function POS() {
             />
           )}
 
+          {/* Badge de plataforma (Rappi / DiDi) */}
+          {platformChannel && (
+            <div className={`flex items-center gap-2 px-3 py-2 rounded-xl border-2 ${
+              platformChannel === 'rappi'
+                ? 'bg-[#FF424D]/8 border-[#FF424D]/40 text-[#FF424D]'
+                : 'bg-[#FF6600]/8 border-[#FF6600]/40 text-[#FF6600]'
+            }`}>
+              <span className={`text-[10px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded text-white ${
+                platformChannel === 'rappi' ? 'bg-[#FF424D]' : 'bg-[#FF6600]'
+              }`}>
+                {platformChannel === 'rappi' ? 'Rappi' : 'DiDi'}
+              </span>
+              <span className="text-xs font-semibold">
+                Pedido de plataforma — pago por transferencia
+              </span>
+            </div>
+          )}
+
           {/* Cortesía toggle */}
-          <label className="flex items-center gap-2.5 cursor-pointer select-none">
-            <input type="checkbox" checked={isCourtesy}
-              onChange={e => { setIsCourtesy(e.target.checked); setCourtesyPaid(''); setCourtesyMethod('cash'); setCourtesyTransferRef('') }}
-              className="w-4 h-4 accent-brand-pink" />
-            <span className="text-sm text-gray-600 flex items-center gap-1.5">
-              <svg className="w-4 h-4 text-gray-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
-              </svg>
-              Es cortesía
-            </span>
-          </label>
+          {!platformChannel && (
+            <label className="flex items-center gap-2.5 cursor-pointer select-none">
+              <input type="checkbox" checked={isCourtesy}
+                onChange={e => { setIsCourtesy(e.target.checked); setCourtesyPaid(''); setCourtesyMethod('cash'); setCourtesyTransferRef('') }}
+                className="w-4 h-4 accent-brand-pink" />
+              <span className="text-sm text-gray-600 flex items-center gap-1.5">
+                <svg className="w-4 h-4 text-gray-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
+                </svg>
+                Es cortesía
+              </span>
+            </label>
+          )}
 
           {/* Campos cortesía */}
-          {isCourtesy && (
+          {!platformChannel && isCourtesy && (
             <div className="p-3 bg-pink-50 border border-pink-100 rounded-xl space-y-2">
               <p className="text-xs text-pink-600 font-medium">
                 La diferencia entre el total y lo recibido se registrará como gasto automáticamente.
