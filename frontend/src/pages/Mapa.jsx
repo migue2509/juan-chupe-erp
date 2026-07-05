@@ -1,9 +1,11 @@
 import { useEffect, useRef, useState } from 'react'
 import { getDeliveryHeatmap } from '../api'
 
-const MED_LAT  = 6.2442
-const MED_LNG  = -75.5812
-const ZOOM_INI = 13
+const MED_LAT    = 6.2442
+const MED_LNG    = -75.5812
+const ZOOM_INI   = 13
+const STORE_LAT  = 6.285462773644746
+const STORE_LNG  = -75.57793997784694
 
 // ── Cargar Leaflet + Leaflet.heat desde CDN ──────────────────────────────────
 let mapLibsReady = null
@@ -70,7 +72,7 @@ export default function Mapa() {
       if (!mapRef.current || mapObjRef.current) return
 
       const map = L.map(mapRef.current, {
-        center: [MED_LAT, MED_LNG],
+        center: [STORE_LAT, STORE_LNG],
         zoom:   ZOOM_INI,
         zoomControl: true,
       })
@@ -79,6 +81,26 @@ export default function Mapa() {
         attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
         maxZoom: 19,
       }).addTo(map)
+
+      // Marcador del negocio
+      const storeIcon = L.divIcon({
+        className: '',
+        html: `
+          <div style="
+            width:36px; height:36px; border-radius:50%;
+            background:#FF0099; border:3px solid white;
+            box-shadow:0 2px 8px rgba(0,0,0,0.35);
+            display:flex; align-items:center; justify-content:center;
+            font-size:18px; line-height:1;
+          ">🧋</div>
+        `,
+        iconSize:   [36, 36],
+        iconAnchor: [18, 18],
+        popupAnchor:[0, -20],
+      })
+      L.marker([STORE_LAT, STORE_LNG], { icon: storeIcon, zIndexOffset: 9999 })
+        .addTo(map)
+        .bindPopup('<b>Juan Chupe Granizados</b><br/>Tu negocio', { maxWidth: 180 })
 
       // Capa de calor vacía
       heatRef.current = L.heatLayer([], {
@@ -265,6 +287,10 @@ export default function Mapa() {
                       <div className="flex items-center gap-2">
                         <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ background: '#94a3b8' }} />
                         <span className="text-gray-600">Histórico</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-base leading-none">🧋</span>
+                        <span className="text-gray-600">Tu negocio</span>
                       </div>
                     </div>
                   </div>
