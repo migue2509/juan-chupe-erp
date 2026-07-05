@@ -2,42 +2,139 @@ import { NavLink } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { Icon } from './Icons'
 
-const NAV_OPERATIVE = [
-  { to: '/',           label: 'Dashboard',      icon: 'dashboard' },
-  { to: '/pos',        label: 'Punto de Venta', icon: 'pos' },
-  { to: '/billing',    label: 'Facturas',        icon: 'billing' },
-  { to: '/deliveries', label: 'Domicilios',      icon: 'deliveries' },
-  { to: '/expenses',   label: 'Gastos',          icon: 'expenses' },
+// Grupos por rol — cada sección tiene label (null = sin cabecera) + items
+const GROUPS_ADMIN = [
+  {
+    label: null,
+    items: [
+      { to: '/',        label: 'Dashboard',      icon: 'dashboard' },
+    ],
+  },
+  {
+    label: 'Operaciones',
+    items: [
+      { to: '/pos',        label: 'Punto de Venta', icon: 'pos' },
+      { to: '/billing',    label: 'Facturas',        icon: 'billing' },
+      { to: '/deliveries', label: 'Domicilios',      icon: 'deliveries' },
+      { to: '/expenses',   label: 'Gastos',          icon: 'expenses' },
+    ],
+  },
+  {
+    label: 'Turno',
+    items: [
+      { to: '/shifts', label: 'Jornadas', icon: 'shifts' },
+    ],
+  },
+  {
+    label: 'Catalogo',
+    items: [
+      { to: '/products',   label: 'Productos',   icon: 'products' },
+      { to: '/promotions', label: 'Promociones', icon: 'promotions' },
+      { to: '/inventory',  label: 'Inventario',  icon: 'inventory' },
+    ],
+  },
+  {
+    label: 'Analisis',
+    items: [
+      { to: '/reports',    label: 'Reportes',   icon: 'reports' },
+      { to: '/platforms',  label: 'Plataformas', icon: 'platform' },
+      { to: '/mapa',       label: 'Mapa',        icon: 'map' },
+    ],
+  },
+  {
+    label: 'Equipo',
+    items: [
+      { to: '/users',      label: 'Usuarios',   icon: 'users' },
+      { to: '/attendance', label: 'Asistencia', icon: 'attendance' },
+      { to: '/payroll',    label: 'Nomina',     icon: 'cash' },
+    ],
+  },
+  {
+    label: 'Configuracion',
+    items: [
+      { to: '/config-pos', label: 'Config Pagos', icon: 'config' },
+    ],
+  },
 ]
 
-const NAV_SELLER = [
-  { to: '/',            label: 'Dashboard',      icon: 'dashboard' },
-  { to: '/attendance',  label: 'Asistencia',     icon: 'attendance' },
-  { to: '/pos',         label: 'Punto de Venta', icon: 'pos' },
-  { to: '/billing',     label: 'Facturas',       icon: 'billing' },
-  { to: '/deliveries',  label: 'Domicilios',     icon: 'deliveries' },
-  { to: '/expenses',    label: 'Gastos',         icon: 'expenses' },
-  { to: '/inventory',   label: 'Inventario',     icon: 'inventory' },
+const GROUPS_SELLER = [
+  {
+    label: null,
+    items: [
+      { to: '/', label: 'Dashboard', icon: 'dashboard' },
+    ],
+  },
+  {
+    label: 'Operaciones',
+    items: [
+      { to: '/pos',        label: 'Punto de Venta', icon: 'pos' },
+      { to: '/billing',    label: 'Facturas',        icon: 'billing' },
+      { to: '/deliveries', label: 'Domicilios',      icon: 'deliveries' },
+      { to: '/expenses',   label: 'Gastos',          icon: 'expenses' },
+      { to: '/inventory',  label: 'Inventario',      icon: 'inventory' },
+    ],
+  },
+  {
+    label: 'Personal',
+    items: [
+      { to: '/attendance', label: 'Asistencia', icon: 'attendance' },
+    ],
+  },
 ]
 
-const NAV_ADMIN = [
-  { to: '/shifts',     label: 'Jornadas',       icon: 'shifts' },
-  { to: '/products',   label: 'Productos',      icon: 'products' },
-  { to: '/inventory',  label: 'Inventario',     icon: 'inventory' },
-  { to: '/promotions', label: 'Promociones',    icon: 'promotions' },
-  { to: '/reports',    label: 'Reportes',       icon: 'reports' },
-  { to: '/platforms',  label: 'Plataformas',    icon: 'platform' },
-  { to: '/mapa',       label: 'Mapa',           icon: 'map' },
-  { to: '/users',      label: 'Usuarios',       icon: 'users' },
-  { to: '/attendance', label: 'Asistencia',     icon: 'attendance' },
-  { to: '/payroll',    label: 'Nómina',         icon: 'cash' },
-  { to: '/config-pos', label: 'Config Pagos',   icon: 'config' },
+const GROUPS_DELIVERY = [
+  {
+    label: null,
+    items: [
+      { to: '/', label: 'Dashboard', icon: 'dashboard' },
+    ],
+  },
+  {
+    label: 'Operaciones',
+    items: [
+      { to: '/pos',        label: 'Punto de Venta', icon: 'pos' },
+      { to: '/billing',    label: 'Facturas',        icon: 'billing' },
+      { to: '/deliveries', label: 'Domicilios',      icon: 'deliveries' },
+      { to: '/expenses',   label: 'Gastos',          icon: 'expenses' },
+    ],
+  },
 ]
+
+function NavGroups({ groups, onClose }) {
+  return (
+    <>
+      {groups.map((group, gi) => (
+        <div key={gi} className={gi > 0 ? 'pt-3' : ''}>
+          {group.label && (
+            <div className="px-3 pb-1.5">
+              <p className="text-[10px] font-semibold uppercase tracking-widest text-slate-500">
+                {group.label}
+              </p>
+            </div>
+          )}
+          <div className="space-y-0.5">
+            {group.items.map(({ to, label, icon }) => (
+              <NavLink key={to} to={to} end={to === '/'} onClick={onClose}
+                className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}`}>
+                <Icon name={icon} className="w-4 h-4 flex-shrink-0" />
+                <span>{label}</span>
+              </NavLink>
+            ))}
+          </div>
+        </div>
+      ))}
+    </>
+  )
+}
 
 export default function Sidebar({ open, onClose }) {
   const { isAdmin, user } = useAuth()
-  const isSeller = user?.role === 'operative' || user?.role === 'delivery'
-  const navItems = isSeller ? NAV_SELLER : NAV_OPERATIVE
+
+  const groups = isAdmin
+    ? GROUPS_ADMIN
+    : user?.role === 'delivery'
+      ? GROUPS_DELIVERY
+      : GROUPS_SELLER
 
   const inner = (
     <aside className="flex flex-col w-60 flex-shrink-0 h-full" style={{ background: '#0F1035' }}>
@@ -53,29 +150,8 @@ export default function Sidebar({ open, onClose }) {
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 px-3 py-4 overflow-y-auto space-y-0.5">
-        {navItems.map(({ to, label, icon }) => (
-          <NavLink key={to} to={to} end={to === '/'} onClick={onClose}
-            className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}`}>
-            <Icon name={icon} className="w-4 h-4 flex-shrink-0" />
-            <span>{label}</span>
-          </NavLink>
-        ))}
-
-        {isAdmin && (
-          <>
-            <div className="pt-5 pb-2 px-3">
-              <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-widest">Administración</p>
-            </div>
-            {NAV_ADMIN.map(({ to, label, icon }) => (
-              <NavLink key={to} to={to} onClick={onClose}
-                className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}`}>
-                <Icon name={icon} className="w-4 h-4 flex-shrink-0" />
-                <span>{label}</span>
-              </NavLink>
-            ))}
-          </>
-        )}
+      <nav className="flex-1 px-3 py-4 overflow-y-auto">
+        <NavGroups groups={groups} onClose={onClose} />
       </nav>
 
       <div className="px-5 py-4 border-t border-white/8">
