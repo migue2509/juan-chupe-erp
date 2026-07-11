@@ -68,6 +68,7 @@ class SaleSerializer(serializers.ModelSerializer):
             return obj.seller.full_name
         return obj.seller_name or '—'
     is_voided      = serializers.SerializerMethodField()
+    invoice_number = serializers.SerializerMethodField()
     delivery_status = serializers.SerializerMethodField()
 
     def get_is_voided(self, obj):
@@ -75,6 +76,12 @@ class SaleSerializer(serializers.ModelSerializer):
             return obj.invoice.voided
         except Exception:
             return False
+
+    def get_invoice_number(self, obj):
+        try:
+            return obj.invoice.invoice_number
+        except Exception:
+            return ''
 
     def get_delivery_status(self, obj):
         if not obj.is_delivery:
@@ -100,6 +107,6 @@ class SaleSerializer(serializers.ModelSerializer):
             'id', 'shift', 'seller', 'seller_name', 'promotion', 'promotion_name',
             'payment_method', 'cash_received', 'transfer_amount', 'transfer_reference',
             'total', 'change_given', 'is_delivery', 'is_courtesy', 'courtesy_paid',
-            'notes', 'created_at', 'items', 'is_voided', 'delivery_status', 'delivery_person_name',
+            'notes', 'created_at', 'items', 'is_voided', 'invoice_number', 'delivery_status', 'delivery_person_name',
             'promotion_category'
         ]

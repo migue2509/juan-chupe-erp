@@ -148,8 +148,8 @@ export default function POS() {
     // Para promos de plataforma usar net_price (ya descontado el % de Rappi/DiDi)
     const isPlatformPromo = promo.category && promo.category !== 'pos'
     const effectiveUnitPrice = isPlatformPromo
-      ? Number(promo.net_price) / cups.length
-      : Number(promo.unit_price)
+      ? Math.round(Number(promo.net_price) / cups.length)
+      : Math.round(Number(promo.unit_price))
 
     const newItems = cups.map((cup, i) => {
       const fNames = cup.flavorIds.map(id => flavors.find(f => f.id === id)?.name).join(' + ')
@@ -222,7 +222,7 @@ export default function POS() {
         }))
       })
 
-      toast.success('Venta registrada')
+      toast.success(`Factura ${saleRes.data?.invoice_number || 'generada'} registrada`, { duration: 3000 })
       setCartOpen(false)
       setItems([])
       setCurrent(emptyItem())
@@ -905,12 +905,11 @@ export default function POS() {
             <p className="font-bold text-gray-800 text-lg">{qrZoom.name}</p>
             <img src={qrZoom.url} alt={qrZoom.name} className="w-full object-contain rounded-xl" />
             <p className="text-xs text-gray-400">Apunta la cámara al código para transferir</p>
-            <button onClick={() => setQrZoom(null)} className="btn-ghost w-full justify-center">
-              Cerrar
-            </button>
+            <button onClick={() => setQrZoom(null)} className="btn-secondary w-full">Cerrar</button>
           </div>
         </div>
       )}
+
     </>
   )
 }

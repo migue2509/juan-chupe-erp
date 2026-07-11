@@ -8,7 +8,13 @@ from .serializers import InvoiceSerializer
 
 
 class InvoiceViewSet(viewsets.ReadOnlyModelViewSet):
-    queryset = Invoice.objects.select_related('sale', 'sale__seller', 'shift').all()
+    queryset = Invoice.objects.select_related(
+        'sale', 'sale__seller', 'sale__promotion', 'shift', 'voided_by'
+    ).prefetch_related(
+        'sale__items__saleitems_flavors__flavor',
+        'sale__items__cup_size',
+        'sale__items__topping',
+    ).all()
     serializer_class = InvoiceSerializer
     permission_classes = [IsOperative]
     filterset_fields = ['shift', 'voided']

@@ -29,8 +29,16 @@ class SaleViewSet(viewsets.ReadOnlyModelViewSet):
         data = serializer.validated_data
 
         with transaction.atomic():
-            # ── Pre-validar stock antes de crear nada ──
+            # ── Pre-cargar objetos en bulk (evitar N+1 en validación y creación) ──
             from apps.inventory.models import FlavorBag, CupStock
+            all_cup_ids    = {d['cup_size_id'] for d in data['items'] if d.get('cup_size_id')}
+            all_flavor_ids = {fid for d in data['items'] for fid in d.get('flavor_ids', [])}
+            all_topping_ids= {d['topping_id'] for d in data['items'] if d.get('topping_id')}
+            cup_map    = {c.id: c for c in CupSize.objects.filter(id__in=all_cup_ids)}
+            flavor_map = {f.id: f for f in Flavor.objects.select_related('bag').filter(id__in=all_flavor_ids)}
+            topping_map= {t.id: t for t in Topping.objects.select_related('stock').filter(id__in=all_topping_ids)}
+
+            # ── Pre-validar stock antes de crear nada ──
             for item_data in data['items']:
                 qty          = item_data.get('quantity', 1)
                 is_topping_only = not item_data.get('cup_size_id')
@@ -38,7 +46,9 @@ class SaleViewSet(viewsets.ReadOnlyModelViewSet):
                 if is_topping_only:
                     continue  # Solo-topping: sin stock de vaso ni bolsa que validar
 
-                cup_size = CupSize.objects.get(id=item_data['cup_size_id'])
+                cup_size = cup_map.get(item_data['cup_size_id'])
+                if not cup_size:
+                    return Response({'detail': f'Tamaño de vaso no encontrado.'}, status=status.HTTP_400_BAD_REQUEST)
 
                 # Vasos
                 try:
@@ -56,13 +66,13 @@ class SaleViewSet(viewsets.ReadOnlyModelViewSet):
                     )
 
                 # Bolsas de granizado
-                flavor_objs  = Flavor.objects.filter(id__in=item_data.get('flavor_ids', []))
-                num_flavors  = flavor_objs.count()
+                flavor_objs  = [flavor_map[fid] for fid in item_data.get('flavor_ids', []) if fid in flavor_map]
+                num_flavors  = len(flavor_objs)
                 ml_por_sabor = cup_size.ml / Decimal(str(max(num_flavors, 1))) * qty
 
                 for flavor in flavor_objs:
                     try:
-                        bag = flavor.bag
+                        bag = flavor.bag  # ya cargado por select_related
                         if bag.stock_ml < ml_por_sabor:
                             return Response(
                                 {'detail': f'Stock insuficiente de {flavor.name}. '
@@ -76,7 +86,7 @@ class SaleViewSet(viewsets.ReadOnlyModelViewSet):
                         )
 
                 # Bolsa de topping automática según categoría
-                categories = {f.category for f in flavor_objs}
+                categories = {f.category for f in flavor_objs}  # flavor_objs ya es lista
                 if categories:
                     primary_cat = next(iter(categories))
                     try:
@@ -131,14 +141,9 @@ class SaleViewSet(viewsets.ReadOnlyModelViewSet):
                 is_topping_only = not item_data.get('cup_size_id')
                 cup_size = None
                 if not is_topping_only:
-                    cup_size = CupSize.objects.get(id=item_data['cup_size_id'])
+                    cup_size = cup_map.get(item_data['cup_size_id'])  # ya pre-cargado
 
-                topping = None
-                if item_data.get('topping_id'):
-                    try:
-                        topping = Topping.objects.get(id=item_data['topping_id'])
-                    except Topping.DoesNotExist:
-                        pass
+                topping = topping_map.get(item_data.get('topping_id')) if item_data.get('topping_id') else None
 
                 unit_price    = item_data['unit_price']
                 # Para solo-topping: unit_price ya es el precio del topping, topping_price = 0
@@ -154,8 +159,8 @@ class SaleViewSet(viewsets.ReadOnlyModelViewSet):
                 )
 
                 if not is_topping_only:
-                    flavors = Flavor.objects.filter(id__in=item_data.get('flavor_ids', []))
-                    num_flavors   = flavors.count()
+                    flavors = [flavor_map[fid] for fid in item_data.get('flavor_ids', []) if fid in flavor_map]
+                    num_flavors   = len(flavors)
                     ml_per_flavor = cup_size.ml / Decimal(str(max(num_flavors, 1)))
                     for flavor in flavors:
                         SaleItemFlavor.objects.create(
@@ -164,8 +169,8 @@ class SaleViewSet(viewsets.ReadOnlyModelViewSet):
                             ml_consumed=ml_per_flavor * sale_item.quantity
                         )
 
-                # Apply inventory deduction
-                sale_item.apply_inventory()
+                # Apply inventory deduction (shift ya obtenido arriba, no relanzar query)
+                sale_item.apply_inventory(shift=shift)
 
             sale.calculate_total()
 
@@ -295,9 +300,10 @@ class SaleViewSet(viewsets.ReadOnlyModelViewSet):
                         except Exception:
                             return Response({'detail': f'Sin bolsa para {flavor.name}.'}, status=400)
 
-                # Revertir inventario de items actuales
+                # Revertir inventario de items actuales (reusar shift activo)
+                edit_shift = Shift.get_active()
                 for item in sale.items.all():
-                    item.reverse_inventory()
+                    item.reverse_inventory(shift=edit_shift)
                 sale.items.all().delete()
 
                 # Crear nuevos items (unit_price viene explícito desde el frontend)
@@ -320,7 +326,7 @@ class SaleViewSet(viewsets.ReadOnlyModelViewSet):
                             sale_item=sale_item, flavor=flavor,
                             ml_consumed=ml_per_flavor * sale_item.quantity
                         )
-                    sale_item.apply_inventory()
+                    sale_item.apply_inventory(shift=edit_shift)
 
                 sale.calculate_total()
             else:
@@ -347,7 +353,13 @@ class SaleViewSet(viewsets.ReadOnlyModelViewSet):
             )
 
         # Incluir todas las ventas (incluyendo anuladas) para mostrar estado en dashboard
-        sales = Sale.objects.filter(shift=shift).select_related('invoice', 'delivery__delivery_person')
+        sales = Sale.objects.filter(shift=shift).select_related(
+            'invoice', 'delivery__delivery_person', 'seller', 'promotion'
+        ).prefetch_related(
+            'items__saleitems_flavors__flavor',
+            'items__cup_size',
+            'items__topping',
+        )
         # Solo contar en el total las no anuladas
         active_sales = [s for s in sales if not self._is_voided(s)]
         total = sum(

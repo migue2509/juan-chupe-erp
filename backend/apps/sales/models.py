@@ -89,11 +89,12 @@ class SaleItem(models.Model):
         self.subtotal = (self.unit_price + self.topping_price) * self.quantity
         super().save(*args, **kwargs)
 
-    def reverse_inventory(self, note_prefix=None):
+    def reverse_inventory(self, note_prefix=None, shift=None):
         """Devuelve al inventario lo que consumió este item."""
         from apps.inventory.models import FlavorBag, CupStock, StockMovement
         from apps.shifts.models import Shift
-        shift = Shift.get_active()
+        if shift is None:
+            shift = Shift.get_active()
         prefix = note_prefix or f'Corrección venta #{self.sale_id}'
 
         if not self.cup_size:
@@ -150,7 +151,7 @@ class SaleItem(models.Model):
         except ToppingModel.DoesNotExist:
             pass  # No hay topping automático para esta categoría, es normal
 
-    def apply_inventory(self):
+    def apply_inventory(self, shift=None):
         """Motor de consumo: descuenta ml por sabor y vasos (RN-008, RN-009)"""
         if not self.cup_size:
             # topping-only: descontar del stock del topping vendido
@@ -158,7 +159,8 @@ class SaleItem(models.Model):
                 try:
                     from apps.inventory.models import StockMovement
                     from apps.shifts.models import Shift
-                    shift = Shift.get_active()
+                    if shift is None:
+                        shift = Shift.get_active()
                     ts = self.topping.stock
                     ts.consume(self.quantity)
                     StockMovement.objects.create(
@@ -174,7 +176,8 @@ class SaleItem(models.Model):
         from apps.inventory.models import FlavorBag, CupStock, StockMovement
         from apps.shifts.models import Shift
 
-        shift = Shift.get_active()
+        if shift is None:
+            shift = Shift.get_active()
         cup_ml = self.cup_size.ml
         sale_flavors = self.saleitems_flavors.all()
         num_flavors = sale_flavors.count()

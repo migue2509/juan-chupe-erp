@@ -79,6 +79,7 @@ DATABASES = {
         'PASSWORD': config('DB_PASSWORD', default='password'),
         'HOST': config('DB_HOST', default='127.0.0.1'),
         'PORT': config('DB_PORT', default='5432'),
+        'CONN_MAX_AGE': 60,        # reusar conexiones PostgreSQL (evita overhead por request)
         'OPTIONS': {
             'connect_timeout': 10,
         },

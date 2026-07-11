@@ -122,16 +122,7 @@ class FlavorBagViewSet(viewsets.ModelViewSet):
 class CupStockViewSet(viewsets.ModelViewSet):
     serializer_class = CupStockSerializer
     permission_classes = [IsAdminOrReadOnly]
-
-    def get_queryset(self):
-        """Auto-crea CupStock para vasos que no lo tengan aún"""
-        from apps.products.models import CupSize
-        for cup in CupSize.objects.all():
-            CupStock.objects.get_or_create(
-                cup_size=cup,
-                defaults={'min_quantity': cup.min_quantity}
-            )
-        return CupStock.objects.select_related('cup_size').all()
+    queryset = CupStock.objects.select_related('cup_size').all()
 
     @action(detail=True, methods=['post'], url_path='add-stock', permission_classes=[IsAdmin])
     def add_stock(self, request, pk=None):
@@ -188,16 +179,7 @@ class CupStockViewSet(viewsets.ModelViewSet):
 class ToppingStockViewSet(viewsets.ModelViewSet):
     serializer_class = ToppingStockSerializer
     permission_classes = [IsAdminOrReadOnly]
-
-    def get_queryset(self):
-        """Auto-crea ToppingStock para toppings que no lo tengan aún"""
-        from apps.products.models import Topping
-        for t in Topping.objects.all():
-            ToppingStock.objects.get_or_create(
-                topping=t,
-                defaults={'min_quantity': t.min_stock}
-            )
-        return ToppingStock.objects.select_related('topping').all()
+    queryset = ToppingStock.objects.select_related('topping').all()
 
     @action(detail=True, methods=['post'], url_path='add-stock', permission_classes=[IsAdmin])
     def add_stock(self, request, pk=None):
