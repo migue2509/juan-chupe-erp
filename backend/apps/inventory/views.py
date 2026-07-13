@@ -11,7 +11,7 @@ from .serializers import (
 
 
 class FlavorBagViewSet(viewsets.ModelViewSet):
-    queryset = FlavorBag.objects.select_related('flavor').all()
+    queryset = FlavorBag.objects.select_related('flavor').filter(flavor__is_active=True).order_by('id')
     serializer_class = FlavorBagSerializer
     permission_classes = [IsAdminOrReadOnly]
 
@@ -122,7 +122,7 @@ class FlavorBagViewSet(viewsets.ModelViewSet):
 class CupStockViewSet(viewsets.ModelViewSet):
     serializer_class = CupStockSerializer
     permission_classes = [IsAdminOrReadOnly]
-    queryset = CupStock.objects.select_related('cup_size').all()
+    queryset = CupStock.objects.select_related('cup_size').filter(cup_size__is_active=True).order_by('id')
 
     @action(detail=True, methods=['post'], url_path='add-stock', permission_classes=[IsAdmin])
     def add_stock(self, request, pk=None):
@@ -179,7 +179,7 @@ class CupStockViewSet(viewsets.ModelViewSet):
 class ToppingStockViewSet(viewsets.ModelViewSet):
     serializer_class = ToppingStockSerializer
     permission_classes = [IsAdminOrReadOnly]
-    queryset = ToppingStock.objects.select_related('topping').all()
+    queryset = ToppingStock.objects.select_related('topping').filter(topping__is_active=True).order_by('id')
 
     @action(detail=True, methods=['post'], url_path='add-stock', permission_classes=[IsAdmin])
     def add_stock(self, request, pk=None):
@@ -223,7 +223,7 @@ class StockMovementViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = StockMovement.objects.select_related(
         'flavor_bag__flavor', 'cup_stock__cup_size', 'topping_stock__topping',
         'created_by', 'sale__invoice'
-    ).all()
+    ).order_by('-id')
     serializer_class = StockMovementSerializer
     permission_classes = [IsAdminOrReadOnly]
     filterset_fields = ['movement_type', 'shift']
