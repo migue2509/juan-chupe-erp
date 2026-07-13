@@ -260,43 +260,53 @@ export default function POS() {
       <div className="flex-1 space-y-4 overflow-y-auto min-w-0">
         <h1>Punto de Venta</h1>
 
-        {/* ── Promos de plataforma (Rappi / DiDi) ── */}
-        {promotions.some(p => p.category !== 'pos') && (
-          <div className="card border border-orange-200 bg-orange-50/40">
-            <p className="label mb-2 text-orange-600">Pedidos de plataforma</p>
-            <div className="flex gap-2 flex-wrap">
-              {promotions.filter(p => p.category !== 'pos').map(p => {
-                const isRappi  = p.category === 'rappi'
-                const active   = promoConfig?.promo?.id === p.id
-                const bgActive = isRappi ? 'border-[#FF424D] bg-[#FF424D]/10 text-[#FF424D]'
-                                         : 'border-[#FF6600] bg-[#FF6600]/10 text-[#FF6600]'
-                const bgIdle   = 'border-gray-200 text-gray-700 hover:border-orange-300 hover:bg-orange-50'
-                return (
-                  <button key={p.id}
-                    onClick={() => active ? cancelPromo() : startPromo(p)}
-                    className={`flex items-center gap-2 px-4 py-2.5 rounded-xl border-2 font-medium text-sm transition-all ${active ? bgActive : bgIdle}`}>
-                    <span className={`text-[10px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded ${
-                      isRappi ? 'bg-[#FF424D] text-white' : 'bg-[#FF6600] text-white'
-                    }`}>{p.category_label}</span>
-                    <span className="font-bold">{p.name}</span>
-                    {p.items?.length > 0
-                      ? <span className="text-xs opacity-60">{p.items.reduce((s, i) => s + i.quantity, 0)} vasos</span>
-                      : <span className="text-xs opacity-60">{p.quantity_included}×{p.cup_size_label}</span>
-                    }
-                    {Number(p.platform_fee_pct) > 0 ? (
-                      <span className="flex flex-col items-end leading-tight">
-                        <span className="text-[10px] line-through text-gray-400">{fmt(p.promo_price)}</span>
-                        <span className="font-bold text-green-700">{fmt(p.net_price)}</span>
-                      </span>
-                    ) : (
-                      <span className="font-bold">{fmt(p.promo_price)}</span>
-                    )}
-                  </button>
-                )
-              })}
+        {/* ── Promos de plataforma — una cajita por plataforma ── */}
+        {['rappi', 'didi'].map(platform => {
+          const platPromos = promotions.filter(p => p.category === platform)
+          if (!platPromos.length) return null
+          const isRappi   = platform === 'rappi'
+          const color     = isRappi ? '#FF424D' : '#FF6600'
+          const bgCard    = isRappi ? 'border-[#FF424D]/30 bg-[#FF424D]/4' : 'border-[#FF6600]/30 bg-[#FF6600]/4'
+          const label     = isRappi ? 'Rappi' : 'DiDi Food'
+          return (
+            <div key={platform} className={`card border-2 ${bgCard}`}>
+              <div className="flex items-center gap-2 mb-2.5">
+                <span className="text-[11px] font-bold uppercase tracking-widest px-2 py-0.5 rounded text-white"
+                  style={{ backgroundColor: color }}>
+                  {label}
+                </span>
+                <p className="label text-xs" style={{ color }}>Pedidos {label}</p>
+              </div>
+              <div className="flex gap-2 flex-wrap">
+                {platPromos.map(p => {
+                  const active   = promoConfig?.promo?.id === p.id
+                  const bgActive = `border-2 border-[${color}] bg-[${color}]/10 text-[${color}]`
+                  const bgIdle   = 'border-2 border-gray-200 text-gray-700 hover:bg-gray-50'
+                  return (
+                    <button key={p.id}
+                      onClick={() => active ? cancelPromo() : startPromo(p)}
+                      style={active ? { borderColor: color, backgroundColor: `${color}18`, color } : {}}
+                      className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-medium text-sm transition-all ${active ? '' : bgIdle}`}>
+                      <span className="font-bold">{p.name}</span>
+                      {p.items?.length > 0
+                        ? <span className="text-xs opacity-60">{p.items.reduce((s, i) => s + i.quantity, 0)} vasos</span>
+                        : <span className="text-xs opacity-60">{p.quantity_included}×{p.cup_size_label}</span>
+                      }
+                      {Number(p.platform_fee_pct) > 0 ? (
+                        <span className="flex flex-col items-end leading-tight">
+                          <span className="text-[10px] line-through text-gray-400">{fmt(p.promo_price)}</span>
+                          <span className="font-bold text-green-700">{fmt(p.net_price)}</span>
+                        </span>
+                      ) : (
+                        <span className="font-bold">{fmt(p.promo_price)}</span>
+                      )}
+                    </button>
+                  )
+                })}
+              </div>
             </div>
-          </div>
-        )}
+          )
+        })}
 
         {/* ── Promociones POS ── */}
         {promotions.some(p => !p.category || p.category === 'pos') && (
