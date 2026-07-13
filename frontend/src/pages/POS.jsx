@@ -260,8 +260,8 @@ export default function POS() {
       <div className="flex-1 space-y-4 overflow-y-auto min-w-0">
         <h1>Punto de Venta</h1>
 
-        {/* ── Promos de plataforma — una cajita por plataforma ── */}
-        {['rappi', 'didi'].map(platform => {
+        {/* ── Promos de plataforma — solo admin (oculto a vendedoras) ── */}
+        {user?.role === 'admin' && ['rappi', 'didi'].map(platform => {
           const platPromos = promotions.filter(p => p.category === platform)
           if (!platPromos.length) return null
           const isRappi   = platform === 'rappi'
