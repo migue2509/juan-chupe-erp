@@ -54,6 +54,7 @@ export const getActivePromotions = () => api.get('/promotions/active/')
 export const createPromotion = (data) => api.post('/promotions/', data)
 export const updatePromotion = (id, data) => api.patch(`/promotions/${id}/`, data)
 export const togglePromotion   = (id) => api.patch(`/promotions/${id}/toggle/`)
+export const deletePromotion   = (id) => api.delete(`/promotions/${id}/`)
 export const setPromotionItems = (id, items) => api.put(`/promotions/${id}/items/`, items)
 
 // Expenses
