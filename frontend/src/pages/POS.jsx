@@ -191,6 +191,7 @@ export default function POS() {
   // ─── Submit ───────────────────────────────────────────────────────────────
   const handleSubmit = async () => {
     if (items.length === 0) { toast.error('Agrega al menos un producto'); return }
+    if (isDelivery && !deliveryFourDigits.trim()) { toast.error('El nombre/identificación del cliente es obligatorio para domicilios'); return }
     if (isDelivery && !deliveryLat) { toast.error('Selecciona la ubicación del domicilio en el mapa'); return }
     setSubmitting(true)
     try {
@@ -768,7 +769,7 @@ export default function POS() {
                     value={deliveryNotes} onChange={e => setDeliveryNotes(e.target.value)} />
                 </div>
                 <div className="w-28">
-                  <label className="label">Cliente</label>
+                  <label className="label">Cliente <span className="text-red-400">*</span></label>
                   <input className="input text-sm" placeholder="Nombre..."
                     value={deliveryFourDigits}
                     onChange={e => setDeliveryFourDigits(e.target.value)} />
