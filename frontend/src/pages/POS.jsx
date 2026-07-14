@@ -183,9 +183,7 @@ export default function POS() {
   const platformChannel = items.find(i => i.promoCategory && i.promoCategory !== 'pos')?.promoCategory ?? null
   const change       = paymentMethod === 'cash' && !isCourtesy
     ? Math.max(0, Number(cashReceived) - orderTotal)
-    : paymentMethod === 'mixed' && !isCourtesy
-      ? Math.max(0, Number(cashReceived) - Math.max(0, orderTotal - Number(transferAmount || 0)))
-      : 0
+    : 0
   const courtesyDiff = isCourtesy ? Math.max(0, orderTotal - Number(courtesyPaid || 0)) : 0
 
   // ─── Submit ───────────────────────────────────────────────────────────────
@@ -637,28 +635,12 @@ export default function POS() {
             </div>
           )}
 
-          {(paymentMethod === 'cash' || paymentMethod === 'mixed') && !platformChannel && (
-            <div className="mb-2">
-              <label className="label">Efectivo recibido</label>
-              <input type="number" className="input" placeholder="0" value={cashReceived}
-                onChange={e => setCashReceived(e.target.value)} />
-              {cashReceived && Number(cashReceived) > 0 && change > 0 && (
-                <p className="text-xs text-green-600 mt-1 font-semibold">Cambio: {fmt(change)}</p>
-              )}
-            </div>
-          )}
-
           {(paymentMethod === 'transfer' || paymentMethod === 'mixed') && !platformChannel && (
             <div className="mb-2 space-y-2">
               <div>
                 <label className="label">Monto transferencia</label>
                 <input type="number" className="input" placeholder="0" value={transferAmount}
                   onChange={e => setTransferAmount(e.target.value)} />
-                {paymentMethod === 'mixed' && cashReceived && Number(cashReceived) > 0 && Number(cashReceived) < orderTotal && !transferAmount && (
-                  <p className="text-xs text-cyan-600 mt-1">
-                    Sugerido: {fmt(orderTotal - Number(cashReceived))}
-                  </p>
-                )}
               </div>
               <div>
                 <label className="label">Referencia</label>
@@ -718,6 +700,24 @@ export default function POS() {
                     )
                   })}
                 </div>
+              )}
+            </div>
+          )}
+
+          {(paymentMethod === 'cash' || paymentMethod === 'mixed') && !platformChannel && (
+            <div className="mb-2">
+              <label className="label">
+                {paymentMethod === 'mixed' ? 'Monto efectivo' : 'Efectivo recibido'}
+              </label>
+              <input type="number" className="input" placeholder="0" value={cashReceived}
+                onChange={e => setCashReceived(e.target.value)} />
+              {paymentMethod === 'mixed' && transferAmount && Number(transferAmount) > 0 && !cashReceived && (
+                <p className="text-xs text-cyan-600 mt-1">
+                  Sugerido: {fmt(Math.max(0, orderTotal - Number(transferAmount)))}
+                </p>
+              )}
+              {paymentMethod === 'cash' && cashReceived && Number(cashReceived) > 0 && change > 0 && (
+                <p className="text-xs text-green-600 mt-1 font-semibold">Cambio: {fmt(change)}</p>
               )}
             </div>
           )}

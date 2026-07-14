@@ -31,7 +31,10 @@ class DailySummaryView(APIView):
         sales = Sale.objects.filter(shift=shift).exclude(invoice__voided=True)
         total_sales    = sales.aggregate(total=Sum('total'))['total'] or Decimal('0')
         total_transfer = sum(s.transfer_amount for s in sales)
-        total_cash     = total_sales - total_transfer
+        total_cash     = sum(
+            s.cash_received if s.payment_method == 'mixed' else (s.total - s.transfer_amount)
+            for s in sales
+        )
 
         expenses = Expense.objects.filter(shift=shift)
         total_expenses = expenses.aggregate(total=Sum('amount'))['total'] or Decimal('0')
@@ -184,13 +187,17 @@ class RangeReportView(APIView):
         sellers = sorted(seller_map.values(), key=lambda x: x['total'], reverse=True)
 
         # ── Medio de pago ─────────────────────────────────────────────────────
-        # efectivo real = total - transfer_amount (cash_received incluye vuelto)
+        # mixto: cash_received es el monto exacto en efectivo a caja
         total_transfer = sum(float(s.transfer_amount) for s in sales)
         total_sales    = sum(
             float(s.courtesy_paid) if s.is_courtesy else float(s.total)
             for s in sales
         )
-        total_cash  = total_sales - total_transfer
+        total_cash  = sum(
+            float(s.cash_received) if s.payment_method == 'mixed'
+            else (0.0 if s.payment_method == 'transfer' else float(s.total))
+            for s in sales
+        )
         total_money = total_sales
 
         # ── Ventas por tamaño de vaso ─────────────────────────────────────────

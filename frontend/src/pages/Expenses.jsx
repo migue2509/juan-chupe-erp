@@ -359,8 +359,8 @@ export default function Expenses() {
         <div style={{ minWidth: '1350px' }}>
         {/* Table header */}
         <div className="grid px-5 py-2.5 bg-slate-50 border-b border-gray-100 text-[10px] font-semibold text-gray-400 uppercase tracking-widest gap-3"
-          style={{ gridTemplateColumns: '60px 80px 90px 130px 80px minmax(0,1fr) 120px 90px 90px 80px 64px' }}>
-          {['Hora', 'Fecha', 'Jornada', 'Categoría', 'Canal', 'Descripción', 'Registrado por', 'Caja', 'Método', 'Monto', ''].map(h => (
+          style={{ gridTemplateColumns: '44px 60px 80px 90px 130px 80px minmax(0,1fr) 120px 90px 90px 80px 64px' }}>
+          {['#', 'Hora', 'Fecha', 'Jornada', 'Categoría', 'Canal', 'Descripción', 'Registrado por', 'Caja', 'Método', 'Monto', ''].map(h => (
             <span key={h}>{h}</span>
           ))}
         </div>
@@ -374,7 +374,8 @@ export default function Expenses() {
           ) : filtered.map(e => (
             <div key={e.id}
               className="grid px-5 py-3 items-center gap-3 hover:bg-slate-50 transition-colors"
-              style={{ gridTemplateColumns: '60px 80px 90px 130px 80px minmax(0,1fr) 120px 90px 90px 80px 64px' }}>
+              style={{ gridTemplateColumns: '44px 60px 80px 90px 130px 80px minmax(0,1fr) 120px 90px 90px 80px 64px' }}>
+              <span className="text-xs font-bold tabular-nums text-gray-300">#{e.id}</span>
               <span className="text-sm tabular-nums text-gray-500">{fmtTime(e.created_at)}</span>
               <span className="text-sm tabular-nums text-gray-500">{fmtDate(e.created_at)}</span>
               <span className="text-xs font-medium text-brand-navy bg-blue-50 px-2 py-0.5 rounded-full">{e.shift_label}</span>

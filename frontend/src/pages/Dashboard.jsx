@@ -83,11 +83,11 @@ export default function Dashboard() {
   // TOTAL VENTAS = suma de todas las facturas de la jornada (efectivo + transferencias)
   const totalDinero = activeSales.reduce((sum, s) => sum + valorVenta(s), 0)
 
-  // EFECTIVO = pagos cash completos + porción en efectivo de ventas mixtas
+  // EFECTIVO = pagos cash completos + monto efectivo explícito de ventas mixtas
   const totalEfectivo = activeSales.reduce((sum, s) => {
     const val = valorVenta(s)
     if (s.payment_method === 'cash')  return sum + val
-    if (s.payment_method === 'mixed') return sum + Math.max(0, val - Number(s.transfer_amount || 0))
+    if (s.payment_method === 'mixed') return sum + Number(s.cash_received || 0)
     return sum  // transfer: no aporta efectivo
   }, 0)
 

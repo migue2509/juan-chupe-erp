@@ -109,7 +109,10 @@ class CashAuditViewSet(viewsets.ModelViewSet):
 
         def _total(lst):    return sum(s.total for s in lst)
         def _transfer(lst): return sum(s.transfer_amount for s in lst)
-        def _cash(lst):     return _total(lst) - _transfer(lst)
+        def _cash(lst):     return sum(
+            s.cash_received if s.payment_method == 'mixed' else (s.total - s.transfer_amount)
+            for s in lst
+        )
 
         pos_total    = _total(pos_sales)
         pos_transfer = _transfer(pos_sales)

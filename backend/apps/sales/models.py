@@ -49,12 +49,10 @@ class Sale(models.Model):
         total = sum(item.subtotal for item in self.items.all())
         self.total = total
         if self.payment_method == 'mixed':
-            # Si no se ingresó monto de transferencia, lo calculamos del déficit de efectivo
+            # cash_received = monto efectivo exacto que va a caja; no hay vuelto en mixto
             if self.transfer_amount == Decimal('0'):
                 self.transfer_amount = max(Decimal('0'), total - self.cash_received)
-            # El cambio es solo sobre la porción en efectivo
-            cash_portion = total - self.transfer_amount
-            self.change_given = max(Decimal('0'), self.cash_received - cash_portion)
+            self.change_given = Decimal('0')
         elif self.payment_method == 'transfer':
             # Si no se ingresó transfer_amount, usar el total
             if self.transfer_amount == Decimal('0'):
