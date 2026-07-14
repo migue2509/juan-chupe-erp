@@ -51,7 +51,7 @@ export default function Inventory() {
     try {
       const [b, c, t, m] = await Promise.all([
         getBags(), getCupStocks(), getToppingStocks(),
-        getMovements({ ordering: '-created_at' }),
+        getMovements({ ordering: '-created_at', page_size: 500 }),
       ])
       setBags(b.data?.results ?? b.data ?? [])
       setCups(c.data?.results ?? c.data ?? [])
@@ -94,12 +94,16 @@ export default function Inventory() {
 
   // Movimientos filtrados
   const filteredMovements = movements.filter(m => {
-    const matchType   = typeFilter ? m.movement_type === typeFilter : true
+    // Bug 2 fix: 'out' filter también incluye movimientos tipo 'sale'
+    const matchType = typeFilter
+      ? (typeFilter === 'out' ? ['out', 'sale'].includes(m.movement_type) : m.movement_type === typeFilter)
+      : true
     const matchSearch = search ? m.item_name?.toLowerCase().includes(search.toLowerCase()) : true
     if (dateFrom || dateTo) {
       const d = new Date(m.created_at); d.setHours(0, 0, 0, 0)
-      if (dateFrom && d < new Date(dateFrom)) return false
-      if (dateTo   && d > new Date(dateTo))   return false
+      // Bug 3 fix: parsear fechas como hora local, no UTC
+      if (dateFrom && d < new Date(dateFrom + 'T00:00:00')) return false
+      if (dateTo   && d > new Date(dateTo   + 'T23:59:59')) return false
     }
     return matchType && matchSearch
   })
@@ -163,7 +167,13 @@ export default function Inventory() {
       }
       toast.success('Entrada registrada' + (needsAmount ? ' y gasto creado' : ''))
       setModal(null); load()
-    } catch { toast.error('Error al registrar entrada') }
+    } catch (err) {
+      const msg = err?.response?.data?.detail
+        || err?.response?.data?.non_field_errors?.[0]
+        || Object.values(err?.response?.data ?? {})[0]
+        || 'Error al registrar entrada'
+      toast.error(String(msg))
+    }
     setSaving(false)
   }
 
@@ -335,10 +345,13 @@ export default function Inventory() {
               </div>
             ) : filteredMovements.map(m => {
               const mv = MOVEMENT_TYPE[m.movement_type] ?? { label: m.movement_type, cls: 'bg-gray-100 text-gray-500' }
+              // Bug 1 fix: ajustes negativos tenían signo doble (+-X)
+              const rawVal = m.quantity_units ?? Number(m.quantity_ml ?? 0)
+              const isNeg  = ['out','sale'].includes(m.movement_type)
+                || (m.movement_type === 'adjustment' && Number(rawVal) < 0)
               const qty = m.quantity_units != null
-                ? `${['out','sale'].includes(m.movement_type) ? '-' : '+'}${m.quantity_units}`
-                : `${['out','sale'].includes(m.movement_type) ? '-' : '+'}${Math.round(Number(m.quantity_ml || 0)).toLocaleString('es-CO')} ml`
-              const isNeg = ['out','sale'].includes(m.movement_type)
+                ? `${isNeg ? '-' : '+'}${Math.abs(m.quantity_units)}`
+                : `${isNeg ? '-' : '+'}${Math.round(Math.abs(Number(m.quantity_ml || 0))).toLocaleString('es-CO')} ml`
               return (
                 <div key={m.id} className="grid px-5 py-3 items-center gap-3 hover:bg-slate-50 transition-colors"
                   style={{ gridTemplateColumns: '110px 80px minmax(0,1fr) 80px 90px 100px', minWidth: '800px' }}>
