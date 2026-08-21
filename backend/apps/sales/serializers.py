@@ -1,4 +1,5 @@
 from rest_framework import serializers
+from django.core.exceptions import ObjectDoesNotExist
 from decimal import Decimal
 from .models import Sale, SaleItem, SaleItemFlavor
 
@@ -11,7 +12,7 @@ class SaleItemCreateSerializer(serializers.Serializer):
     cup_size_id = serializers.IntegerField(required=False, allow_null=True)
     flavor_ids  = serializers.ListField(child=serializers.IntegerField(), min_length=0, default=[], required=False)
     topping_id  = serializers.IntegerField(required=False, allow_null=True)
-    unit_price  = serializers.DecimalField(max_digits=10, decimal_places=0)
+    unit_price  = serializers.DecimalField(max_digits=10, decimal_places=0, min_value=Decimal('0'))
     quantity    = serializers.IntegerField(default=1, min_value=1)
 
 
@@ -19,19 +20,27 @@ class SaleCreateSerializer(serializers.Serializer):
     seller_id = serializers.IntegerField(required=False, allow_null=True)
     promotion_id = serializers.IntegerField(required=False, allow_null=True)
     payment_method = serializers.ChoiceField(choices=['cash', 'transfer', 'mixed'])
-    cash_received = serializers.DecimalField(max_digits=10, decimal_places=0, default=Decimal('0'))
-    transfer_amount = serializers.DecimalField(max_digits=10, decimal_places=0, default=Decimal('0'))
+    cash_received = serializers.DecimalField(max_digits=10, decimal_places=0, default=Decimal('0'), min_value=Decimal('0'))
+    transfer_amount = serializers.DecimalField(max_digits=10, decimal_places=0, default=Decimal('0'), min_value=Decimal('0'))
     transfer_reference = serializers.CharField(required=False, allow_blank=True)
     is_delivery      = serializers.BooleanField(default=False)
     delivery_address = serializers.CharField(required=False, allow_blank=True, default='')
     delivery_client  = serializers.CharField(required=False, allow_blank=True, default='')
     delivery_notes   = serializers.CharField(required=False, allow_blank=True, default='')
-    delivery_lat     = serializers.FloatField(required=False, allow_null=True, default=None)
-    delivery_lng     = serializers.FloatField(required=False, allow_null=True, default=None)
+    delivery_lat     = serializers.FloatField(required=False, allow_null=True, default=None, min_value=-90, max_value=90)
+    delivery_lng     = serializers.FloatField(required=False, allow_null=True, default=None, min_value=-180, max_value=180)
     is_courtesy      = serializers.BooleanField(default=False)
-    courtesy_paid = serializers.DecimalField(max_digits=10, decimal_places=0, default=Decimal('0'), required=False)
+    courtesy_paid = serializers.DecimalField(max_digits=10, decimal_places=0, default=Decimal('0'), required=False, min_value=Decimal('0'))
     notes = serializers.CharField(required=False, allow_blank=True)
     items = SaleItemCreateSerializer(many=True, min_length=1)
+
+    def validate(self, attrs):
+        if attrs.get('is_delivery'):
+            if not attrs.get('delivery_client', '').strip():
+                raise serializers.ValidationError({'detail': 'El cliente es obligatorio para domicilios.'})
+            if attrs.get('delivery_lat') is None or attrs.get('delivery_lng') is None:
+                raise serializers.ValidationError({'detail': 'Selecciona la ubicacion del domicilio en el mapa.'})
+        return attrs
 
 
 class SaleItemSerializer(serializers.ModelSerializer):
@@ -74,13 +83,13 @@ class SaleSerializer(serializers.ModelSerializer):
     def get_is_voided(self, obj):
         try:
             return obj.invoice.voided
-        except Exception:
+        except (ObjectDoesNotExist, AttributeError):
             return False
 
     def get_invoice_number(self, obj):
         try:
             return obj.invoice.invoice_number
-        except Exception:
+        except (ObjectDoesNotExist, AttributeError):
             return ''
 
     def get_delivery_status(self, obj):
@@ -88,7 +97,7 @@ class SaleSerializer(serializers.ModelSerializer):
             return None
         try:
             return obj.delivery.status
-        except Exception:
+        except (ObjectDoesNotExist, AttributeError):
             return None
 
     def get_delivery_person_name(self, obj):
@@ -96,7 +105,7 @@ class SaleSerializer(serializers.ModelSerializer):
             return None
         try:
             return obj.delivery.delivery_person.name
-        except Exception:
+        except (ObjectDoesNotExist, AttributeError):
             return None
 
     delivery_person_name = serializers.SerializerMethodField()

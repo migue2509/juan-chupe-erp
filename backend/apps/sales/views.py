@@ -4,7 +4,7 @@ from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
 from django.core.exceptions import ObjectDoesNotExist
 from django.db import transaction
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
 from core.permissions import IsOperative, IsAdmin
 from apps.shifts.models import Shift
 from apps.products.models import Flavor, CupSize, Topping
@@ -27,6 +27,48 @@ class SaleViewSet(viewsets.ReadOnlyModelViewSet):
             raise ValidationError({'detail': str(exc)})
         except ObjectDoesNotExist:
             raise ValidationError({'detail': 'No hay stock registrado para uno de los items de la venta.'})
+
+    def _decimal_or_error(self, value, label):
+        try:
+            amount = Decimal(str(value or 0))
+        except (InvalidOperation, ValueError, TypeError):
+            raise ValidationError({'detail': f'{label} debe ser un numero valido.'})
+        if amount < 0:
+            raise ValidationError({'detail': f'{label} no puede ser negativo.'})
+        return amount
+
+    def _positive_int_or_error(self, value, label):
+        try:
+            amount = int(value)
+        except (ValueError, TypeError):
+            raise ValidationError({'detail': f'{label} debe ser un numero entero valido.'})
+        if amount < 1:
+            raise ValidationError({'detail': f'{label} debe ser mayor a 0.'})
+        return amount
+
+    def _validate_payment_or_error(self, sale):
+        total = Decimal(str(sale.total or 0))
+        cash = Decimal(str(sale.cash_received or 0))
+        transfer = Decimal(str(sale.transfer_amount or 0))
+        courtesy_paid = Decimal(str(sale.courtesy_paid or 0))
+
+        if min(cash, transfer, courtesy_paid) < 0:
+            raise ValidationError({'detail': 'Los montos de pago no pueden ser negativos.'})
+
+        if sale.is_courtesy:
+            if courtesy_paid > total:
+                raise ValidationError({'detail': 'El valor pagado en cortesia no puede superar el total.'})
+            return
+
+        if sale.payment_method == 'cash' and cash < total:
+            raise ValidationError({'detail': 'El efectivo recibido no alcanza para cubrir el total.'})
+        if sale.payment_method == 'transfer' and transfer < total:
+            raise ValidationError({'detail': 'El monto de transferencia no alcanza para cubrir el total.'})
+        if sale.payment_method == 'mixed':
+            if cash <= 0 or transfer <= 0:
+                raise ValidationError({'detail': 'El pago mixto debe tener efectivo y transferencia.'})
+            if cash + transfer < total:
+                raise ValidationError({'detail': 'La suma de efectivo y transferencia no cubre el total.'})
 
     @action(detail=False, methods=['post'], url_path='create-sale')
     def create_sale(self, request):
@@ -212,6 +254,7 @@ class SaleViewSet(viewsets.ReadOnlyModelViewSet):
                 self._apply_inventory_or_error(sale_item, shift)
 
             sale.calculate_total()
+            self._validate_payment_or_error(sale)
 
             # Auto-gasto por cortesía (no afecta caja)
             if is_courtesy:
@@ -254,6 +297,10 @@ class SaleViewSet(viewsets.ReadOnlyModelViewSet):
 
         with transaction.atomic():
             # ── Campos sin impacto en inventario ──
+            decimal_labels = {
+                'cash_received': 'El efectivo recibido',
+                'transfer_amount': 'El monto de transferencia',
+            }
             decimal_fields = {'cash_received', 'transfer_amount'}
             simple_fields  = ['cash_received', 'transfer_amount',
                               'transfer_reference', 'is_delivery', 'notes']
@@ -261,13 +308,15 @@ class SaleViewSet(viewsets.ReadOnlyModelViewSet):
                 if field in request.data:
                     val = request.data[field]
                     if field in decimal_fields:
-                        val = Decimal(str(val or 0))
+                        val = self._decimal_or_error(val, decimal_labels[field])
                     setattr(sale, field, val)
 
             # ── Método de pago: limpiar montos contrarios automáticamente ──
             if 'payment_method' in request.data:
                 sale.payment_method = request.data['payment_method']
                 pm = sale.payment_method
+                if pm not in {choice[0] for choice in Sale.PAYMENT_CHOICES}:
+                    raise ValidationError({'detail': 'Metodo de pago invalido.'})
                 if pm == 'cash':
                     sale.transfer_amount    = Decimal('0')
                     sale.transfer_reference = ''
@@ -304,7 +353,10 @@ class SaleViewSet(viewsets.ReadOnlyModelViewSet):
             if 'is_courtesy' in request.data:
                 sale.is_courtesy = bool(request.data['is_courtesy'])
             if 'courtesy_paid' in request.data:
-                sale.courtesy_paid = Decimal(str(request.data.get('courtesy_paid') or 0))
+                sale.courtesy_paid = self._decimal_or_error(
+                    request.data.get('courtesy_paid'),
+                    'El valor pagado en cortesia'
+                )
 
             # ── Si vienen items nuevos → revertir inventario y reemplazar ──
             if 'items' in request.data:
@@ -317,7 +369,10 @@ class SaleViewSet(viewsets.ReadOnlyModelViewSet):
                 # Pre-validar stock (descontando lo que ya se va a devolver)
                 from apps.inventory.models import FlavorBag, CupStock, ToppingStock
                 for item_data in items_data:
-                    qty = item_data.get('quantity', 1)
+                    qty = self._positive_int_or_error(item_data.get('quantity', 1), 'La cantidad')
+                    if 'unit_price' not in item_data:
+                        raise ValidationError({'detail': 'El precio unitario es obligatorio.'})
+                    self._decimal_or_error(item_data.get('unit_price'), 'El precio unitario')
                     cup_size_id = item_data.get('cup_size_id')
                     flavor_ids = item_data.get('flavor_ids', [])
                     topping_id = item_data.get('topping_id')
@@ -406,12 +461,13 @@ class SaleViewSet(viewsets.ReadOnlyModelViewSet):
                     topping  = None
                     if item_data.get('topping_id'):
                         topping = Topping.objects.get(id=item_data['topping_id'], is_active=True)
-                    unit_price = item_data['unit_price']
+                    unit_price = self._decimal_or_error(item_data.get('unit_price'), 'El precio unitario')
+                    quantity = self._positive_int_or_error(item_data.get('quantity', 1), 'La cantidad')
                     topping_price = (topping.price if topping else Decimal('0')) if not is_topping_only else Decimal('0')
                     sale_item = SaleItem.objects.create(
                         sale=sale, cup_size=cup_size, topping=topping,
                         unit_price=unit_price, topping_price=topping_price,
-                        quantity=item_data.get('quantity', 1),
+                        quantity=quantity,
                     )
                     if not is_topping_only:
                         flavors = Flavor.objects.filter(id__in=item_data['flavor_ids'], is_active=True)
@@ -425,12 +481,10 @@ class SaleViewSet(viewsets.ReadOnlyModelViewSet):
                     self._apply_inventory_or_error(sale_item, edit_shift)
 
                 sale.calculate_total()
+                self._validate_payment_or_error(sale)
             else:
-                sale.change_given = max(
-                    Decimal('0'),
-                    Decimal(str(sale.cash_received)) - sale.total
-                )
-                sale.save()
+                sale.calculate_total()
+                self._validate_payment_or_error(sale)
 
         return Response(SaleSerializer(sale).data)
 
