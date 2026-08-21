@@ -34,7 +34,13 @@ class FlavorBag(models.Model):
 
     def consume(self, ml: Decimal):
         """Descuenta ml del stock (llamado por el motor de ventas)"""
-        self.stock_ml = max(Decimal('0'), self.stock_ml - ml)
+        ml = Decimal(str(ml))
+        if ml > self.stock_ml:
+            raise ValueError(
+                f'Stock insuficiente de {self.flavor.name}. '
+                f'Disponible: {self.stock_ml:.0f} ml, necesario: {ml:.0f} ml.'
+            )
+        self.stock_ml -= ml
         self.save()
 
     def add_stock(self, ml: Decimal):
@@ -63,7 +69,13 @@ class CupStock(models.Model):
         return self.quantity <= self.min_quantity
 
     def consume(self, qty: int = 1):
-        self.quantity = max(0, self.quantity - qty)
+        qty = int(qty)
+        if qty > self.quantity:
+            raise ValueError(
+                f'Stock insuficiente de vasos {self.cup_size.size}. '
+                f'Disponible: {self.quantity}, necesario: {qty}.'
+            )
+        self.quantity -= qty
         self.save()
 
     def add_stock(self, qty: int):
@@ -92,7 +104,13 @@ class ToppingStock(models.Model):
         return self.min_quantity > 0 and self.quantity <= self.min_quantity
 
     def consume(self, qty: int = 1):
-        self.quantity = max(0, self.quantity - qty)
+        qty = int(qty)
+        if qty > self.quantity:
+            raise ValueError(
+                f'Stock insuficiente de {self.topping.name}. '
+                f'Disponible: {self.quantity}, necesario: {qty}.'
+            )
+        self.quantity -= qty
         self.save()
 
     def add_stock(self, qty: int):

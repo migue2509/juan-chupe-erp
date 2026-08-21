@@ -1,6 +1,8 @@
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
+from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
+from django.core.exceptions import ObjectDoesNotExist
 from django.db import transaction
 from decimal import Decimal
 from core.permissions import IsOperative, IsAdmin
@@ -17,6 +19,14 @@ class SaleViewSet(viewsets.ReadOnlyModelViewSet):
     serializer_class = SaleSerializer
     permission_classes = [IsOperative]
     filterset_fields = ['shift', 'payment_method', 'is_delivery']
+
+    def _apply_inventory_or_error(self, sale_item, shift):
+        try:
+            sale_item.apply_inventory(shift=shift)
+        except ValueError as exc:
+            raise ValidationError({'detail': str(exc)})
+        except ObjectDoesNotExist:
+            raise ValidationError({'detail': 'No hay stock registrado para uno de los items de la venta.'})
 
     @action(detail=False, methods=['post'], url_path='create-sale')
     def create_sale(self, request):
@@ -115,7 +125,7 @@ class SaleViewSet(viewsets.ReadOnlyModelViewSet):
 
                 # Bolsa de topping automática según categoría
                 categories = {f.category for f in flavor_objs}  # flavor_objs ya es lista
-                if categories:
+                if len(categories) == 1:
                     primary_cat = next(iter(categories))
                     try:
                         auto_topping = Topping.objects.get(linked_category=primary_cat, is_active=True)
@@ -199,7 +209,7 @@ class SaleViewSet(viewsets.ReadOnlyModelViewSet):
                         )
 
                 # Apply inventory deduction (shift ya obtenido arriba, no relanzar query)
-                sale_item.apply_inventory(shift=shift)
+                self._apply_inventory_or_error(sale_item, shift)
 
             sale.calculate_total()
 
@@ -284,8 +294,10 @@ class SaleViewSet(viewsets.ReadOnlyModelViewSet):
             if 'promotion_id' in request.data:
                 promo_id = request.data['promotion_id']
                 if promo_id:
-                    try: sale.promotion = Promotion.objects.get(id=promo_id)
-                    except: sale.promotion = None
+                    try:
+                        sale.promotion = Promotion.objects.get(id=promo_id, is_active=True)
+                    except (Promotion.DoesNotExist, ValueError, TypeError):
+                        sale.promotion = None
                 else:
                     sale.promotion = None
 
@@ -298,64 +310,119 @@ class SaleViewSet(viewsets.ReadOnlyModelViewSet):
             if 'items' in request.data:
                 items_data = request.data['items']
 
+                edit_shift = Shift.get_active()
+                for item in sale.items.all():
+                    item.reverse_inventory(shift=edit_shift)
+
                 # Pre-validar stock (descontando lo que ya se va a devolver)
-                from apps.inventory.models import FlavorBag, CupStock
+                from apps.inventory.models import FlavorBag, CupStock, ToppingStock
                 for item_data in items_data:
-                    cup_size = CupSize.objects.get(id=item_data['cup_size_id'])
-                    qty      = item_data.get('quantity', 1)
-                    flavor_objs  = Flavor.objects.filter(id__in=item_data['flavor_ids'])
-                    num_flavors  = flavor_objs.count()
+                    qty = item_data.get('quantity', 1)
+                    cup_size_id = item_data.get('cup_size_id')
+                    flavor_ids = item_data.get('flavor_ids', [])
+                    topping_id = item_data.get('topping_id')
+                    is_topping_only = not cup_size_id
+
+                    topping = None
+                    if topping_id:
+                        try:
+                            topping = Topping.objects.get(id=topping_id, is_active=True)
+                        except (Topping.DoesNotExist, ValueError, TypeError):
+                            raise ValidationError({'detail': 'Topping no encontrado o inactivo.'})
+
+                    if is_topping_only:
+                        if not topping:
+                            raise ValidationError({'detail': 'Selecciona un topping para venderlo solo.'})
+                        try:
+                            topping_stock = topping.stock
+                        except ToppingStock.DoesNotExist:
+                            raise ValidationError({'detail': f'No hay stock registrado para {topping.name}.'})
+                        if topping_stock.quantity < qty:
+                            raise ValidationError({
+                                'detail': f'Stock insuficiente de {topping.name}. '
+                                          f'Disponible: {topping_stock.quantity}, necesario: {qty}.'
+                            })
+                        continue
+
+                    try:
+                        cup_size = CupSize.objects.get(id=cup_size_id, is_active=True)
+                    except (CupSize.DoesNotExist, ValueError, TypeError):
+                        raise ValidationError({'detail': 'Tamano de vaso no encontrado o inactivo.'})
+
+                    if not flavor_ids:
+                        raise ValidationError({'detail': f'El vaso {cup_size.size} necesita al menos un sabor.'})
+                    if len(flavor_ids) != len(set(flavor_ids)):
+                        raise ValidationError({'detail': 'No repitas el mismo sabor en un vaso.'})
+
+                    flavor_objs = list(Flavor.objects.select_related('bag').filter(id__in=flavor_ids, is_active=True))
+                    if len(flavor_objs) != len(flavor_ids):
+                        raise ValidationError({'detail': 'Uno o mas sabores no existen o estan inactivos.'})
+
+                    num_flavors = len(flavor_objs)
                     ml_por_sabor = cup_size.ml / Decimal(str(max(num_flavors, 1))) * qty
 
                     # Vasos
                     try:
                         cs = CupStock.objects.get(cup_size=cup_size)
                         if cs.quantity < qty:
-                            return Response(
-                                {'detail': f'Stock insuficiente de vasos {cup_size.size}. Disponible: {cs.quantity}.'},
-                                status=status.HTTP_400_BAD_REQUEST
-                            )
+                            raise ValidationError({'detail': f'Stock insuficiente de vasos {cup_size.size}. Disponible: {cs.quantity}, necesario: {qty}.'})
                     except CupStock.DoesNotExist:
-                        return Response({'detail': f'Sin stock para vasos {cup_size.size}.'}, status=400)
+                        raise ValidationError({'detail': f'Sin stock para vasos {cup_size.size}.'})
 
                     for flavor in flavor_objs:
                         try:
                             if flavor.bag.stock_ml < ml_por_sabor:
-                                return Response(
-                                    {'detail': f'Stock insuficiente de {flavor.name}. '
-                                               f'Disponible: {flavor.bag.stock_ml:.0f} ml.'},
-                                    status=400
-                                )
-                        except Exception:
-                            return Response({'detail': f'Sin bolsa para {flavor.name}.'}, status=400)
+                                raise ValidationError({
+                                    'detail': f'Stock insuficiente de {flavor.name}. '
+                                              f'Disponible: {flavor.bag.stock_ml:.0f} ml, necesario: {ml_por_sabor:.0f} ml.'
+                                })
+                        except FlavorBag.DoesNotExist:
+                            raise ValidationError({'detail': f'Sin bolsa para {flavor.name}.'})
 
-                # Revertir inventario de items actuales (reusar shift activo)
-                edit_shift = Shift.get_active()
-                for item in sale.items.all():
-                    item.reverse_inventory(shift=edit_shift)
+                    categories = {f.category for f in flavor_objs if f.category}
+                    if len(categories) == 1:
+                        primary_cat = next(iter(categories))
+                        try:
+                            auto_topping = Topping.objects.get(linked_category=primary_cat, is_active=True)
+                            auto_ts = ToppingStock.objects.get(topping=auto_topping)
+                            if auto_ts.quantity < qty:
+                                raise ValidationError({
+                                    'detail': f'Stock insuficiente de {auto_topping.name}. '
+                                              f'Disponible: {auto_ts.quantity}, necesario: {qty}.'
+                                })
+                        except Topping.DoesNotExist:
+                            pass
+                        except Topping.MultipleObjectsReturned:
+                            raise ValidationError({'detail': f'Hay mas de un topping automatico activo para la categoria {primary_cat}.'})
+                        except ToppingStock.DoesNotExist:
+                            raise ValidationError({'detail': f'No hay stock registrado para {auto_topping.name}.'})
+
                 sale.items.all().delete()
 
                 # Crear nuevos items (unit_price viene explícito desde el frontend)
                 for item_data in items_data:
-                    cup_size = CupSize.objects.get(id=item_data['cup_size_id'])
+                    is_topping_only = not item_data.get('cup_size_id')
+                    cup_size = None if is_topping_only else CupSize.objects.get(id=item_data['cup_size_id'], is_active=True)
                     topping  = None
                     if item_data.get('topping_id'):
-                        try: topping = Topping.objects.get(id=item_data['topping_id'])
-                        except: pass
+                        topping = Topping.objects.get(id=item_data['topping_id'], is_active=True)
                     unit_price = item_data['unit_price']
+                    topping_price = (topping.price if topping else Decimal('0')) if not is_topping_only else Decimal('0')
                     sale_item = SaleItem.objects.create(
                         sale=sale, cup_size=cup_size, topping=topping,
-                        unit_price=unit_price, quantity=item_data.get('quantity', 1),
+                        unit_price=unit_price, topping_price=topping_price,
+                        quantity=item_data.get('quantity', 1),
                     )
-                    flavors = Flavor.objects.filter(id__in=item_data['flavor_ids'])
-                    num_flavors  = flavors.count()
-                    ml_per_flavor = cup_size.ml / Decimal(str(max(num_flavors, 1)))
-                    for flavor in flavors:
-                        SaleItemFlavor.objects.create(
-                            sale_item=sale_item, flavor=flavor,
-                            ml_consumed=ml_per_flavor * sale_item.quantity
-                        )
-                    sale_item.apply_inventory(shift=edit_shift)
+                    if not is_topping_only:
+                        flavors = Flavor.objects.filter(id__in=item_data['flavor_ids'], is_active=True)
+                        num_flavors  = flavors.count()
+                        ml_per_flavor = cup_size.ml / Decimal(str(max(num_flavors, 1)))
+                        for flavor in flavors:
+                            SaleItemFlavor.objects.create(
+                                sale_item=sale_item, flavor=flavor,
+                                ml_consumed=ml_per_flavor * sale_item.quantity
+                            )
+                    self._apply_inventory_or_error(sale_item, edit_shift)
 
                 sale.calculate_total()
             else:
@@ -405,5 +472,5 @@ class SaleViewSet(viewsets.ReadOnlyModelViewSet):
     def _is_voided(sale):
         try:
             return sale.invoice.voided
-        except Exception:
+        except ObjectDoesNotExist:
             return False

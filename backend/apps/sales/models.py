@@ -134,8 +134,8 @@ class SaleItem(models.Model):
         # Revertir topping automático
         try:
             from apps.products.models import Topping as ToppingModel
-            categories = {sf.flavor.category for sf in sale_flavors}
-            if categories:
+            categories = {sf.flavor.category for sf in sale_flavors if sf.flavor.category}
+            if len(categories) == 1:
                 primary_cat = next(iter(categories))
                 auto_topping = ToppingModel.objects.get(linked_category=primary_cat, is_active=True)
                 auto_ts = auto_topping.stock
@@ -174,56 +174,57 @@ class SaleItem(models.Model):
         if shift is None:
             shift = Shift.get_active()
         cup_ml = self.cup_size.ml
-        sale_flavors = self.saleitems_flavors.all()
-        num_flavors = sale_flavors.count()
+        sale_flavors = list(self.saleitems_flavors.select_related('flavor__bag').all())
+        num_flavors = len(sale_flavors)
+        if num_flavors == 0:
+            raise ValueError(f'La venta #{self.sale_id} no tiene sabores para descontar.')
 
         for sf in sale_flavors:
-            try:
-                bag = sf.flavor.bag
-                ml_per_flavor = cup_ml / Decimal(str(num_flavors)) * self.quantity
-                bag.consume(ml_per_flavor)
-                StockMovement.objects.create(
-                    movement_type='sale', flavor_bag=bag,
-                    quantity_ml=ml_per_flavor,
-                    sale=self.sale,
-                    notes=f'Venta #{self.sale_id} — {self.cup_size.size}',
-                    created_by=self.sale.seller, shift=shift
-                )
-            except Exception:
-                pass
-
-        # Descuenta vasos
-        try:
-            cup_stock = CupStock.objects.get(cup_size=self.cup_size)
-            cup_stock.consume(self.quantity)
+            bag = sf.flavor.bag
+            ml_per_flavor = cup_ml / Decimal(str(num_flavors)) * self.quantity
+            bag.consume(ml_per_flavor)
             StockMovement.objects.create(
-                movement_type='sale', cup_stock=cup_stock,
-                quantity_units=self.quantity,
+                movement_type='sale', flavor_bag=bag,
+                quantity_ml=ml_per_flavor,
                 sale=self.sale,
-                notes=f'Venta #{self.sale_id}',
+                notes=f'Venta #{self.sale_id} — {self.cup_size.size}',
                 created_by=self.sale.seller, shift=shift
             )
-        except Exception:
-            pass
+
+        # Descuenta vasos
+        cup_stock = CupStock.objects.get(cup_size=self.cup_size)
+        cup_stock.consume(self.quantity)
+        StockMovement.objects.create(
+            movement_type='sale', cup_stock=cup_stock,
+            quantity_units=self.quantity,
+            sale=self.sale,
+            notes=f'Venta #{self.sale_id}',
+            created_by=self.sale.seller, shift=shift
+        )
 
         # ── Descuenta bolsa de topping automática según categoría del sabor ──
+        from apps.products.models import Topping as ToppingModel
+        categories = {sf.flavor.category for sf in sale_flavors if sf.flavor.category}
+        if len(categories) != 1:
+            return
+
+        primary_cat = next(iter(categories))
         try:
-            from apps.products.models import Topping as ToppingModel
-            categories = {sf.flavor.category for sf in sale_flavors}
-            if categories:
-                primary_cat = next(iter(categories))
-                auto_topping = ToppingModel.objects.get(linked_category=primary_cat, is_active=True)
-                auto_ts = auto_topping.stock
-                auto_ts.consume(self.quantity)
-                StockMovement.objects.create(
-                    movement_type='sale', topping_stock=auto_ts,
-                    quantity_units=self.quantity,
-                    sale=self.sale,
-                    notes=f'Venta #{self.sale_id} — bolsa auto {primary_cat}',
-                    created_by=self.sale.seller, shift=shift
-                )
-        except Exception:
-            pass
+            auto_topping = ToppingModel.objects.get(linked_category=primary_cat, is_active=True)
+        except ToppingModel.DoesNotExist:
+            return
+        except ToppingModel.MultipleObjectsReturned:
+            raise ValueError(f'Hay mas de un topping automatico activo para la categoria {primary_cat}.')
+
+        auto_ts = auto_topping.stock
+        auto_ts.consume(self.quantity)
+        StockMovement.objects.create(
+            movement_type='sale', topping_stock=auto_ts,
+            quantity_units=self.quantity,
+            sale=self.sale,
+            notes=f'Venta #{self.sale_id} — bolsa auto {primary_cat}',
+            created_by=self.sale.seller, shift=shift
+        )
 
 
 class SaleItemFlavor(models.Model):
