@@ -30,25 +30,53 @@ class SaleViewSet(viewsets.ReadOnlyModelViewSet):
 
         with transaction.atomic():
             # ── Pre-cargar objetos en bulk (evitar N+1 en validación y creación) ──
-            from apps.inventory.models import FlavorBag, CupStock
+            from apps.inventory.models import FlavorBag, CupStock, ToppingStock
             all_cup_ids    = {d['cup_size_id'] for d in data['items'] if d.get('cup_size_id')}
             all_flavor_ids = {fid for d in data['items'] for fid in d.get('flavor_ids', [])}
             all_topping_ids= {d['topping_id'] for d in data['items'] if d.get('topping_id')}
-            cup_map    = {c.id: c for c in CupSize.objects.filter(id__in=all_cup_ids)}
-            flavor_map = {f.id: f for f in Flavor.objects.select_related('bag').filter(id__in=all_flavor_ids)}
-            topping_map= {t.id: t for t in Topping.objects.select_related('stock').filter(id__in=all_topping_ids)}
+            cup_map    = {c.id: c for c in CupSize.objects.filter(id__in=all_cup_ids, is_active=True)}
+            flavor_map = {f.id: f for f in Flavor.objects.select_related('bag').filter(id__in=all_flavor_ids, is_active=True)}
+            topping_map= {t.id: t for t in Topping.objects.select_related('stock').filter(id__in=all_topping_ids, is_active=True)}
 
             # ── Pre-validar stock antes de crear nada ──
             for item_data in data['items']:
-                qty          = item_data.get('quantity', 1)
-                is_topping_only = not item_data.get('cup_size_id')
+                qty = item_data.get('quantity', 1)
+                cup_size_id = item_data.get('cup_size_id')
+                flavor_ids = item_data.get('flavor_ids', [])
+                topping_id = item_data.get('topping_id')
+                is_topping_only = not cup_size_id
+
+                if topping_id and topping_id not in topping_map:
+                    return Response({'detail': 'Topping no encontrado o inactivo.'}, status=status.HTTP_400_BAD_REQUEST)
 
                 if is_topping_only:
+                    topping = topping_map.get(topping_id)
+                    if not topping:
+                        return Response({'detail': 'Selecciona un topping para venderlo solo.'}, status=status.HTTP_400_BAD_REQUEST)
+                    try:
+                        topping_stock = topping.stock
+                    except ToppingStock.DoesNotExist:
+                        return Response({'detail': f'No hay stock registrado para {topping.name}.'}, status=status.HTTP_400_BAD_REQUEST)
+                    if topping_stock.quantity < qty:
+                        return Response(
+                            {'detail': f'Stock insuficiente de {topping.name}. '
+                                       f'Disponible: {topping_stock.quantity}, necesario: {qty}.'},
+                            status=status.HTTP_400_BAD_REQUEST
+                        )
                     continue  # Solo-topping: sin stock de vaso ni bolsa que validar
 
-                cup_size = cup_map.get(item_data['cup_size_id'])
+                cup_size = cup_map.get(cup_size_id)
                 if not cup_size:
-                    return Response({'detail': f'Tamaño de vaso no encontrado.'}, status=status.HTTP_400_BAD_REQUEST)
+                    return Response({'detail': f'Tamano de vaso no encontrado o inactivo.'}, status=status.HTTP_400_BAD_REQUEST)
+
+                if not flavor_ids:
+                    return Response({'detail': f'El vaso {cup_size.size} necesita al menos un sabor.'}, status=status.HTTP_400_BAD_REQUEST)
+
+                if len(flavor_ids) != len(set(flavor_ids)):
+                    return Response({'detail': 'No repitas el mismo sabor en un vaso.'}, status=status.HTTP_400_BAD_REQUEST)
+
+                if any(fid not in flavor_map for fid in flavor_ids):
+                    return Response({'detail': 'Uno o mas sabores no existen o estan inactivos.'}, status=status.HTTP_400_BAD_REQUEST)
 
                 # Vasos
                 try:
@@ -66,7 +94,7 @@ class SaleViewSet(viewsets.ReadOnlyModelViewSet):
                     )
 
                 # Bolsas de granizado
-                flavor_objs  = [flavor_map[fid] for fid in item_data.get('flavor_ids', []) if fid in flavor_map]
+                flavor_objs  = [flavor_map[fid] for fid in flavor_ids]
                 num_flavors  = len(flavor_objs)
                 ml_por_sabor = cup_size.ml / Decimal(str(max(num_flavors, 1))) * qty
 
@@ -90,7 +118,6 @@ class SaleViewSet(viewsets.ReadOnlyModelViewSet):
                 if categories:
                     primary_cat = next(iter(categories))
                     try:
-                        from apps.inventory.models import ToppingStock
                         auto_topping = Topping.objects.get(linked_category=primary_cat, is_active=True)
                         auto_ts = ToppingStock.objects.get(topping=auto_topping)
                         if auto_ts.quantity < qty:
@@ -101,8 +128,10 @@ class SaleViewSet(viewsets.ReadOnlyModelViewSet):
                             )
                     except Topping.DoesNotExist:
                         pass
-                    except Exception:
-                        pass
+                    except Topping.MultipleObjectsReturned:
+                        return Response({'detail': f'Hay mas de un topping automatico activo para la categoria {primary_cat}.'}, status=status.HTTP_400_BAD_REQUEST)
+                    except ToppingStock.DoesNotExist:
+                        return Response({'detail': f'No hay stock registrado para {auto_topping.name}.'}, status=status.HTTP_400_BAD_REQUEST)
 
             # Resolve FK
             seller = None
@@ -159,7 +188,7 @@ class SaleViewSet(viewsets.ReadOnlyModelViewSet):
                 )
 
                 if not is_topping_only:
-                    flavors = [flavor_map[fid] for fid in item_data.get('flavor_ids', []) if fid in flavor_map]
+                    flavors = [flavor_map[fid] for fid in item_data.get('flavor_ids', [])]
                     num_flavors   = len(flavors)
                     ml_per_flavor = cup_size.ml / Decimal(str(max(num_flavors, 1)))
                     for flavor in flavors:

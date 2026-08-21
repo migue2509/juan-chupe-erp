@@ -19,6 +19,7 @@ class CustomTokenObtainPairView(TokenObtainPairView):
 class UserViewSet(viewsets.ModelViewSet):
     queryset = User.objects.all().order_by('full_name')
     permission_classes = [IsAdmin]
+    filterset_fields = ['role', 'is_active']
 
     def get_serializer_class(self):
         if self.action == 'create':

@@ -154,22 +154,19 @@ class SaleItem(models.Model):
         if not self.cup_size:
             # topping-only: descontar del stock del topping vendido
             if self.topping:
-                try:
-                    from apps.inventory.models import StockMovement
-                    from apps.shifts.models import Shift
-                    if shift is None:
-                        shift = Shift.get_active()
-                    ts = self.topping.stock
-                    ts.consume(self.quantity)
-                    StockMovement.objects.create(
-                        movement_type='sale', topping_stock=ts,
-                        quantity_units=self.quantity,
-                        sale=self.sale,
-                        notes=f'Venta #{self.sale_id} — topping suelto',
-                        created_by=self.sale.seller, shift=shift
-                    )
-                except Exception:
-                    pass
+                from apps.inventory.models import StockMovement
+                from apps.shifts.models import Shift
+                if shift is None:
+                    shift = Shift.get_active()
+                ts = self.topping.stock
+                ts.consume(self.quantity)
+                StockMovement.objects.create(
+                    movement_type='sale', topping_stock=ts,
+                    quantity_units=self.quantity,
+                    sale=self.sale,
+                    notes=f'Venta #{self.sale_id} — topping suelto',
+                    created_by=self.sale.seller, shift=shift
+                )
             return
         from apps.inventory.models import FlavorBag, CupStock, StockMovement
         from apps.shifts.models import Shift

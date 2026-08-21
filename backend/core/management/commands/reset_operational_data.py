@@ -68,8 +68,8 @@ class Command(BaseCommand):
             self._ok(f'Attendance: {n} eliminados')
 
             # ── 4. Nómina — logs y pagos (horarios se conservan) ──────────
-            from apps.payroll.models import WorkLog, PayrollPayment
-            PayrollPayment.objects.all().delete()
+            from apps.payroll.models import WorkLog, WagePayment
+            WagePayment.objects.all().delete()
             n, _ = WorkLog.objects.all().delete()
             self._ok(f'Payroll WorkLog/Payment: {n} eliminados')
 

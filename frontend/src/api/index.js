@@ -102,10 +102,11 @@ export const myCheckout           = ()       => api.post('/attendance/my-checkou
 // Users
 export const getUsers = () => api.get('/auth/users/')
 export const getOperatives = () => api.get('/auth/users/operatives/')
+export const getDeliveryUsers = () => api.get('/auth/users/', { params: { role: 'delivery', is_active: true } })
 export const createUser = (data) => api.post('/auth/users/', data)
 export const updateUser = (id, data) => api.patch(`/auth/users/${id}/`, data)
-export const changePassword = (id, data) => api.post(`/auth/users/${id}/change-password/`, data)
-export const toggleUserActive = (id) => api.post(`/auth/users/${id}/toggle-active/`)
+export const changePassword = (data) => api.post('/auth/users/change-password/', data)
+export const toggleUserActive = (id) => api.patch(`/auth/users/${id}/toggle-active/`)
 
 // Payroll
 export const getPayrollSummary    = (params)   => api.get('/payroll/payments/summary/', { params })
