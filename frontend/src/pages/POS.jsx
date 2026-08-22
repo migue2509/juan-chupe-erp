@@ -186,23 +186,79 @@ export default function POS() {
     : 0
   const courtesyDiff = isCourtesy ? Math.max(0, orderTotal - Number(courtesyPaid || 0)) : 0
 
+  const readAmount = (value, label) => {
+    const amount = Number(value || 0)
+    if (!Number.isFinite(amount)) {
+      toast.error(`${label} debe ser un numero valido`)
+      return null
+    }
+    if (amount < 0) {
+      toast.error(`${label} no puede ser negativo`)
+      return null
+    }
+    return amount
+  }
+
   // ─── Submit ───────────────────────────────────────────────────────────────
   const handleSubmit = async () => {
     if (items.length === 0) { toast.error('Agrega al menos un producto'); return }
+    if (items.some(i => Number(i.qty || 0) < 1)) { toast.error('Cada producto debe tener cantidad mayor a 0'); return }
+    if (items.some(i => Number(i.unit_price || 0) < 0)) { toast.error('Ningun producto puede tener precio negativo'); return }
     if (isDelivery && !deliveryFourDigits.trim()) { toast.error('El nombre/identificación del cliente es obligatorio para domicilios'); return }
-    if (isDelivery && !deliveryLat) { toast.error('Selecciona la ubicación del domicilio en el mapa'); return }
+    if (isDelivery && !deliveryAddress.trim()) { toast.error('Selecciona la direccion del domicilio en el mapa'); return }
+    if (isDelivery && (deliveryLat == null || deliveryLng == null)) { toast.error('Selecciona la ubicacion del domicilio en el mapa'); return }
+
+    let cashAmount = 0
+    let transferValue = 0
+    let courtesyAmount = 0
+
+    if (isCourtesy) {
+      courtesyAmount = readAmount(courtesyPaid, 'El valor recibido por cortesia')
+      if (courtesyAmount == null) return
+    } else if (!platformChannel) {
+      if (paymentMethod === 'cash' || paymentMethod === 'mixed') {
+        cashAmount = readAmount(cashReceived, 'El efectivo recibido')
+        if (cashAmount == null) return
+      }
+      if (paymentMethod === 'transfer' || paymentMethod === 'mixed') {
+        transferValue = readAmount(transferAmount, 'El monto de transferencia')
+        if (transferValue == null) return
+      }
+    }
+
+    if (isCourtesy && courtesyAmount > orderTotal) {
+      toast.error('El valor recibido por cortesia no puede superar el total')
+      return
+    }
+
+    if (!isCourtesy && !platformChannel) {
+      if (paymentMethod === 'cash' && cashAmount < orderTotal) {
+        toast.error('El efectivo recibido no alcanza para cubrir el total')
+        return
+      }
+      if (paymentMethod === 'mixed') {
+        if (cashAmount <= 0 || transferValue <= 0) {
+          toast.error('El pago mixto debe tener efectivo y transferencia')
+          return
+        }
+        if (cashAmount + transferValue < orderTotal) {
+          toast.error('La suma de efectivo y transferencia no cubre el total')
+          return
+        }
+      }
+    }
+
     setSubmitting(true)
     try {
       const promoIds = [...new Set(items.map(i => i.promoId).filter(Boolean))]
       const singlePromo = promoIds.length === 1 && items.every(i => i.promoId) ? promoIds[0] : null
 
-      const courtesyAmount = Number(courtesyPaid) || 0
       const saleRes = await createSale({
         seller_id: user?.id,
         promotion_id: singlePromo,
         payment_method: isCourtesy ? courtesyMethod : paymentMethod,
-        cash_received:    isCourtesy ? (courtesyMethod === 'cash'     ? courtesyAmount : 0) : (Number(cashReceived) || 0),
-        transfer_amount:  isCourtesy ? (courtesyMethod === 'transfer' ? courtesyAmount : 0) : (Number(transferAmount) || 0),
+        cash_received:    isCourtesy ? (courtesyMethod === 'cash'     ? courtesyAmount : 0) : cashAmount,
+        transfer_amount:  isCourtesy ? (courtesyMethod === 'transfer' ? courtesyAmount : 0) : transferValue,
         transfer_reference: isCourtesy ? (courtesyMethod === 'transfer' ? courtesyTransferRef : '') : transferRef,
         is_delivery:      isDelivery,
         delivery_address: isDelivery ? deliveryAddress.trim() : '',
@@ -639,7 +695,7 @@ export default function POS() {
             <div className="mb-2 space-y-2">
               <div>
                 <label className="label">Monto transferencia</label>
-                <input type="number" className="input" placeholder="0" value={transferAmount}
+                <input type="number" min="0" className="input" placeholder="0" value={transferAmount}
                   onChange={e => setTransferAmount(e.target.value)} />
               </div>
               <div>
@@ -709,7 +765,7 @@ export default function POS() {
               <label className="label">
                 {paymentMethod === 'mixed' ? 'Monto efectivo' : 'Efectivo recibido'}
               </label>
-              <input type="number" className="input" placeholder="0" value={cashReceived}
+              <input type="number" min="0" className="input" placeholder="0" value={cashReceived}
                 onChange={e => setCashReceived(e.target.value)} />
               {paymentMethod === 'mixed' && transferAmount && Number(transferAmount) > 0 && !cashReceived && (
                 <p className="text-xs text-cyan-600 mt-1">
