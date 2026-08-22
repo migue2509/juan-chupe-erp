@@ -34,6 +34,7 @@ function POSResumenModal({ shiftId, onClose }) {
   const [deliveries, setDeliveries]         = useState({})
   const [activeTab, setActiveTab]           = useState('sellers')
   const [cupCounts, setCupCounts]           = useState({})  // product_id → conteo real
+  const [cupEntries, setCupEntries]         = useState({})
 
   // Pre-carga montos guardados cuando llegan los datos
   useEffect(() => {
@@ -44,6 +45,23 @@ function POSResumenModal({ shiftId, onClose }) {
       init[key] = s.net_delivered != null ? String(s.net_delivered) : ''
     })
     setDeliveries(init)
+  }, [p])
+
+  useEffect(() => {
+    if (!p?.catalog) return
+    const entriesInit = {}
+    const countsInit = {}
+    p.catalog
+      .filter(row => row.product_type === 'cup')
+      .forEach(row => {
+        const key = String(row.product_id)
+        entriesInit[key] = String(row.entries ?? 0)
+        if (row.closing_stock !== null && row.closing_stock !== undefined) {
+          countsInit[key] = String(row.closing_stock)
+        }
+      })
+    setCupEntries(entriesInit)
+    setCupCounts(countsInit)
   }, [p])
 
   if (loading) return (
@@ -62,6 +80,40 @@ function POSResumenModal({ shiftId, onClose }) {
   const COL = '2fr 110px 70px 110px'
 
   const sellers = p.sellers_breakdown || []
+  const visibleCups = cups.filter(r =>
+    (r.sales_qty || 0) > 0 ||
+    (r.current_stock || 0) > 0 ||
+    (r.prev_closing || 0) > 0 ||
+    (r.entries || 0) > 0
+  )
+  const parseQty = value => {
+    const parsed = parseInt(value, 10)
+    return Number.isFinite(parsed) && parsed >= 0 ? parsed : 0
+  }
+  const cupAuditValues = row => {
+    const key = String(row.product_id)
+    const opening = Number(row.prev_closing || 0)
+    const entries = parseQty(cupEntries[key] ?? row.entries ?? 0)
+    const available = opening + entries
+    const sold = Number(row.sales_qty || 0)
+    const expectedClosing = available - sold
+    const rawClosing = cupCounts[key]
+    const closing = rawClosing !== undefined && rawClosing !== '' ? parseQty(rawClosing) : null
+    const diff = closing !== null ? closing - expectedClosing : null
+    return { opening, entries, available, sold, expectedClosing, closing, diff }
+  }
+  const buildAuditItems = () => visibleCups.map(row => {
+    const values = cupAuditValues(row)
+    return {
+      product_name:  row.product_name,
+      product_type:  'cup',
+      product_id:    row.product_id,
+      unit_price:    row.unit_price || 0,
+      opening_stock: values.opening,
+      entries:       values.entries,
+      closing_stock: values.closing ?? 0,
+    }
+  })
 
   const handleSaveDeliveries = async () => {
     setSavingDeliveries(true)
@@ -78,6 +130,43 @@ function POSResumenModal({ shiftId, onClose }) {
       toast.error(e?.response?.data?.detail || 'Error al guardar')
     }
     setSavingDeliveries(false)
+  }
+
+  const handleMarkPOSDelivered = async () => {
+    const missingCounts = visibleCups.filter(row => {
+      const value = cupCounts[String(row.product_id)]
+      return value === undefined || value === ''
+    })
+    if (missingCounts.length > 0) {
+      setActiveTab('liquidacion')
+      toast.error('Ingresa el conteo real de todos los vasos')
+      return
+    }
+
+    const negativeExpected = visibleCups.some(row => cupAuditValues(row).expectedClosing < 0)
+    if (negativeExpected) {
+      setActiveTab('liquidacion')
+      toast.error('Hay vasos vendidos mayores que lo disponible; revisa las entradas')
+      return
+    }
+
+    setSaving(true)
+    try {
+      await createCashAudit({
+        shift:             shiftId,
+        channel:           'pos',
+        expected_cash:     p.net_expected_cash,
+        expected_transfer: p.pos_transfer,
+        actual_cash:       p.net_expected_cash,
+        actual_transfer:   0,
+        items:             buildAuditItems(),
+      })
+      toast.success('POS marcado como entregado')
+      reload()
+    } catch (e) {
+      toast.error(e?.response?.data?.detail || 'Error')
+    }
+    setSaving(false)
   }
 
   return (
@@ -389,64 +478,72 @@ function POSResumenModal({ shiftId, onClose }) {
           )}
 
           {/* ── Cuadre de inventario de vasos ── */}
-          {cups.filter(r => r.sales_qty > 0 || r.current_stock > 0).length > 0 && (
+          {visibleCups.length > 0 && (
             <div className="card p-0 overflow-hidden overflow-x-auto">
               <div className="px-5 py-3 border-b border-gray-100 flex items-center gap-2">
                 <h3 className="text-sm font-semibold text-gray-700">Cuadre de inventario — Vasos</h3>
-                <span className="text-[10px] text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">ingresa el conteo real para verificar</span>
+                <span className="text-[10px] text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">registra entradas y conteo real</span>
               </div>
 
               {/* Header */}
               <div className="grid text-[10px] font-semibold text-gray-400 uppercase tracking-widest px-4 py-2 bg-gray-50 border-b border-gray-100"
                 style={{ gridTemplateColumns: '1.4fr 80px 80px 80px 80px 80px 100px 80px', minWidth: '760px' }}>
                 <span>Vaso</span>
-                <span className="text-center">Cierre inv.</span>
-                <span className="text-center">Ingresos</span>
-                <span className="text-center">Total</span>
+                <span className="text-center">Anterior</span>
+                <span className="text-center">Entradas</span>
+                <span className="text-center">Disponible</span>
                 <span className="text-center">Vendidos</span>
-                <span className="text-center text-blue-500">Esperados</span>
+                <span className="text-center text-blue-500">Esperado</span>
                 <span className="text-center text-purple-500">Conteo real</span>
                 <span className="text-center">Dif.</span>
               </div>
 
-              {cups.filter(r => r.sales_qty > 0 || r.current_stock > 0).map(row => {
-                const entries  = row.entries || 0
-                const cierre   = row.current_stock || 0
-                const total    = cierre + entries
-                const vendidos = row.sales_qty || 0
-                const esperados = total - vendidos
-                const conteo   = cupCounts[row.product_id]
-                const conteoNum = conteo !== undefined && conteo !== '' ? (parseInt(conteo) || 0) : null
-                const diff     = conteoNum !== null ? conteoNum - esperados : null
+              {visibleCups.map(row => {
+                const key = String(row.product_id)
+                const values = cupAuditValues(row)
 
                 return (
                   <div key={row.product_name}
                     className="grid items-center px-4 py-3 border-b border-gray-50 hover:bg-gray-50/50"
                     style={{ gridTemplateColumns: '1.4fr 80px 80px 80px 80px 80px 100px 80px', minWidth: '760px' }}>
                     <span className="text-sm font-semibold text-gray-800">{row.product_name}</span>
-                    <span className="text-center text-sm text-gray-600">{cierre}</span>
-                    <span className="text-center text-sm text-emerald-600 font-medium">{entries > 0 ? `+${entries}` : '—'}</span>
-                    <span className="text-center text-sm text-gray-700 font-semibold">{total}</span>
-                    <span className="text-center text-sm text-amber-600 font-semibold">{vendidos}</span>
-                    <span className="text-center text-sm text-blue-700 font-bold">{esperados}</span>
+                    <span className="text-center text-sm text-gray-600">{values.opening}</span>
                     <span className="text-center">
                       <input
                         type="number"
+                        min="0"
                         placeholder="0"
+                        disabled={!!p?.arqueos?.pos}
                         className="input text-center py-1 text-sm w-20"
-                        value={conteo ?? ''}
-                        onChange={e => setCupCounts(prev => ({ ...prev, [row.product_id]: e.target.value }))}
+                        value={cupEntries[key] ?? ''}
+                        onChange={e => setCupEntries(prev => ({ ...prev, [key]: e.target.value }))}
+                      />
+                    </span>
+                    <span className="text-center text-sm text-gray-700 font-semibold">{values.available}</span>
+                    <span className="text-center text-sm text-amber-600 font-semibold">{values.sold}</span>
+                    <span className={`text-center text-sm font-bold ${values.expectedClosing < 0 ? 'text-red-600' : 'text-blue-700'}`}>
+                      {values.expectedClosing}
+                    </span>
+                    <span className="text-center">
+                      <input
+                        type="number"
+                        min="0"
+                        placeholder="0"
+                        disabled={!!p?.arqueos?.pos}
+                        className="input text-center py-1 text-sm w-20"
+                        value={cupCounts[key] ?? ''}
+                        onChange={e => setCupCounts(prev => ({ ...prev, [key]: e.target.value }))}
                       />
                     </span>
                     <span className="text-center">
-                      {diff === null ? (
+                      {values.diff === null ? (
                         <span className="text-gray-300 text-sm">—</span>
-                      ) : diff === 0 ? (
+                      ) : values.diff === 0 ? (
                         <span className="text-green-600 font-bold text-sm">OK</span>
-                      ) : diff < 0 ? (
-                        <span className="text-red-600 font-bold text-sm">-{Math.abs(diff)}</span>
+                      ) : values.diff < 0 ? (
+                        <span className="text-red-600 font-bold text-sm">-{Math.abs(values.diff)}</span>
                       ) : (
-                        <span className="text-amber-600 font-bold text-sm">+{diff}</span>
+                        <span className="text-amber-600 font-bold text-sm">+{values.diff}</span>
                       )}
                     </span>
                   </div>
@@ -472,24 +569,7 @@ function POSResumenModal({ shiftId, onClose }) {
           ) : (
             <button
               disabled={saving}
-              onClick={async () => {
-                setSaving(true)
-                try {
-                  await createCashAudit({
-                    shift:             shiftId,
-                    channel:           'pos',
-                    expected_cash:     p.net_expected_cash,
-                    expected_transfer: p.pos_transfer,
-                    actual_cash:       p.net_expected_cash,
-                    actual_transfer:   0,
-                  })
-                  toast.success('POS marcado como entregado')
-                  reload()
-                } catch (e) {
-                  toast.error(e?.response?.data?.detail || 'Error')
-                }
-                setSaving(false)
-              }}
+              onClick={handleMarkPOSDelivered}
               className="btn-primary"
             >
               {saving ? 'Guardando...' : 'Marcar como entregado'}

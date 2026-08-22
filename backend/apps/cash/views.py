@@ -245,19 +245,33 @@ class CashAuditViewSet(viewsets.ModelViewSet):
         # product_id → entries (unidades que entraron al inventario durante el turno)
         current_entries = {}   # product_id → entries
         current_entries_name = {}  # product_name → entries (fallback)
+        current_closing = {}   # product_id → closing_stock guardado en arqueo actual
+        current_closing_name = {}  # product_name → closing_stock guardado (fallback)
+        current_audit = None
         try:
             current_audit = shift.cash_audits.filter(channel='pos').first()
             if current_audit:
                 for item in current_audit.items.all():
                     if item.product_id:
                         current_entries[item.product_id] = item.entries
+                        current_closing[item.product_id] = item.closing_stock
                     current_entries_name[item.product_name] = item.entries
+                    current_closing_name[item.product_name] = item.closing_stock
         except Exception:
             pass
 
         # ── Revenue real por vaso — solo POS, separado regular vs promo ──
         from apps.products.models import CupSize, Topping
-        from apps.inventory.models import CupStock, ToppingStock
+        from apps.inventory.models import StockMovement
+
+        movement_entries = {}
+        if not current_audit:
+            for row in StockMovement.objects.filter(
+                shift=shift,
+                movement_type='in',
+                cup_stock__isnull=False,
+            ).values('cup_stock__cup_size_id').annotate(total=Sum('quantity_units')):
+                movement_entries[row['cup_stock__cup_size_id']] = int(row['total'] or 0)
 
         # Incluir vasos con ventas en la jornada aunque hayan sido desactivados mid-shift
         active_ids = set(CupSize.objects.filter(is_active=True).values_list('id', flat=True))
@@ -309,8 +323,15 @@ class CashAuditViewSet(viewsets.ModelViewSet):
             name = f'Vaso {cs.size}'
             try:    stock = cs.stock.quantity
             except: stock = 0
-            prev    = prev_closing.get(cs.pk, prev_closing_name.get(name, 0))
-            entries = current_entries.get(cs.pk, current_entries_name.get(name, 0))
+            revenue = cup_revenue.get(name, {'sales_qty': 0, 'sales_revenue': 0,
+                                             'regular_qty': 0, 'regular_revenue': 0,
+                                             'promo_qty': 0, 'promo_revenue': 0, 'promo_unit': None,
+                                             'plat_qty': 0})
+            entries = current_entries.get(cs.pk, current_entries_name.get(name, movement_entries.get(cs.pk, 0)))
+            prev = prev_closing.get(cs.pk, prev_closing_name.get(name))
+            if prev is None:
+                prev = max(0, int(stock) + int(revenue['sales_qty'] or 0) - int(entries or 0))
+            closing = current_closing.get(cs.pk, current_closing_name.get(name))
             catalog.append({
                 'product_name':  name,
                 'product_type':  'cup',
@@ -319,10 +340,8 @@ class CashAuditViewSet(viewsets.ModelViewSet):
                 'current_stock': stock,
                 'prev_closing':  prev,
                 'entries':       entries,   # ingresos al inventario durante la jornada
-                **cup_revenue.get(name, {'sales_qty': 0, 'sales_revenue': 0,
-                                         'regular_qty': 0, 'regular_revenue': 0,
-                                         'promo_qty': 0, 'promo_revenue': 0, 'promo_unit': None,
-                                         'plat_qty': 0}),
+                'closing_stock':  closing,
+                **revenue,
             })
 
         for t in Topping.objects.filter(is_active=True).order_by('name'):
