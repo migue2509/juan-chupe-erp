@@ -9,29 +9,52 @@ const STORE_LNG  = -75.57793997784694
 
 // ── Cargar Leaflet + Leaflet.heat desde CDN ──────────────────────────────────
 let mapLibsReady = null
+function loadStylesheet(href) {
+  if (document.querySelector(`link[href="${href}"]`)) return
+  const link = document.createElement('link')
+  link.rel = 'stylesheet'
+  link.href = href
+  document.head.appendChild(link)
+}
+
+function loadScript(src) {
+  return new Promise((resolve, reject) => {
+    const existing = [...document.scripts].find(script => script.src === src)
+    if (existing?.dataset.loaded === 'true') { resolve(); return }
+    if (existing) {
+      existing.addEventListener('load', resolve, { once: true })
+      existing.addEventListener('error', reject, { once: true })
+      return
+    }
+
+    const script = document.createElement('script')
+    script.src = src
+    script.async = true
+    script.onload = () => {
+      script.dataset.loaded = 'true'
+      resolve()
+    }
+    script.onerror = () => reject(new Error(`No se pudo cargar ${src}`))
+    document.head.appendChild(script)
+  })
+}
+
 function loadMapLibs() {
   if (mapLibsReady) return mapLibsReady
-  mapLibsReady = new Promise((resolve) => {
-    if (window.L?.heatLayer) { resolve(window.L); return }
-
-    // CSS
-    const link = document.createElement('link')
-    link.rel  = 'stylesheet'
-    link.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css'
-    document.head.appendChild(link)
-
-    // Leaflet JS
-    const s1 = document.createElement('script')
-    s1.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js'
-    s1.onload = () => {
-      // Leaflet.heat JS
-      const s2 = document.createElement('script')
-      s2.src = 'https://leaflet.github.io/Leaflet.heat/dist/leaflet-heat.js'
-      s2.onload = () => resolve(window.L)
-      document.head.appendChild(s2)
+  mapLibsReady = (async () => {
+    loadStylesheet('https://unpkg.com/leaflet@1.9.4/dist/leaflet.css')
+    if (!window.L) {
+      await loadScript('https://unpkg.com/leaflet@1.9.4/dist/leaflet.js')
     }
-    document.head.appendChild(s1)
-  })
+    if (!window.L?.heatLayer) {
+      try {
+        await loadScript('https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js')
+      } catch (e) {
+        console.warn('Mapa: Leaflet.heat no disponible, se mostraran solo marcadores.', e)
+      }
+    }
+    return window.L
+  })()
   return mapLibsReady
 }
 
@@ -44,6 +67,8 @@ export default function Mapa() {
 
   const [data,    setData]    = useState(null)
   const [loading, setLoading] = useState(true)
+  const [mapReady, setMapReady] = useState(false)
+  const [mapError, setMapError] = useState('')
   const [dateFrom, setDateFrom] = useState('')
   const [dateTo,   setDateTo]   = useState('')
   const [selected, setSelected] = useState(null) // punto seleccionado en el mapa
@@ -69,8 +94,10 @@ export default function Mapa() {
 
   // Inicializar mapa una vez
   useEffect(() => {
+    let cancelled = false
     loadMapLibs().then((L) => {
-      if (!mapRef.current || mapObjRef.current) return
+      if (cancelled || !mapRef.current || mapObjRef.current) return
+      if (!L) throw new Error('Leaflet no disponible')
 
       const map = L.map(mapRef.current, {
         center: [STORE_LAT, STORE_LNG],
@@ -103,18 +130,26 @@ export default function Mapa() {
         .addTo(map)
         .bindPopup('<b>Juan Chupe Granizados</b><br/>Tu negocio', { maxWidth: 180 })
 
-      // Capa de calor vacía
-      heatRef.current = L.heatLayer([], {
-        radius:  30,
-        blur:    20,
-        maxZoom: 17,
-        gradient: { 0.0: '#3b82f6', 0.3: '#8b5cf6', 0.6: '#f59e0b', 0.8: '#ef4444', 1.0: '#FF0099' },
-      }).addTo(map)
+      // Capa de calor vacía. Si el plugin falla, los marcadores siguen activos.
+      if (L.heatLayer) {
+        heatRef.current = L.heatLayer([], {
+          radius:  30,
+          blur:    20,
+          maxZoom: 17,
+          gradient: { 0.0: '#3b82f6', 0.3: '#8b5cf6', 0.6: '#f59e0b', 0.8: '#ef4444', 1.0: '#FF0099' },
+        }).addTo(map)
+      }
 
       mapObjRef.current = map
+      setMapReady(true)
+      setTimeout(() => map.invalidateSize(), 0)
+    }).catch((e) => {
+      console.error('Mapa: error cargando Leaflet', e)
+      setMapError('No se pudo cargar el mapa. Revisa la conexion e intenta de nuevo.')
     })
 
     return () => {
+      cancelled = true
       if (mapObjRef.current) {
         mapObjRef.current.remove()
         mapObjRef.current = null
@@ -125,13 +160,18 @@ export default function Mapa() {
 
   // Actualizar heat map cuando llegan datos
   useEffect(() => {
-    if (!data || !heatRef.current) return
-    const points = data.points.map(p => [
-      parseFloat(p.latitude),
-      parseFloat(p.longitude),
-      1, // peso uniforme
-    ])
-    heatRef.current.setLatLngs(points)
+    if (!data || !mapReady || !mapObjRef.current) return
+    const points = (data.points || [])
+      .map(p => ({
+        ...p,
+        lat: parseFloat(p.latitude),
+        lng: parseFloat(p.longitude),
+      }))
+      .filter(p => Number.isFinite(p.lat) && Number.isFinite(p.lng))
+
+    if (heatRef.current?.setLatLngs) {
+      heatRef.current.setLatLngs(points.map(p => [p.lat, p.lng, 1]))
+    }
 
     // Markers clickeables (círculos pequeños)
     if (!mapObjRef.current) return
@@ -146,9 +186,9 @@ export default function Mapa() {
     const markerLayer = L.layerGroup().addTo(mapObjRef.current)
     mapObjRef.current._markerLayer = markerLayer
 
-    data.points.forEach(p => {
+    points.forEach(p => {
       const isHistorical = p.status === 'historical'
-      const circle = L.circleMarker([parseFloat(p.latitude), parseFloat(p.longitude)], {
+      const circle = L.circleMarker([p.lat, p.lng], {
         radius: isHistorical ? 4 : 5,
         color:       isHistorical ? '#64748b' : '#FF0099',
         fillColor:   isHistorical ? '#94a3b8' : '#FF0099',
@@ -158,7 +198,7 @@ export default function Mapa() {
       circle.on('click', () => setSelected(p))
       circle.addTo(markerLayer)
     })
-  }, [data])
+  }, [data, mapReady])
 
   const handleFilter = (e) => {
     e.preventDefault()
@@ -242,6 +282,15 @@ export default function Mapa() {
         {/* Mapa */}
         <div className="flex-1 relative">
           <div ref={mapRef} className="w-full h-full" />
+
+          {mapError && (
+            <div className="absolute inset-0 bg-white/90 flex items-center justify-center text-center px-6">
+              <div className="max-w-sm">
+                <p className="text-sm font-semibold text-red-600">{mapError}</p>
+                <p className="text-xs text-gray-400 mt-1">Los datos siguen disponibles cuando la conexion al proveedor del mapa se restablezca.</p>
+              </div>
+            </div>
+          )}
 
           {/* Leyenda colapsable */}
           <div className="absolute bottom-6 left-4 text-xs" style={{ zIndex: 1000 }}>
