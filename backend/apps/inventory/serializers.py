@@ -1,4 +1,6 @@
 from rest_framework import serializers
+from django.core.exceptions import ObjectDoesNotExist
+from decimal import Decimal
 from .models import FlavorBag, CupStock, ToppingStock, StockMovement
 
 
@@ -32,20 +34,28 @@ class StockMovementSerializer(serializers.ModelSerializer):
 
     def get_item_name(self, obj):
         if obj.flavor_bag_id:
-            try: return obj.flavor_bag.flavor.name
-            except: pass
+            try:
+                return obj.flavor_bag.flavor.name
+            except (ObjectDoesNotExist, AttributeError):
+                pass
         if obj.cup_stock_id:
-            try: return obj.cup_stock.cup_size.size
-            except: pass
+            try:
+                return obj.cup_stock.cup_size.size
+            except (ObjectDoesNotExist, AttributeError):
+                pass
         if obj.topping_stock_id:
-            try: return obj.topping_stock.topping.name
-            except: pass
+            try:
+                return obj.topping_stock.topping.name
+            except (ObjectDoesNotExist, AttributeError):
+                pass
         return '—'
 
     def get_invoice_number(self, obj):
         if obj.sale_id:
-            try: return obj.sale.invoice.invoice_number
-            except: pass
+            try:
+                return obj.sale.invoice.invoice_number
+            except (ObjectDoesNotExist, AttributeError):
+                pass
         return None
 
     class Meta:
@@ -72,6 +82,11 @@ class StockEntrySerializer(serializers.Serializer):
     """Para agregar stock manualmente"""
     flavor_bag_id = serializers.IntegerField(required=False)
     cup_stock_id = serializers.IntegerField(required=False)
-    quantity_ml = serializers.DecimalField(max_digits=10, decimal_places=2, required=False)
-    quantity_units = serializers.IntegerField(required=False)
+    quantity_ml = serializers.DecimalField(max_digits=10, decimal_places=2, required=False, min_value=Decimal('0.01'))
+    quantity_units = serializers.IntegerField(required=False, min_value=1)
     notes = serializers.CharField(required=False, allow_blank=True)
+
+    def validate(self, attrs):
+        if 'quantity_ml' not in attrs and 'quantity_units' not in attrs:
+            raise serializers.ValidationError({'detail': 'Debes indicar una cantidad para agregar stock.'})
+        return attrs
