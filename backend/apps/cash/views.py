@@ -3,6 +3,7 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from decimal import Decimal
 from collections import defaultdict
+from django.core.exceptions import ObjectDoesNotExist
 from django.db.models import Sum
 from core.permissions import IsAdmin
 from apps.shifts.models import Shift
@@ -103,16 +104,13 @@ class CashAuditViewSet(viewsets.ModelViewSet):
             return Response({'detail': 'No hay jornada.'}, status=status.HTTP_404_NOT_FOUND)
 
         # ── Resumen de ventas ──
-        sales          = Sale.objects.filter(shift=shift)
-        pos_sales      = list(sales.filter(is_delivery=False))
+        sales          = Sale.objects.filter(shift=shift).exclude(invoice__voided=True).select_related('invoice', 'promotion', 'seller')
+        pos_sales      = list(sales.filter(is_delivery=False).exclude(promotion__category__in=['rappi', 'didi']))
         delivery_sales = list(sales.filter(is_delivery=True))
 
-        def _total(lst):    return sum(s.total for s in lst)
-        def _transfer(lst): return sum(s.transfer_amount for s in lst)
-        def _cash(lst):     return sum(
-            s.cash_received if s.payment_method == 'mixed' else (s.total - s.transfer_amount)
-            for s in lst
-        )
+        def _total(lst):    return sum(s.paid_total for s in lst)
+        def _transfer(lst): return sum(s.transfer_paid for s in lst)
+        def _cash(lst):     return sum(s.cash_amount for s in lst)
 
         pos_total    = _total(pos_sales)
         pos_transfer = _transfer(pos_sales)
@@ -156,14 +154,19 @@ class CashAuditViewSet(viewsets.ModelViewSet):
         # ── Resumen por domiciliario ──
         from apps.deliveries.models import Delivery
         dom_groups = defaultdict(lambda: {'name': 'Sin asignar', 'count': 0, 'total': Decimal('0'), 'cash': Decimal('0'), 'transfer': Decimal('0')})
-        for d in Delivery.objects.filter(shift=shift).exclude(status='cancelled').select_related('delivery_person', 'sale'):
+        for d in Delivery.objects.filter(shift=shift).exclude(status='cancelled').select_related('delivery_person', 'sale', 'sale__invoice'):
+            try:
+                if d.sale.invoice.voided:
+                    continue
+            except ObjectDoesNotExist:
+                pass
             key = d.delivery_person_id or 0
             if d.delivery_person:
                 dom_groups[key]['name'] = d.delivery_person.name
             dom_groups[key]['count']    += 1
-            dom_groups[key]['total']    += d.sale.total
-            dom_groups[key]['cash']     += d.sale.total - d.sale.transfer_amount
-            dom_groups[key]['transfer'] += d.sale.transfer_amount
+            dom_groups[key]['total']    += d.sale.paid_total
+            dom_groups[key]['cash']     += d.sale.cash_amount
+            dom_groups[key]['transfer'] += d.sale.transfer_paid
 
         delivery_breakdown = sorted([
             {
@@ -194,8 +197,8 @@ class CashAuditViewSet(viewsets.ModelViewSet):
             key = s.seller_id
             if key is not None:
                 seller_groups[key]['name'] = s.seller_name or '—'
-            seller_groups[key]['cash']     += s.total - s.transfer_amount
-            seller_groups[key]['transfer'] += s.transfer_amount
+            seller_groups[key]['cash']     += s.cash_amount
+            seller_groups[key]['transfer'] += s.transfer_paid
 
         # Cargar montos guardados
         saved_map = {}
@@ -258,15 +261,19 @@ class CashAuditViewSet(viewsets.ModelViewSet):
 
         # Incluir vasos con ventas en la jornada aunque hayan sido desactivados mid-shift
         active_ids = set(CupSize.objects.filter(is_active=True).values_list('id', flat=True))
-        sales_ids  = set(CupSize.objects.filter(
-            saleitem__sale__shift=shift, saleitem__sale__is_delivery=False
-        ).values_list('id', flat=True))
+        sales_ids  = set(SaleItem.objects.filter(
+            sale__shift=shift, sale__is_delivery=False, cup_size__isnull=False
+        ).exclude(
+            sale__invoice__voided=True
+        ).values_list('cup_size_id', flat=True))
         cups_to_process = CupSize.objects.filter(id__in=active_ids | sales_ids)
 
         cup_revenue = {}
         for cs in cups_to_process:
             name     = f'Vaso {cs.size}'
-            base_qs  = SaleItem.objects.filter(sale__shift=shift, sale__is_delivery=False, cup_size=cs)
+            base_qs  = SaleItem.objects.filter(
+                sale__shift=shift, sale__is_delivery=False, cup_size=cs
+            ).exclude(sale__invoice__voided=True)
 
             # Ventas a precio regular (sin promoción)
             reg = base_qs.filter(sale__promotion__isnull=True).aggregate(qty=Sum('quantity'), rev=Sum('subtotal'))
@@ -323,7 +330,7 @@ class CashAuditViewSet(viewsets.ModelViewSet):
             except: stock = 0
             t_agg = SaleItem.objects.filter(
                 sale__shift=shift, topping=t, cup_size__isnull=True
-            ).aggregate(qty=Sum('quantity'), rev=Sum('subtotal'))
+            ).exclude(sale__invoice__voided=True).aggregate(qty=Sum('quantity'), rev=Sum('subtotal'))
             prev_t = prev_closing.get(t.pk, prev_closing_name.get(t.name, 0))
             catalog.append({
                 'product_name':  t.name,

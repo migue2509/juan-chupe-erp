@@ -45,6 +45,43 @@ class Sale(models.Model):
     def __str__(self):
         return f'Venta #{self.id} — ${self.total:,.0f} — {self.created_at.strftime("%d/%m %H:%M")}'
 
+    @property
+    def paid_total(self):
+        """Dinero real que debe entrar por la venta."""
+        return self.courtesy_paid if self.is_courtesy else self.total
+
+    @property
+    def cash_amount(self):
+        """Efectivo real de la venta para arqueos."""
+        if self.is_courtesy:
+            if self.payment_method == 'cash':
+                return self.courtesy_paid
+            if self.payment_method == 'mixed':
+                return self.cash_received
+            return Decimal('0')
+
+        if self.payment_method == 'cash':
+            return self.total
+        if self.payment_method == 'mixed':
+            return self.cash_received
+        return Decimal('0')
+
+    @property
+    def transfer_paid(self):
+        """Transferencia real de la venta para reportes y arqueos."""
+        if self.is_courtesy:
+            if self.payment_method == 'transfer':
+                return self.courtesy_paid
+            if self.payment_method == 'mixed':
+                return self.transfer_amount
+            return Decimal('0')
+
+        if self.payment_method == 'transfer':
+            return self.transfer_amount or self.total
+        if self.payment_method == 'mixed':
+            return self.transfer_amount
+        return Decimal('0')
+
     def calculate_total(self):
         total = sum(item.subtotal for item in self.items.all())
         self.total = total

@@ -1,6 +1,7 @@
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
+from django.core.exceptions import ObjectDoesNotExist
 from core.permissions import IsAdmin, IsOperative
 from .models import Shift
 from .serializers import ShiftSerializer
@@ -59,7 +60,8 @@ class ShiftViewSet(viewsets.ReadOnlyModelViewSet):
         shift   = self.get_object()
         channel = request.query_params.get('channel', 'all')
 
-        sales_qs = Sale.objects.filter(shift=shift).prefetch_related(
+        base_sales_qs = Sale.objects.filter(shift=shift).exclude(invoice__voided=True)
+        sales_qs = base_sales_qs.prefetch_related(
             'items__cup_size', 'items__topping', 'items__saleitems_flavors__flavor'
         ).select_related('invoice', 'promotion')
         if channel == 'pos':
@@ -78,14 +80,13 @@ class ShiftViewSet(viewsets.ReadOnlyModelViewSet):
             expenses_qs = expenses_qs.none()
 
         # ── Totales del filtro activo ──
-        # Nota: cash_received incluye vuelto, así que efectivo real = total - transfer_amount
-        total_sales    = sum(s.total for s in sales_qs)
-        total_transfer = sum(s.transfer_amount for s in sales_qs)
-        total_cash     = total_sales - total_transfer
+        total_sales    = sum(s.paid_total for s in sales_qs)
+        total_transfer = sum(s.transfer_paid for s in sales_qs)
+        total_cash     = sum(s.cash_amount for s in sales_qs)
         total_expenses = sum(e.amount for e in expenses_qs)
 
         # ── Desglose completo por canal (siempre, independiente del filtro) ──
-        all_sales_qs = Sale.objects.filter(shift=shift).select_related('promotion')
+        all_sales_qs = base_sales_qs.select_related('promotion')
         all_sales_list = list(all_sales_qs)
         # POS excluye plataformas
         pos_sales  = [s for s in all_sales_list if not s.is_delivery and not (s.promotion and s.promotion.category in ('rappi', 'didi'))]
@@ -94,10 +95,9 @@ class ShiftViewSet(viewsets.ReadOnlyModelViewSet):
         rappi_sales = [s for s in plat_sales if s.promotion.category == 'rappi']
         didi_sales  = [s for s in plat_sales if s.promotion.category == 'didi']
 
-        # efectivo real = total de la venta - lo que fue por transferencia
-        def _transfer(lst): return sum(s.transfer_amount for s in lst)
-        def _cash(lst):     return _total(lst) - _transfer(lst)
-        def _total(lst):    return sum(s.total for s in lst)
+        def _transfer(lst): return sum(s.transfer_paid for s in lst)
+        def _cash(lst):     return sum(s.cash_amount for s in lst)
+        def _total(lst):    return sum(s.paid_total for s in lst)
 
         pos_total       = _total(pos_sales)
         pos_cash        = _cash(pos_sales)
@@ -138,7 +138,7 @@ class ShiftViewSet(viewsets.ReadOnlyModelViewSet):
                 })
             try:
                 invoice_number = s.invoice.invoice_number
-            except Exception:
+            except ObjectDoesNotExist:
                 invoice_number = None
             sales_data.append({
                 'id':                 s.id,
