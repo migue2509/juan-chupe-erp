@@ -12,6 +12,7 @@ from apps.promotions.models import Promotion
 from apps.users.models import User
 from .models import Sale, SaleItem, SaleItemFlavor
 from .serializers import SaleSerializer, SaleCreateSerializer
+from .selectors import is_active_sale
 
 
 class SaleViewSet(viewsets.ReadOnlyModelViewSet):
@@ -510,8 +511,8 @@ class SaleViewSet(viewsets.ReadOnlyModelViewSet):
             'items__cup_size',
             'items__topping',
         )
-        # Solo contar en el total las no anuladas
-        active_sales = [s for s in sales if not self._is_voided(s)]
+        # Solo contar en el total las ventas activas
+        active_sales = [s for s in sales if is_active_sale(s)]
         total = sum(
             (s.courtesy_paid if s.is_courtesy else s.total)
             for s in active_sales
@@ -521,10 +522,3 @@ class SaleViewSet(viewsets.ReadOnlyModelViewSet):
             'total': float(total),
             'count': len(active_sales)
         })
-
-    @staticmethod
-    def _is_voided(sale):
-        try:
-            return sale.invoice.voided
-        except ObjectDoesNotExist:
-            return False

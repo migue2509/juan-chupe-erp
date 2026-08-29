@@ -8,6 +8,7 @@ from django.db.models import Sum
 from core.permissions import IsAdmin
 from apps.shifts.models import Shift
 from apps.sales.models import Sale, SaleItem
+from apps.sales.selectors import active_sales
 from .models import CashAudit, SellerCashDelivery
 from .serializers import CashAuditSerializer
 
@@ -104,7 +105,7 @@ class CashAuditViewSet(viewsets.ModelViewSet):
             return Response({'detail': 'No hay jornada.'}, status=status.HTTP_404_NOT_FOUND)
 
         # ── Resumen de ventas ──
-        sales          = Sale.objects.filter(shift=shift).exclude(invoice__voided=True).select_related('invoice', 'promotion', 'seller')
+        sales          = active_sales(Sale.objects.filter(shift=shift)).select_related('invoice', 'promotion', 'seller')
         pos_sales      = list(sales.filter(is_delivery=False).exclude(promotion__category__in=['rappi', 'didi']))
         delivery_sales = list(sales.filter(is_delivery=True))
 

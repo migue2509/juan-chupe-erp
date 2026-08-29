@@ -55,12 +55,13 @@ class ShiftViewSet(viewsets.ReadOnlyModelViewSet):
         Query param: channel = all | pos | delivery
         """
         from apps.sales.models import Sale
+        from apps.sales.selectors import active_sales
         from apps.expenses.models import Expense
 
         shift   = self.get_object()
         channel = request.query_params.get('channel', 'all')
 
-        base_sales_qs = Sale.objects.filter(shift=shift).exclude(invoice__voided=True)
+        base_sales_qs = active_sales(Sale.objects.filter(shift=shift))
         sales_qs = base_sales_qs.prefetch_related(
             'items__cup_size', 'items__topping', 'items__saleitems_flavors__flavor'
         ).select_related('invoice', 'promotion')

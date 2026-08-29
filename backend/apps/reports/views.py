@@ -8,6 +8,7 @@ from decimal import Decimal
 from core.permissions import IsAdmin
 from apps.shifts.models import Shift
 from apps.sales.models import Sale, SaleItem, SaleItemFlavor
+from apps.sales.selectors import active_sales
 from apps.expenses.models import Expense
 from apps.inventory.models import FlavorBag, CupStock
 
@@ -28,7 +29,7 @@ class DailySummaryView(APIView):
         if not shift:
             return Response({'detail': 'No hay jornadas.'}, status=404)
 
-        sales = Sale.objects.filter(shift=shift).exclude(invoice__voided=True)
+        sales = active_sales(Sale.objects.filter(shift=shift))
         total_sales    = sales.aggregate(total=Sum('total'))['total'] or Decimal('0')
         total_transfer = sum(s.transfer_amount for s in sales)
         total_cash     = sum(
@@ -44,13 +45,13 @@ class DailySummaryView(APIView):
 
         # Sales by flavor
         flavor_sales = []
-        for sif in SaleItemFlavor.objects.filter(sale_item__sale__shift=shift).select_related('flavor'):
+        for sif in SaleItemFlavor.objects.filter(sale_item__sale__in=sales).select_related('flavor'):
             flavor_sales.append({'flavor': sif.flavor.name, 'ml': float(sif.ml_consumed)})
 
         # Sales by cup size
-        cup_sales = SaleItem.objects.filter(sale__shift=shift).values(
+        cup_sales = SaleItem.objects.filter(sale__in=sales, cup_size__isnull=False).values(
             'cup_size__size'
-        ).annotate(count=Count('id'), total=Sum('subtotal'))
+        ).annotate(count=Sum('quantity'), total=Sum('subtotal'))
 
         # Deliveries count
         deliveries_count = sales.filter(is_delivery=True).count()
@@ -80,7 +81,7 @@ class WeeklyReportView(APIView):
         shifts = Shift.objects.filter(opened_at__gte=start, opened_at__lte=end)
         data = []
         for shift in shifts:
-            total = Sale.objects.filter(shift=shift).exclude(invoice__voided=True).aggregate(t=Sum('total'))['t'] or Decimal('0')
+            total = active_sales(Sale.objects.filter(shift=shift)).aggregate(t=Sum('total'))['t'] or Decimal('0')
             data.append({
                 'date': shift.opened_at.strftime('%d/%m/%Y'),
                 'total': float(total),
@@ -96,7 +97,7 @@ class MonthlyReportView(APIView):
         now = timezone.now()
         start = now.replace(day=1, hour=0, minute=0, second=0)
         shifts = Shift.objects.filter(opened_at__gte=start)
-        total = Sale.objects.filter(shift__in=shifts).exclude(invoice__voided=True).aggregate(t=Sum('total'))['t'] or Decimal('0')
+        total = active_sales(Sale.objects.filter(shift__in=shifts)).aggregate(t=Sum('total'))['t'] or Decimal('0')
         expense_total = Expense.objects.filter(shift__in=shifts).aggregate(t=Sum('amount'))['t'] or Decimal('0')
         return Response({
             'month': now.strftime('%B %Y'),
@@ -156,9 +157,9 @@ class RangeReportView(APIView):
         end_dt   = timezone.make_aware(datetime.datetime.combine(date_to,   datetime.time.max))
 
         # ── Base querysets ────────────────────────────────────────────────────
-        sales_qs = Sale.objects.filter(
+        sales_qs = active_sales(Sale.objects.filter(
             created_at__gte=start_dt, created_at__lte=end_dt,
-        ).exclude(invoice__voided=True)
+        ))
         if channel == 'pos':
             sales_qs = sales_qs.filter(is_delivery=False).exclude(promotion__category__in=['rappi', 'didi'])
         elif channel == 'delivery':
@@ -203,7 +204,7 @@ class RangeReportView(APIView):
         # ── Ventas por tamaño de vaso ─────────────────────────────────────────
         cup_items = SaleItem.objects.filter(
             sale__in=sales, cup_size__isnull=False,
-        ).values('cup_size__size').annotate(count=Count('id'), total=Sum('subtotal'))
+        ).values('cup_size__size').annotate(count=Sum('quantity'), total=Sum('subtotal'))
         cup_sales = [{'size': r['cup_size__size'], 'count': r['count'], 'total': float(r['total'] or 0)} for r in cup_items]
 
         # ── Sabores más vendidos ──────────────────────────────────────────────
@@ -248,9 +249,9 @@ class RangeReportView(APIView):
         # ── Domicilios ────────────────────────────────────────────────────────
         from apps.deliveries.models import Delivery
         deliveries_qs = Delivery.objects.filter(created_at__gte=start_dt, created_at__lte=end_dt)
-        delivery_sales = Sale.objects.filter(
+        delivery_sales = active_sales(Sale.objects.filter(
             created_at__gte=start_dt, created_at__lte=end_dt, is_delivery=True
-        )
+        ))
         delivery_total = sum(
             (float(s.courtesy_paid) if s.is_courtesy else float(s.total))
             for s in delivery_sales
@@ -311,11 +312,11 @@ class PlatformReportView(APIView):
         start_dt = timezone.make_aware(datetime.datetime.combine(date_from, datetime.time.min))
         end_dt   = timezone.make_aware(datetime.datetime.combine(date_to,   datetime.time.max))
 
-        sales_qs = Sale.objects.filter(
+        sales_qs = active_sales(Sale.objects.filter(
             created_at__gte=start_dt,
             created_at__lte=end_dt,
             promotion__category__in=['rappi', 'didi'],
-        ).exclude(invoice__voided=True).select_related('promotion', 'seller')
+        )).select_related('promotion', 'seller')
 
         if channel in ('rappi', 'didi'):
             sales_qs = sales_qs.filter(promotion__category=channel)
