@@ -1,4 +1,5 @@
 from django.db import models
+from django.utils import timezone
 
 
 class Invoice(models.Model):
@@ -21,6 +22,21 @@ class Invoice(models.Model):
 
     def __str__(self):
         return f'Factura {self.invoice_number}'
+
+    def void_and_restore_inventory(self, user, reason='', note_prefix=None):
+        if self.voided:
+            return False
+
+        note = note_prefix or f'Anulacion factura {self.invoice_number}'
+        for item in self.sale.items.prefetch_related('saleitems_flavors__flavor__bag').all():
+            item.reverse_inventory(note_prefix=note, shift=self.shift)
+
+        self.voided = True
+        self.voided_by = user
+        self.voided_at = timezone.now()
+        self.void_reason = reason
+        self.save(update_fields=['voided', 'voided_by', 'voided_at', 'void_reason'])
+        return True
 
     def save(self, *args, **kwargs):
         if not self.invoice_number:

@@ -1,7 +1,7 @@
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
+from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
-from django.utils import timezone
 from django.db import transaction
 from core.permissions import IsOperative, IsAdmin
 from apps.shifts.models import Shift
@@ -32,32 +32,31 @@ class DeliveryViewSet(viewsets.ModelViewSet):
 
     def _void_invoice_and_reverse_inventory(self, delivery, user):
         from apps.billing.models import Invoice
-        sale_id = delivery.sale_id
-        print(f'[cancel] delivery={delivery.id} sale_id={sale_id}')
+        try:
+            invoice = Invoice.objects.select_for_update().select_related(
+                'sale', 'shift'
+            ).prefetch_related(
+                'sale__items__saleitems_flavors__flavor__bag'
+            ).get(sale_id=delivery.sale_id)
+        except Invoice.DoesNotExist:
+            raise ValidationError({'detail': 'El domicilio no tiene factura asociada.'})
 
-        updated = Invoice.objects.filter(
-            sale_id=sale_id, voided=False
-        ).update(
-            voided=True,
-            voided_by=user,
-            voided_at=timezone.now(),
-            void_reason='Domicilio cancelado',
+        if invoice.voided:
+            return False
+
+        invoice.void_and_restore_inventory(
+            user=user,
+            reason='Domicilio cancelado',
+            note_prefix=f'Cancelacion domicilio #{delivery.id} venta #{delivery.sale_id}',
         )
-        print(f'[cancel] facturas actualizadas: {updated}')
-
-        sale = delivery.sale
-        note = f'Cancelacion domicilio #{delivery.id} venta #{sale_id}'
-        for item in sale.items.prefetch_related('saleitems_flavors__flavor__bag').all():
-            try:
-                item.reverse_inventory(note_prefix=note)
-            except Exception as e:
-                print(f'[cancel] ERROR inventario item {item.id}: {e}')
+        return True
 
     def perform_update(self, serializer):
         old_status = serializer.instance.status
-        instance = serializer.save()
-        if instance.status == 'cancelled' and old_status != 'cancelled':
-            self._void_invoice_and_reverse_inventory(instance, self.request.user)
+        with transaction.atomic():
+            instance = serializer.save()
+            if instance.status == 'cancelled' and old_status != 'cancelled':
+                self._void_invoice_and_reverse_inventory(instance, self.request.user)
 
     @action(detail=False, methods=['get'], url_path='heatmap', permission_classes=[IsAdmin])
     def heatmap(self, request):
@@ -106,9 +105,9 @@ class DeliveryViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=['post'], permission_classes=[IsOperative])
     def cancel(self, request, pk=None):
-        delivery = self.get_object()
-        print(f'[cancel endpoint] delivery={delivery.id} estado={delivery.status}')
+        delivery_id = self.get_object().pk
         with transaction.atomic():
+            delivery = self.get_queryset().select_for_update().get(pk=delivery_id)
             if delivery.status != 'cancelled':
                 delivery.status = 'cancelled'
                 delivery.save(update_fields=['status'])
