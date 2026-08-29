@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { getDeliveries, updateDelivery, cancelDeliveryReq, getDomiciliarios, createDomiciliario, updateDomiciliario, getShifts, getExpenses } from '../api'
 import { Icon } from '../components/Icons'
+import { isActiveSale, saleCashAmount, salePaidTotal, saleTransferAmount } from '../utils/sales'
 import toast from 'react-hot-toast'
 
 const fmt     = n  => `$${Number(n).toLocaleString('es-CO')}`
@@ -159,19 +160,11 @@ export default function Deliveries() {
     return acc
   }, {})
 
-  // ── Stats financieras (solo domicilios no cancelados del filtro) ──
-  const activeDels = filtered.filter(d => d.status !== 'cancelled')
-  const totalVentas = activeDels.reduce((s, d) => s + Number(d.sale_detail?.total || 0), 0)
-  const totalEfectivoVentas = activeDels.reduce((s, d) => {
-    const sale = d.sale_detail
-    if (!sale) return s
-    const total = Number(sale.total || 0)
-    const trf   = Number(sale.transfer_amount || 0)
-    if (sale.payment_method === 'cash')  return s + total
-    if (sale.payment_method === 'mixed') return s + Math.max(0, total - trf)
-    return s
-  }, 0)
-  const totalTransfer = activeDels.reduce((s, d) => s + Number(d.sale_detail?.transfer_amount || 0), 0)
+  // ── Stats financieras (solo domicilios activos del filtro) ──
+  const activeDels = filtered.filter(d => isActiveSale(d.sale_detail, d.status))
+  const totalVentas = activeDels.reduce((s, d) => s + salePaidTotal(d.sale_detail), 0)
+  const totalEfectivoVentas = activeDels.reduce((s, d) => s + saleCashAmount(d.sale_detail), 0)
+  const totalTransfer = activeDels.reduce((s, d) => s + saleTransferAmount(d.sale_detail), 0)
 
   // Gastos de domicilios — mismos filtros que los domicilios (jornada + fechas)
   const filteredExpenses = expenses.filter(e => {
@@ -197,7 +190,7 @@ export default function Deliveries() {
     if (!domChart[name]) domChart[name] = { total: 0, delivered: 0, on_way: 0, pending: 0, cancelled: 0, monto: 0 }
     domChart[name].total++
     if (d.status) domChart[name][d.status] = (domChart[name][d.status] || 0) + 1
-    if (d.status !== 'cancelled') domChart[name].monto += Number(d.sale_detail?.total || 0)
+    if (isActiveSale(d.sale_detail, d.status)) domChart[name].monto += salePaidTotal(d.sale_detail)
   })
   const domChartArr = Object.entries(domChart)
     .map(([name, v]) => ({ name, ...v }))

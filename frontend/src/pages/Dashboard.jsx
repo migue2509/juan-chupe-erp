@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { getActiveShift, getTodaySales, getInventoryAlerts, getTodayExpenses, openShift, closeShift } from '../api'
 import { useAuth } from '../context/AuthContext'
 import { Icon } from '../components/Icons'
+import { isActiveSale, isPlatformSale, saleCashAmount, salePaidTotal, saleTransferAmount } from '../utils/sales'
 import toast from 'react-hot-toast'
 
 const fmt  = (n) => `$${Number(n).toLocaleString('es-CO')}`
@@ -63,7 +64,6 @@ export default function Dashboard() {
 
   // ── Filter sales by jornada activa + categoría ──
   const shiftId = shift?.id
-  const isPlatformSale = s => s.promotion_category === 'rappi' || s.promotion_category === 'didi'
   const filteredSales = allSales.filter(s => {
     if (shiftId && s.shift !== shiftId) return false
     if (filter === 'delivery') return s.is_delivery === true && s.delivery_status !== null
@@ -72,32 +72,19 @@ export default function Dashboard() {
     if (filter === 'didi')     return s.promotion_category === 'didi'
     return true
   })
-  const activeSales = filteredSales.filter(s => !s.is_voided)
+  const activeSales = filteredSales.filter(s => isActiveSale(s))
 
-  // ── Stats computed from ACTIVE (non-voided) sales ──
+  // ── Stats computed from ACTIVE sales ──
   const cantidadVentas = activeSales.length
 
-  // Valor real de cada venta (cortesías: solo lo que pagaron)
-  const valorVenta = (s) => s.is_courtesy ? Number(s.courtesy_paid || 0) : Number(s.total || 0)
-
   // TOTAL VENTAS = suma de todas las facturas de la jornada (efectivo + transferencias)
-  const totalDinero = activeSales.reduce((sum, s) => sum + valorVenta(s), 0)
+  const totalDinero = activeSales.reduce((sum, s) => sum + salePaidTotal(s), 0)
 
   // EFECTIVO = pagos cash completos + monto efectivo explícito de ventas mixtas
-  const totalEfectivo = activeSales.reduce((sum, s) => {
-    const val = valorVenta(s)
-    if (s.payment_method === 'cash')  return sum + val
-    if (s.payment_method === 'mixed') return sum + Number(s.cash_received || 0)
-    return sum  // transfer: no aporta efectivo
-  }, 0)
+  const totalEfectivo = activeSales.reduce((sum, s) => sum + saleCashAmount(s), 0)
 
   // TRANSFERENCIAS = pagos transfer completos + porción transferencia de ventas mixtas
-  const totalTransf = activeSales.reduce((sum, s) => {
-    const val = valorVenta(s)
-    if (s.payment_method === 'transfer') return sum + val
-    if (s.payment_method === 'mixed')    return sum + Number(s.transfer_amount || 0)
-    return sum  // cash: no aporta transferencia
-  }, 0)
+  const totalTransf = activeSales.reduce((sum, s) => sum + saleTransferAmount(s), 0)
 
   const filteredExpenses = expenses.filter(e => {
     if (shiftId && e.shift !== shiftId) return false
@@ -127,7 +114,7 @@ export default function Dashboard() {
   activeSales.forEach(s => {
     const name = s.seller_name || 'Sin asignar'
     if (!vendedoraMap[name]) vendedoraMap[name] = { total: 0, count: 0 }
-    vendedoraMap[name].total += s.is_courtesy ? Number(s.courtesy_paid || 0) : Number(s.total || 0)
+    vendedoraMap[name].total += salePaidTotal(s)
     vendedoraMap[name].count++
   })
   const vendedoraChart = Object.entries(vendedoraMap)
@@ -411,7 +398,7 @@ export default function Dashboard() {
           const name = s.promotion_name || 'Sin promo'
           if (!promoMap[name]) promoMap[name] = { count: 0, total: 0 }
           promoMap[name].count++
-          promoMap[name].total += valorVenta(s)
+          promoMap[name].total += salePaidTotal(s)
         })
         const promoChart = Object.entries(promoMap)
           .map(([name, d]) => ({ name, ...d }))
@@ -570,7 +557,7 @@ export default function Dashboard() {
                   </span>
                   <span className="tabular-nums">
                     <span className={`text-sm font-semibold ${isVoided ? 'line-through text-gray-400' : 'text-gray-900'}`}>
-                      {fmt(sale.is_courtesy ? (sale.courtesy_paid || 0) : sale.total)}
+                      {fmt(salePaidTotal(sale))}
                     </span>
                     {sale.is_courtesy && !isVoided && (
                       <span className="block text-[10px] text-gray-400 leading-none">
