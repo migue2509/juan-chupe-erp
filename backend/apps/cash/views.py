@@ -85,6 +85,10 @@ class CashAuditViewSet(viewsets.ModelViewSet):
         obj = serializer.save(audited_by=self.request.user)
         obj.calculate_difference()
 
+    def perform_update(self, serializer):
+        obj = serializer.save()
+        obj.calculate_difference()
+
     @action(detail=False, methods=['get'], url_path='prefill')
     def prefill(self, request):
         """

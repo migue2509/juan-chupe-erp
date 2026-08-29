@@ -31,12 +31,22 @@ class CashAuditSerializer(serializers.ModelSerializer):
             'items',
         ]
         read_only_fields = ['id', 'created_at', 'audited_by', 'cash_difference']
+        validators = []
 
     def create(self, validated_data):
         items_data = validated_data.pop('items', [])
-        audit = CashAudit.objects.create(**validated_data)
-        for item in items_data:
-            ShiftAuditItem.objects.create(audit=audit, **item)
+        audit = CashAudit.objects.filter(
+            shift=validated_data.get('shift'),
+            channel=validated_data.get('channel', 'pos'),
+        ).first()
+        if audit:
+            for attr, val in validated_data.items():
+                setattr(audit, attr, val)
+            audit.save()
+            audit.items.all().delete()
+        else:
+            audit = CashAudit.objects.create(**validated_data)
+        self._create_items(audit, items_data)
         return audit
 
     def update(self, instance, validated_data):
@@ -46,6 +56,9 @@ class CashAuditSerializer(serializers.ModelSerializer):
         instance.save()
         if items_data is not None:
             instance.items.all().delete()
-            for item in items_data:
-                ShiftAuditItem.objects.create(audit=instance, **item)
+            self._create_items(instance, items_data)
         return instance
+
+    def _create_items(self, audit, items_data):
+        for item in items_data:
+            ShiftAuditItem.objects.create(audit=audit, **item)
