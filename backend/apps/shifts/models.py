@@ -1,4 +1,5 @@
 from django.db import models
+from django.db.models import Q
 from django.utils import timezone
 
 
@@ -25,15 +26,25 @@ class Shift(models.Model):
         verbose_name = 'Jornada'
         verbose_name_plural = 'Jornadas'
         ordering = ['-opened_at']
+        constraints = [
+            models.UniqueConstraint(
+                fields=['status'],
+                condition=Q(status='open'),
+                name='unique_open_shift',
+            )
+        ]
 
     def __str__(self):
         return f'Jornada {self.opened_at.strftime("%d/%m/%Y %H:%M")} — {self.get_status_display()}'
 
     def close(self, user=None):
+        if self.status == 'closed':
+            return False
         self.status = 'closed'
         self.closed_at = timezone.now()
         self.closed_by = user
-        self.save()
+        self.save(update_fields=['status', 'closed_at', 'closed_by'])
+        return True
 
     @classmethod
     def get_active(cls):

@@ -2,6 +2,8 @@ from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from django.core.exceptions import ObjectDoesNotExist
+from django.db import IntegrityError, transaction
+from django.utils import timezone
 from core.permissions import IsAdmin, IsOperative
 from .models import Shift
 from .serializers import ShiftSerializer
@@ -13,32 +15,35 @@ class ShiftViewSet(viewsets.ReadOnlyModelViewSet):
 
     @action(detail=False, methods=['post'], permission_classes=[IsAdmin])
     def open(self, request):
-        active = Shift.get_active()
-        if active:
-            return Response(
-                {'detail': 'Ya hay una jornada activa.', 'shift': ShiftSerializer(active).data},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-        shift = Shift.objects.create(opened_by=request.user)
+        try:
+            with transaction.atomic():
+                active = Shift.objects.select_for_update().filter(status='open').first()
+                if active:
+                    return Response(
+                        {'detail': 'Ya hay una jornada activa.', 'shift': ShiftSerializer(active).data},
+                        status=status.HTTP_400_BAD_REQUEST
+                    )
+                shift = Shift.objects.create(opened_by=request.user)
+        except IntegrityError:
+            active = Shift.get_active()
+            data = {'detail': 'Ya hay una jornada activa.'}
+            if active:
+                data['shift'] = ShiftSerializer(active).data
+            return Response(data, status=status.HTTP_400_BAD_REQUEST)
         return Response(ShiftSerializer(shift).data, status=status.HTTP_201_CREATED)
 
     @action(detail=False, methods=['post'], permission_classes=[IsAdmin])
     def close(self, request):
-        shift = Shift.get_active()
-        if not shift:
-            return Response({'detail': 'No hay jornada activa.'}, status=status.HTTP_400_BAD_REQUEST)
-        shift.close(user=request.user)
+        with transaction.atomic():
+            shift = Shift.objects.select_for_update().filter(status='open').first()
+            if not shift:
+                return Response({'detail': 'No hay jornada activa.'}, status=status.HTTP_400_BAD_REQUEST)
+            shift.close(user=request.user)
         # Cerrar automáticamente todas las asistencias abiertas de esta jornada
-        try:
             from apps.attendance.models import AttendanceRecord
-            from django.utils import timezone
-            open_records = AttendanceRecord.objects.filter(shift=shift, check_out__isnull=True)
-            now = timezone.now()
-            for rec in open_records:
-                rec.check_out = now
-                rec.save(update_fields=['check_out'])
-        except Exception as e:
-            print(f'[close shift] error cerrando asistencias: {e}')
+            AttendanceRecord.objects.filter(shift=shift, check_out__isnull=True).update(
+                check_out=timezone.now()
+            )
         return Response(ShiftSerializer(shift).data)
 
     @action(detail=False, methods=['get'], permission_classes=[IsOperative])
