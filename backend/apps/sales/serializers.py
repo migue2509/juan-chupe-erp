@@ -79,6 +79,11 @@ class SaleSerializer(serializers.ModelSerializer):
     is_voided      = serializers.SerializerMethodField()
     invoice_number = serializers.SerializerMethodField()
     delivery_status = serializers.SerializerMethodField()
+    delivery_address = serializers.SerializerMethodField()
+    delivery_client = serializers.SerializerMethodField()
+    delivery_notes = serializers.SerializerMethodField()
+    delivery_lat = serializers.SerializerMethodField()
+    delivery_lng = serializers.SerializerMethodField()
 
     def get_is_voided(self, obj):
         try:
@@ -100,6 +105,48 @@ class SaleSerializer(serializers.ModelSerializer):
         except (ObjectDoesNotExist, AttributeError):
             return None
 
+    def get_delivery_address(self, obj):
+        if not obj.is_delivery:
+            return ''
+        try:
+            return obj.delivery.address
+        except (ObjectDoesNotExist, AttributeError):
+            return ''
+
+    def get_delivery_client(self, obj):
+        if not obj.is_delivery:
+            return ''
+        try:
+            return obj.delivery.four_digits
+        except (ObjectDoesNotExist, AttributeError):
+            return ''
+
+    def get_delivery_notes(self, obj):
+        if not obj.is_delivery:
+            return ''
+        try:
+            return obj.delivery.notes
+        except (ObjectDoesNotExist, AttributeError):
+            return ''
+
+    def get_delivery_lat(self, obj):
+        if not obj.is_delivery:
+            return None
+        try:
+            value = obj.delivery.latitude
+            return float(value) if value is not None else None
+        except (ObjectDoesNotExist, AttributeError):
+            return None
+
+    def get_delivery_lng(self, obj):
+        if not obj.is_delivery:
+            return None
+        try:
+            value = obj.delivery.longitude
+            return float(value) if value is not None else None
+        except (ObjectDoesNotExist, AttributeError):
+            return None
+
     def get_delivery_person_name(self, obj):
         if not obj.is_delivery:
             return None
@@ -116,6 +163,8 @@ class SaleSerializer(serializers.ModelSerializer):
             'id', 'shift', 'seller', 'seller_name', 'promotion', 'promotion_name',
             'payment_method', 'cash_received', 'transfer_amount', 'transfer_reference',
             'total', 'change_given', 'is_delivery', 'is_courtesy', 'courtesy_paid',
-            'notes', 'created_at', 'items', 'is_voided', 'invoice_number', 'delivery_status', 'delivery_person_name',
+            'notes', 'created_at', 'items', 'is_voided', 'invoice_number', 'delivery_status',
+            'delivery_address', 'delivery_client', 'delivery_notes', 'delivery_lat', 'delivery_lng',
+            'delivery_person_name',
             'promotion_category'
         ]

@@ -47,6 +47,58 @@ class SaleViewSet(viewsets.ReadOnlyModelViewSet):
             raise ValidationError({'detail': f'{label} debe ser mayor a 0.'})
         return amount
 
+    def _coordinate_or_error(self, value, label, minimum, maximum):
+        if value in (None, ''):
+            return None
+        try:
+            coordinate = Decimal(str(value))
+        except (InvalidOperation, ValueError, TypeError):
+            raise ValidationError({'detail': f'{label} debe ser una coordenada valida.'})
+        minimum = Decimal(str(minimum))
+        maximum = Decimal(str(maximum))
+        if coordinate < minimum or coordinate > maximum:
+            raise ValidationError({'detail': f'{label} esta fuera del rango permitido.'})
+        return coordinate
+
+    def _sync_delivery_record(self, sale, data):
+        from apps.deliveries.models import Delivery
+
+        if not sale.is_delivery:
+            Delivery.objects.filter(sale=sale).delete()
+            return
+
+        defaults = {
+            'shift': sale.shift,
+            'address': (data.get('delivery_address') or '').strip() or 'Sin direccion',
+            'four_digits': (data.get('delivery_client') or '').strip(),
+            'notes': (data.get('delivery_notes') or '').strip(),
+            'latitude': self._coordinate_or_error(data.get('delivery_lat'), 'La latitud', -90, 90),
+            'longitude': self._coordinate_or_error(data.get('delivery_lng'), 'La longitud', -180, 180),
+        }
+        delivery, _ = Delivery.objects.get_or_create(sale=sale, defaults=defaults)
+
+        update_fields = []
+        if delivery.shift_id != sale.shift_id:
+            delivery.shift = sale.shift
+            update_fields.append('shift')
+        if 'delivery_address' in data:
+            delivery.address = defaults['address']
+            update_fields.append('address')
+        if 'delivery_client' in data:
+            delivery.four_digits = defaults['four_digits']
+            update_fields.append('four_digits')
+        if 'delivery_notes' in data:
+            delivery.notes = defaults['notes']
+            update_fields.append('notes')
+        if 'delivery_lat' in data:
+            delivery.latitude = defaults['latitude']
+            update_fields.append('latitude')
+        if 'delivery_lng' in data:
+            delivery.longitude = defaults['longitude']
+            update_fields.append('longitude')
+        if update_fields:
+            delivery.save(update_fields=sorted(set(update_fields)))
+
     def _validate_payment_or_error(self, sale):
         total = Decimal(str(sale.total or 0))
         cash = Decimal(str(sale.cash_received or 0))
@@ -486,6 +538,8 @@ class SaleViewSet(viewsets.ReadOnlyModelViewSet):
             else:
                 sale.calculate_total()
                 self._validate_payment_or_error(sale)
+
+            self._sync_delivery_record(sale, request.data)
 
         return Response(SaleSerializer(sale).data)
 
