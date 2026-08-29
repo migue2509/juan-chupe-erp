@@ -6,7 +6,8 @@ from rest_framework.test import APIClient
 
 from apps.billing.models import Invoice
 from apps.deliveries.models import Delivery
-from apps.products.models import CupSize, Flavor
+from apps.inventory.models import ToppingStock
+from apps.products.models import CupSize, Flavor, Topping
 from apps.sales.models import Sale, SaleItem, SaleItemFlavor
 from apps.shifts.models import Shift
 from apps.users.models import User
@@ -30,15 +31,32 @@ class ActiveSalesReportTests(TestCase):
             min_quantity=0,
         )
         self.flavor = Flavor.objects.create(name='Mango', category='refreshing')
+        self.topping = Topping.objects.create(name='Gomitas', price=Decimal('2000'))
+        ToppingStock.objects.create(topping=self.topping, quantity=20, min_quantity=0)
 
-    def _sale(self, *, quantity=1, is_delivery=False, delivery_status='pending', voided=False):
+    def _sale(
+        self,
+        *,
+        quantity=1,
+        is_delivery=False,
+        delivery_status='pending',
+        voided=False,
+        payment_method='cash',
+        cash_received=Decimal('0'),
+        transfer_amount=Decimal('0'),
+        is_courtesy=False,
+        courtesy_paid=Decimal('0'),
+    ):
         sale = Sale.objects.create(
             shift=self.shift,
             seller=self.admin,
             seller_name=self.admin.full_name,
-            payment_method='cash',
-            cash_received=Decimal('0'),
+            payment_method=payment_method,
+            cash_received=cash_received,
+            transfer_amount=transfer_amount,
             is_delivery=is_delivery,
+            is_courtesy=is_courtesy,
+            courtesy_paid=courtesy_paid,
         )
         item = SaleItem.objects.create(
             sale=sale,
@@ -63,6 +81,33 @@ class ActiveSalesReportTests(TestCase):
             )
         return sale, invoice
 
+    def _topping_sale(self, *, quantity=1, is_delivery=False, delivery_status='pending'):
+        sale = Sale.objects.create(
+            shift=self.shift,
+            seller=self.admin,
+            seller_name=self.admin.full_name,
+            payment_method='cash',
+            is_delivery=is_delivery,
+        )
+        SaleItem.objects.create(
+            sale=sale,
+            cup_size=None,
+            topping=self.topping,
+            unit_price=self.topping.price,
+            topping_price=Decimal('0'),
+            quantity=quantity,
+        )
+        sale.calculate_total()
+        Invoice.objects.create(sale=sale, shift=self.shift)
+        if is_delivery:
+            Delivery.objects.create(
+                sale=sale,
+                shift=self.shift,
+                address='Calle 2',
+                status=delivery_status,
+            )
+        return sale
+
     def _seed_sales(self):
         self._sale(quantity=2)
         self._sale(quantity=3, is_delivery=True, delivery_status='cancelled')
@@ -80,6 +125,21 @@ class ActiveSalesReportTests(TestCase):
         self.assertEqual(len(response.data['cup_sales']), 1)
         self.assertEqual(response.data['cup_sales'][0]['count'], 2)
 
+    def test_daily_report_uses_paid_amounts_for_courtesy_sales(self):
+        self._sale(
+            quantity=1,
+            is_courtesy=True,
+            courtesy_paid=Decimal('3000'),
+            cash_received=Decimal('3000'),
+        )
+
+        response = self.client.get(f'/api/reports/daily/?shift_id={self.shift.pk}')
+
+        self.assertEqual(response.status_code, 200, response.data)
+        self.assertEqual(response.data['total_sales'], 3000.0)
+        self.assertEqual(response.data['total_cash'], 3000.0)
+        self.assertEqual(response.data['total_transfer'], 0.0)
+
     def test_shift_detail_and_cash_prefill_ignore_cancelled_delivery_sales(self):
         self._seed_sales()
 
@@ -96,6 +156,20 @@ class ActiveSalesReportTests(TestCase):
         self.assertEqual(prefill.data['delivery_total'], Decimal('0'))
         cup_row = next(row for row in prefill.data['catalog'] if row['product_id'] == self.cup.pk)
         self.assertEqual(cup_row['sales_qty'], 2)
+
+    def test_cash_prefill_catalog_counts_only_pos_topping_sales(self):
+        self._topping_sale(quantity=2)
+        self._topping_sale(quantity=5, is_delivery=True, delivery_status='delivered')
+
+        response = self.client.get(f'/api/cash/prefill/?shift_id={self.shift.pk}')
+
+        self.assertEqual(response.status_code, 200, response.data)
+        topping_row = next(
+            row for row in response.data['catalog']
+            if row['product_type'] == 'topping' and row['product_id'] == self.topping.pk
+        )
+        self.assertEqual(topping_row['sales_qty'], 2)
+        self.assertEqual(topping_row['sales_revenue'], 4000)
 
     def test_range_report_ignores_cancelled_delivery_sales(self):
         self._seed_sales()

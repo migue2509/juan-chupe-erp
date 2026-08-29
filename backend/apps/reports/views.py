@@ -30,12 +30,9 @@ class DailySummaryView(APIView):
             return Response({'detail': 'No hay jornadas.'}, status=404)
 
         sales = active_sales(Sale.objects.filter(shift=shift))
-        total_sales    = sales.aggregate(total=Sum('total'))['total'] or Decimal('0')
-        total_transfer = sum(s.transfer_amount for s in sales)
-        total_cash     = sum(
-            s.cash_received if s.payment_method == 'mixed' else (s.total - s.transfer_amount)
-            for s in sales
-        )
+        total_sales    = sum(s.paid_total for s in sales)
+        total_transfer = sum(s.transfer_paid for s in sales)
+        total_cash     = sum(s.cash_amount for s in sales)
 
         expenses = Expense.objects.filter(shift=shift)
         total_expenses = expenses.aggregate(total=Sum('amount'))['total'] or Decimal('0')
@@ -81,7 +78,7 @@ class WeeklyReportView(APIView):
         shifts = Shift.objects.filter(opened_at__gte=start, opened_at__lte=end)
         data = []
         for shift in shifts:
-            total = active_sales(Sale.objects.filter(shift=shift)).aggregate(t=Sum('total'))['t'] or Decimal('0')
+            total = sum(s.paid_total for s in active_sales(Sale.objects.filter(shift=shift)))
             data.append({
                 'date': shift.opened_at.strftime('%d/%m/%Y'),
                 'total': float(total),
@@ -97,7 +94,7 @@ class MonthlyReportView(APIView):
         now = timezone.now()
         start = now.replace(day=1, hour=0, minute=0, second=0)
         shifts = Shift.objects.filter(opened_at__gte=start)
-        total = active_sales(Sale.objects.filter(shift__in=shifts)).aggregate(t=Sum('total'))['t'] or Decimal('0')
+        total = sum(s.paid_total for s in active_sales(Sale.objects.filter(shift__in=shifts)))
         expense_total = Expense.objects.filter(shift__in=shifts).aggregate(t=Sum('amount'))['t'] or Decimal('0')
         return Response({
             'month': now.strftime('%B %Y'),
@@ -182,23 +179,14 @@ class RangeReportView(APIView):
             name = (s.seller.full_name or s.seller.username) if s.seller else 'Sin asignar'
             if name not in seller_map:
                 seller_map[name] = {'name': name, 'total': 0, 'count': 0}
-            paid = float(s.courtesy_paid) if s.is_courtesy else float(s.total)
-            seller_map[name]['total'] += paid
+            seller_map[name]['total'] += float(s.paid_total)
             seller_map[name]['count'] += 1
         sellers = sorted(seller_map.values(), key=lambda x: x['total'], reverse=True)
 
         # ── Medio de pago ─────────────────────────────────────────────────────
-        # mixto: cash_received es el monto exacto en efectivo a caja
-        total_transfer = sum(float(s.transfer_amount) for s in sales)
-        total_sales    = sum(
-            float(s.courtesy_paid) if s.is_courtesy else float(s.total)
-            for s in sales
-        )
-        total_cash  = sum(
-            float(s.cash_received) if s.payment_method == 'mixed'
-            else (0.0 if s.payment_method == 'transfer' else float(s.total))
-            for s in sales
-        )
+        total_transfer = sum(float(s.transfer_paid) for s in sales)
+        total_sales    = sum(float(s.paid_total) for s in sales)
+        total_cash     = sum(float(s.cash_amount) for s in sales)
         total_money = total_sales
 
         # ── Ventas por tamaño de vaso ─────────────────────────────────────────
@@ -253,8 +241,7 @@ class RangeReportView(APIView):
             created_at__gte=start_dt, created_at__lte=end_dt, is_delivery=True
         ))
         delivery_total = sum(
-            (float(s.courtesy_paid) if s.is_courtesy else float(s.total))
-            for s in delivery_sales
+            float(s.paid_total) for s in delivery_sales
         )
         delivery_stats = {
             'total':     deliveries_qs.count(),

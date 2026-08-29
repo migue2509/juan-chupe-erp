@@ -106,7 +106,8 @@ class CashAuditViewSet(viewsets.ModelViewSet):
 
         # ── Resumen de ventas ──
         sales          = active_sales(Sale.objects.filter(shift=shift)).select_related('invoice', 'promotion', 'seller')
-        pos_sales      = list(sales.filter(is_delivery=False).exclude(promotion__category__in=['rappi', 'didi']))
+        pos_inventory_sales = sales.filter(is_delivery=False)
+        pos_sales      = list(pos_inventory_sales.exclude(promotion__category__in=['rappi', 'didi']))
         delivery_sales = list(sales.filter(is_delivery=True))
 
         def _total(lst):    return sum(s.paid_total for s in lst)
@@ -277,18 +278,14 @@ class CashAuditViewSet(viewsets.ModelViewSet):
         # Incluir vasos con ventas en la jornada aunque hayan sido desactivados mid-shift
         active_ids = set(CupSize.objects.filter(is_active=True).values_list('id', flat=True))
         sales_ids  = set(SaleItem.objects.filter(
-            sale__shift=shift, sale__is_delivery=False, cup_size__isnull=False
-        ).exclude(
-            sale__invoice__voided=True
+            sale__in=pos_inventory_sales, cup_size__isnull=False
         ).values_list('cup_size_id', flat=True))
         cups_to_process = CupSize.objects.filter(id__in=active_ids | sales_ids)
 
         cup_revenue = {}
         for cs in cups_to_process:
             name     = f'Vaso {cs.size}'
-            base_qs  = SaleItem.objects.filter(
-                sale__shift=shift, sale__is_delivery=False, cup_size=cs
-            ).exclude(sale__invoice__voided=True)
+            base_qs  = SaleItem.objects.filter(sale__in=pos_inventory_sales, cup_size=cs)
 
             # Ventas a precio regular (sin promoción)
             reg = base_qs.filter(sale__promotion__isnull=True).aggregate(qty=Sum('quantity'), rev=Sum('subtotal'))
@@ -349,8 +346,8 @@ class CashAuditViewSet(viewsets.ModelViewSet):
             try:    stock = t.stock.quantity
             except: stock = 0
             t_agg = SaleItem.objects.filter(
-                sale__shift=shift, topping=t, cup_size__isnull=True
-            ).exclude(sale__invoice__voided=True).aggregate(qty=Sum('quantity'), rev=Sum('subtotal'))
+                sale__in=pos_inventory_sales, topping=t, cup_size__isnull=True
+            ).aggregate(qty=Sum('quantity'), rev=Sum('subtotal'))
             prev_t = prev_closing.get(t.pk, prev_closing_name.get(t.name, 0))
             catalog.append({
                 'product_name':  t.name,
