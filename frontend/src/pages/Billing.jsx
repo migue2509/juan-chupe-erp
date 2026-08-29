@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { getInvoices, editSale, voidInvoice, getAllFlavors, getCupSizes, getToppings, getOperatives, getShifts, getActivePromotions } from '../api'
 import { Icon } from '../components/Icons'
 import { useAuth } from '../context/AuthContext'
-import { salePaidTotal } from '../utils/sales'
+import { salePaidTotal, saleTransferAmount } from '../utils/sales'
 import toast from 'react-hot-toast'
 
 const fmt     = n  => `$${Number(n).toLocaleString('es-CO')}`
@@ -872,10 +872,10 @@ export default function Billing() {
                       <p className="font-medium">{fmt(sale.cash_received)}</p>
                     </div>
                   )}
-                  {sale.transfer_amount > 0 && (
+                  {saleTransferAmount(sale) > 0 && (
                     <div>
                       <p className="text-xs text-gray-400 mb-0.5">Transferencia</p>
-                      <p className="font-medium">{fmt(sale.transfer_amount)}</p>
+                      <p className="font-medium">{fmt(saleTransferAmount(sale))}</p>
                     </div>
                   )}
                   {sale.change_given > 0 && (

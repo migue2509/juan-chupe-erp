@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { getShifts, openShift, closeShift, getActiveShift, getShiftDetail, getCashAuditPrefill, createCashAudit, getCashAudit, saveSellerDeliveries, saveDeliveryAmount } from '../api'
-import { salePaidTotal } from '../utils/sales'
+import { salePaidTotal, saleTransferAmount } from '../utils/sales'
 import toast from 'react-hot-toast'
 
 const fmt    = n => `$${Number(n || 0).toLocaleString('es-CO')}`
@@ -1794,10 +1794,10 @@ function ShiftDetail({ shift, onBack, onShiftUpdate }) {
                                       <span>{fmt(s.change_given)}</span>
                                     </div>
                                   )}
-                                  {s.transfer_amount > 0 && (
+                                  {saleTransferAmount(s) > 0 && (
                                     <div className="flex justify-between">
                                       <span>Transferencia</span>
-                                      <span>{fmt(s.transfer_amount)}</span>
+                                      <span>{fmt(saleTransferAmount(s))}</span>
                                     </div>
                                   )}
                                   {s.transfer_reference && (

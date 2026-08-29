@@ -415,6 +415,9 @@ export default function Deliveries() {
             ) : filtered.map(d => {
               const s    = STATUS[d.status] ?? STATUS.pending
               const sale = d.sale_detail
+              const salePaid = salePaidTotal(sale)
+              const saleCash = saleCashAmount(sale)
+              const saleTransfer = saleTransferAmount(sale)
               return (
                 <div key={d.id}>
                   <div
@@ -432,7 +435,7 @@ export default function Deliveries() {
                     <span className="font-mono text-xs font-semibold text-brand-navy">
                       {d.invoice_number ? `#${d.invoice_number}` : '—'}
                     </span>
-                    <span className="text-sm font-semibold text-brand-pink tabular-nums">{fmt(sale?.total || 0)}</span>
+                    <span className="text-sm font-semibold text-brand-pink tabular-nums">{fmt(salePaid)}</span>
                     <span className={`text-xs font-medium px-2 py-0.5 rounded-full w-fit ${PAYMENT_BADGE[sale?.payment_method] ?? 'bg-gray-100 text-gray-500'}`}>
                       {PAYMENT_LABELS[sale?.payment_method] ?? '—'}
                     </span>
@@ -480,10 +483,10 @@ export default function Deliveries() {
 
                       {/* Pago detalle */}
                       <div className="flex gap-6 text-sm pt-1 border-t border-blue-100">
-                        {sale?.cash_received > 0 && <div><p className="text-xs text-gray-400">Efectivo</p><p className="font-semibold">{fmt(sale.cash_received)}</p></div>}
-                        {sale?.transfer_amount > 0 && <div><p className="text-xs text-gray-400">Transferencia</p><p className="font-semibold">{fmt(sale.transfer_amount)}</p></div>}
+                        {saleCash > 0 && <div><p className="text-xs text-gray-400">Efectivo</p><p className="font-semibold">{fmt(saleCash)}</p></div>}
+                        {saleTransfer > 0 && <div><p className="text-xs text-gray-400">Transferencia</p><p className="font-semibold">{fmt(saleTransfer)}</p></div>}
                         {sale?.change_given > 0 && <div><p className="text-xs text-gray-400">Cambio</p><p className="font-semibold text-green-600">{fmt(sale.change_given)}</p></div>}
-                        <div className="ml-auto"><p className="text-xs text-gray-400">Total</p><p className="font-bold text-brand-pink">{fmt(sale?.total || 0)}</p></div>
+                        <div className="ml-auto"><p className="text-xs text-gray-400">Total</p><p className="font-bold text-brand-pink">{fmt(salePaid)}</p></div>
                       </div>
 
                       {d.notes && <p className="text-xs text-gray-500 italic">📝 {d.notes}</p>}
