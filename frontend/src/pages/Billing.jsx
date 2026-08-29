@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { getInvoices, editSale, voidInvoice, getAllFlavors, getCupSizes, getToppings, getOperatives, getShifts, getActivePromotions } from '../api'
 import { Icon } from '../components/Icons'
 import { useAuth } from '../context/AuthContext'
+import { salePaidTotal } from '../utils/sales'
 import toast from 'react-hot-toast'
 
 const fmt     = n  => `$${Number(n).toLocaleString('es-CO')}`
@@ -324,7 +325,7 @@ export default function Billing() {
               <span className="text-sm text-gray-700">{inv.sale_detail?.seller_name || '—'}</span>
               <span className="tabular-nums">
                 <span className="text-sm font-bold text-brand-pink">
-                  {fmt(inv.sale_detail?.is_courtesy ? (inv.sale_detail?.courtesy_paid || 0) : (inv.sale_detail?.total || 0))}
+                  {fmt(salePaidTotal(inv.sale_detail))}
                 </span>
                 {inv.sale_detail?.is_courtesy && (
                   <span className="block text-[10px] text-gray-400 leading-none">factura {fmt(inv.sale_detail?.total || 0)}</span>
@@ -934,7 +935,7 @@ export default function Billing() {
                       {sale.is_courtesy ? 'Recibido' : 'Total'}
                     </span>
                     <span className="text-xl font-bold text-brand-pink">
-                      {fmt(sale.is_courtesy ? (sale.courtesy_paid || 0) : sale.total)}
+                      {fmt(salePaidTotal(sale))}
                     </span>
                   </div>
                 </div>

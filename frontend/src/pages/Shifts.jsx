@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { getShifts, openShift, closeShift, getActiveShift, getShiftDetail, getCashAuditPrefill, createCashAudit, getCashAudit, saveSellerDeliveries, saveDeliveryAmount } from '../api'
+import { salePaidTotal } from '../utils/sales'
 import toast from 'react-hot-toast'
 
 const fmt    = n => `$${Number(n || 0).toLocaleString('es-CO')}`
@@ -1820,7 +1821,7 @@ function ShiftDetail({ shift, onBack, onShiftUpdate }) {
                                 {s.is_courtesy ? 'Recibido' : 'Total'}
                               </span>
                               <span className="text-base font-bold text-brand-pink">
-                                {fmt(s.is_courtesy ? (s.courtesy_paid || 0) : s.total)}
+                                {fmt(salePaidTotal(s))}
                               </span>
                             </div>
                           </div>
