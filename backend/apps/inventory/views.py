@@ -158,13 +158,13 @@ class FlavorBagViewSet(StockValidationMixin, viewsets.ModelViewSet):
             return Response({'detail': 'El motivo del ajuste es obligatorio.'}, status=status.HTTP_400_BAD_REQUEST)
         if delta_ml == 0:
             return Response({'detail': 'El delta no puede ser 0.'}, status=status.HTTP_400_BAD_REQUEST)
-        if delta_ml < 0 and abs(delta_ml) > bag.stock_ml:
-            raise ValidationError({'detail': f'No puedes restar mas de {bag.stock_ml:.0f} ml.'})
-        if delta_ml > 0:
-            bag.add_stock(delta_ml)
-        else:
-            bag.stock_ml += delta_ml
-            bag.save()
+        try:
+            if delta_ml > 0:
+                bag.add_stock(delta_ml)
+            else:
+                bag.consume(abs(delta_ml))
+        except ValueError as exc:
+            raise ValidationError({'detail': str(exc)})
         shift = Shift.get_active()
         StockMovement.objects.create(
             movement_type='adjustment', flavor_bag=bag,
@@ -217,13 +217,13 @@ class CupStockViewSet(StockValidationMixin, viewsets.ModelViewSet):
             return Response({'detail': 'El motivo del ajuste es obligatorio.'}, status=status.HTTP_400_BAD_REQUEST)
         if delta == 0:
             return Response({'detail': 'El delta no puede ser 0.'}, status=status.HTTP_400_BAD_REQUEST)
-        if delta < 0 and abs(delta) > cup.quantity:
-            raise ValidationError({'detail': f'No puedes restar mas de {cup.quantity} vasos.'})
-        if delta > 0:
-            cup.add_stock(delta)
-        else:
-            cup.quantity += delta
-            cup.save()
+        try:
+            if delta > 0:
+                cup.add_stock(delta)
+            else:
+                cup.consume(abs(delta))
+        except ValueError as exc:
+            raise ValidationError({'detail': str(exc)})
         shift = Shift.get_active()
         StockMovement.objects.create(
             movement_type='adjustment', cup_stock=cup,
@@ -262,13 +262,13 @@ class ToppingStockViewSet(StockValidationMixin, viewsets.ModelViewSet):
             return Response({'detail': 'El motivo del ajuste es obligatorio.'}, status=status.HTTP_400_BAD_REQUEST)
         if delta == 0:
             return Response({'detail': 'El delta no puede ser 0.'}, status=status.HTTP_400_BAD_REQUEST)
-        if delta < 0 and abs(delta) > stock.quantity:
-            raise ValidationError({'detail': f'No puedes restar mas de {stock.quantity} toppings.'})
-        if delta > 0:
-            stock.add_stock(delta)
-        else:
-            stock.quantity += delta
-            stock.save()
+        try:
+            if delta > 0:
+                stock.add_stock(delta)
+            else:
+                stock.consume(abs(delta))
+        except ValueError as exc:
+            raise ValidationError({'detail': str(exc)})
         shift = Shift.get_active()
         StockMovement.objects.create(
             movement_type='adjustment', topping_stock=stock,

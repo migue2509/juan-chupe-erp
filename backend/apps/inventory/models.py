@@ -1,4 +1,6 @@
 from django.db import models
+from django.db.models import F
+from django.utils import timezone
 from decimal import Decimal
 
 
@@ -35,17 +37,29 @@ class FlavorBag(models.Model):
     def consume(self, ml: Decimal):
         """Descuenta ml del stock (llamado por el motor de ventas)"""
         ml = Decimal(str(ml))
-        if ml > self.stock_ml:
+        if ml <= 0:
+            raise ValueError('La cantidad de ml debe ser mayor a 0.')
+        updated = type(self).objects.filter(pk=self.pk, stock_ml__gte=ml).update(
+            stock_ml=F('stock_ml') - ml,
+            updated_at=timezone.now(),
+        )
+        if not updated:
+            self.refresh_from_db(fields=['stock_ml'])
             raise ValueError(
                 f'Stock insuficiente de {self.flavor.name}. '
                 f'Disponible: {self.stock_ml:.0f} ml, necesario: {ml:.0f} ml.'
             )
-        self.stock_ml -= ml
-        self.save()
+        self.refresh_from_db(fields=['stock_ml', 'updated_at'])
 
     def add_stock(self, ml: Decimal):
-        self.stock_ml += ml
-        self.save()
+        ml = Decimal(str(ml))
+        if ml <= 0:
+            raise ValueError('La cantidad de ml debe ser mayor a 0.')
+        type(self).objects.filter(pk=self.pk).update(
+            stock_ml=F('stock_ml') + ml,
+            updated_at=timezone.now(),
+        )
+        self.refresh_from_db(fields=['stock_ml', 'updated_at'])
 
 
 class CupStock(models.Model):
@@ -70,17 +84,29 @@ class CupStock(models.Model):
 
     def consume(self, qty: int = 1):
         qty = int(qty)
-        if qty > self.quantity:
+        if qty <= 0:
+            raise ValueError('La cantidad de vasos debe ser mayor a 0.')
+        updated = type(self).objects.filter(pk=self.pk, quantity__gte=qty).update(
+            quantity=F('quantity') - qty,
+            updated_at=timezone.now(),
+        )
+        if not updated:
+            self.refresh_from_db(fields=['quantity'])
             raise ValueError(
                 f'Stock insuficiente de vasos {self.cup_size.size}. '
                 f'Disponible: {self.quantity}, necesario: {qty}.'
             )
-        self.quantity -= qty
-        self.save()
+        self.refresh_from_db(fields=['quantity', 'updated_at'])
 
     def add_stock(self, qty: int):
-        self.quantity += qty
-        self.save()
+        qty = int(qty)
+        if qty <= 0:
+            raise ValueError('La cantidad de vasos debe ser mayor a 0.')
+        type(self).objects.filter(pk=self.pk).update(
+            quantity=F('quantity') + qty,
+            updated_at=timezone.now(),
+        )
+        self.refresh_from_db(fields=['quantity', 'updated_at'])
 
 
 class ToppingStock(models.Model):
@@ -105,17 +131,29 @@ class ToppingStock(models.Model):
 
     def consume(self, qty: int = 1):
         qty = int(qty)
-        if qty > self.quantity:
+        if qty <= 0:
+            raise ValueError('La cantidad de toppings debe ser mayor a 0.')
+        updated = type(self).objects.filter(pk=self.pk, quantity__gte=qty).update(
+            quantity=F('quantity') - qty,
+            updated_at=timezone.now(),
+        )
+        if not updated:
+            self.refresh_from_db(fields=['quantity'])
             raise ValueError(
                 f'Stock insuficiente de {self.topping.name}. '
                 f'Disponible: {self.quantity}, necesario: {qty}.'
             )
-        self.quantity -= qty
-        self.save()
+        self.refresh_from_db(fields=['quantity', 'updated_at'])
 
     def add_stock(self, qty: int):
-        self.quantity += qty
-        self.save()
+        qty = int(qty)
+        if qty <= 0:
+            raise ValueError('La cantidad de toppings debe ser mayor a 0.')
+        type(self).objects.filter(pk=self.pk).update(
+            quantity=F('quantity') + qty,
+            updated_at=timezone.now(),
+        )
+        self.refresh_from_db(fields=['quantity', 'updated_at'])
 
 
 class StockMovement(models.Model):
