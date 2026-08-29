@@ -1,62 +1,12 @@
 import { useEffect, useRef, useState } from 'react'
 import { getDeliveryHeatmap } from '../api'
+import { loadLeaflet } from '../utils/leafletLoader'
 
 const MED_LAT    = 6.2442
 const MED_LNG    = -75.5812
 const ZOOM_INI   = 13
 const STORE_LAT  = 6.285462773644746
 const STORE_LNG  = -75.57793997784694
-
-// ── Cargar Leaflet + Leaflet.heat desde CDN ──────────────────────────────────
-let mapLibsReady = null
-function loadStylesheet(href) {
-  if (document.querySelector(`link[href="${href}"]`)) return
-  const link = document.createElement('link')
-  link.rel = 'stylesheet'
-  link.href = href
-  document.head.appendChild(link)
-}
-
-function loadScript(src) {
-  return new Promise((resolve, reject) => {
-    const existing = [...document.scripts].find(script => script.src === src)
-    if (existing?.dataset.loaded === 'true') { resolve(); return }
-    if (existing) {
-      existing.addEventListener('load', resolve, { once: true })
-      existing.addEventListener('error', reject, { once: true })
-      return
-    }
-
-    const script = document.createElement('script')
-    script.src = src
-    script.async = true
-    script.onload = () => {
-      script.dataset.loaded = 'true'
-      resolve()
-    }
-    script.onerror = () => reject(new Error(`No se pudo cargar ${src}`))
-    document.head.appendChild(script)
-  })
-}
-
-function loadMapLibs() {
-  if (mapLibsReady) return mapLibsReady
-  mapLibsReady = (async () => {
-    loadStylesheet('https://unpkg.com/leaflet@1.9.4/dist/leaflet.css')
-    if (!window.L) {
-      await loadScript('https://unpkg.com/leaflet@1.9.4/dist/leaflet.js')
-    }
-    if (!window.L?.heatLayer) {
-      try {
-        await loadScript('https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js')
-      } catch (e) {
-        console.warn('Mapa: Leaflet.heat no disponible, se mostraran solo marcadores.', e)
-      }
-    }
-    return window.L
-  })()
-  return mapLibsReady
-}
 
 const fmt = n => `$${Number(n || 0).toLocaleString('es-CO')}`
 
@@ -95,7 +45,7 @@ export default function Mapa() {
   // Inicializar mapa una vez
   useEffect(() => {
     let cancelled = false
-    loadMapLibs().then((L) => {
+    loadLeaflet({ heat: true }).then((L) => {
       if (cancelled || !mapRef.current || mapObjRef.current) return
       if (!L) throw new Error('Leaflet no disponible')
 
@@ -367,7 +317,7 @@ export default function Mapa() {
           </div>
 
           {/* Loading overlay */}
-          {loading && (
+          {loading && !mapError && (
             <div className="absolute inset-0 bg-white/60 flex items-center justify-center">
               <div className="flex items-center gap-2 bg-white px-5 py-3 rounded-xl shadow">
                 <div className="w-5 h-5 border-2 border-brand-pink border-t-transparent rounded-full animate-spin" />

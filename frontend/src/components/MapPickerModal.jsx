@@ -1,26 +1,9 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
+import { loadLeaflet } from '../utils/leafletLoader'
 
 const MED_LAT      = 6.2442
 const MED_LNG      = -75.5812
 const DEFAULT_ZOOM = 14
-
-// ── Leaflet CDN loader (idempotente) ──────────────────────────────────────────
-let leafletReady = null
-function loadLeaflet() {
-  if (leafletReady) return leafletReady
-  leafletReady = new Promise((resolve) => {
-    if (window.L) { resolve(window.L); return }
-    const link = document.createElement('link')
-    link.rel  = 'stylesheet'
-    link.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css'
-    document.head.appendChild(link)
-    const script = document.createElement('script')
-    script.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js'
-    script.onload = () => resolve(window.L)
-    document.head.appendChild(script)
-  })
-  return leafletReady
-}
 
 // ── Normalización de direcciones colombianas ──────────────────────────────────
 // "Calle 92 #66-65" → "Calle 92 66-65"  (los motores no entienden el #)
@@ -124,6 +107,7 @@ export default function MapPickerModal({ onConfirm, onClose, initialLat, initial
   const searchTimer = useRef(null)
 
   const [mapReady,       setMapReady]       = useState(false)
+  const [mapError,       setMapError]       = useState('')
   const [search,         setSearch]         = useState(initialAddress || '')
   const [results,        setResults]        = useState([])
   const [searching,      setSearching]      = useState(false)
@@ -136,8 +120,9 @@ export default function MapPickerModal({ onConfirm, onClose, initialLat, initial
   )
 
   useEffect(() => {
+    let cancelled = false
     loadLeaflet().then((L) => {
-      if (!mapRef.current || mapObjRef.current) return
+      if (cancelled || !mapRef.current || mapObjRef.current) return
       const map = L.map(mapRef.current, {
         center: [initialLat || MED_LAT, initialLng || MED_LNG],
         zoom:   initialLat ? 16 : DEFAULT_ZOOM,
@@ -166,8 +151,13 @@ export default function MapPickerModal({ onConfirm, onClose, initialLat, initial
 
       mapObjRef.current = map
       setMapReady(true)
+      setTimeout(() => map.invalidateSize(), 0)
+    }).catch((e) => {
+      console.error('Selector mapa: error cargando Leaflet', e)
+      setMapError('No se pudo cargar el mapa. Revisa la conexion e intenta de nuevo.')
     })
     return () => {
+      cancelled = true
       if (mapObjRef.current) { mapObjRef.current.remove(); mapObjRef.current = null; markerRef.current = null }
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -304,7 +294,15 @@ export default function MapPickerModal({ onConfirm, onClose, initialLat, initial
         {/* Mapa */}
         <div className="flex-1 relative">
           <div ref={mapRef} className="w-full h-full" />
-          {!mapReady && (
+          {mapError && (
+            <div className="absolute inset-0 flex items-center justify-center bg-white/90 text-center px-6">
+              <div className="max-w-sm">
+                <p className="text-sm font-semibold text-red-600">{mapError}</p>
+                <p className="text-xs text-gray-400 mt-1">Puedes cerrar e intentar nuevamente cuando la conexion al proveedor del mapa vuelva.</p>
+              </div>
+            </div>
+          )}
+          {!mapReady && !mapError && (
             <div className="absolute inset-0 flex items-center justify-center bg-gray-100">
               <div className="flex items-center gap-2 text-gray-400">
                 <div className="w-5 h-5 border-2 border-brand-pink border-t-transparent rounded-full animate-spin" />
