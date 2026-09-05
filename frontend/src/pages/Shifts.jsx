@@ -156,7 +156,7 @@ function POSResumenModal({ shiftId, onClose }) {
       await createCashAudit({
         shift:             shiftId,
         channel:           'pos',
-        expected_cash:     p.net_expected_cash,
+        expected_cash:     p.pos_cash || p.expected_cash || 0,
         expected_transfer: p.pos_transfer,
         actual_cash:       p.net_expected_cash,
         actual_transfer:   0,
@@ -746,12 +746,15 @@ function DomiciliosResumenModal({ shiftId, onClose }) {
               onClick={async () => {
                 setSaving(true)
                 try {
+                  const actualDeliveryCash = netDelivered !== ''
+                    ? parseInt(netDelivered, 10) || 0
+                    : Number(p.delivery_net_delivered ?? p.delivery_net_cash ?? 0)
                   await createCashAudit({
                     shift:             shiftId,
                     channel:           'delivery',
-                    expected_cash:     p.delivery_net_cash,
+                    expected_cash:     p.delivery_cash || 0,
                     expected_transfer: p.delivery_transfer,
-                    actual_cash:       p.delivery_net_cash,
+                    actual_cash:       actualDeliveryCash,
                     actual_transfer:   0,
                   })
                   toast.success('Domicilios marcado como entregado')
@@ -1161,7 +1164,7 @@ function ViewArqueoModal({ arqueoId, shiftId, onClose }) {
   ;(prefill?.catalog || []).forEach(c => { prefillMap[c.product_name] = c })
 
   const totalLiq = (prefill?.catalog || []).reduce((s, c) => s + (c.sales_revenue || 0), 0)
-  const diff = Number(audit.actual_cash) - Number(audit.expected_cash)
+  const diff = Number(audit.cash_difference || 0)
 
   const COL = '2fr 80px 80px 80px 80px 80px 110px'
 

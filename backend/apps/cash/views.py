@@ -236,33 +236,41 @@ class CashAuditViewSet(viewsets.ModelViewSet):
         # ── Cierre de la jornada anterior ──
         prev_shift = Shift.objects.filter(opened_at__lt=shift.opened_at).order_by('-opened_at').first()
         # Matching por product_id (resistente a renombres); fallback a product_name
-        prev_closing = {}   # product_id → closing_stock
-        prev_closing_name = {}  # product_name → closing_stock (fallback)
+        prev_closing = {}
+        prev_closing_name = {}
         if prev_shift:
             try:
                 for item in prev_shift.cash_audits.filter(channel='pos').first().items.all():
                     if item.product_id:
-                        prev_closing[item.product_id] = item.closing_stock
-                    prev_closing_name[item.product_name] = item.closing_stock
+                        prev_closing[(item.product_type, item.product_id)] = item.closing_stock
+                    prev_closing_name[(item.product_type, item.product_name)] = item.closing_stock
             except Exception:
                 pass
 
         # ── Ingresos de inventario en la jornada actual ──
         # product_id → entries (unidades que entraron al inventario durante el turno)
-        current_entries = {}   # product_id → entries
-        current_entries_name = {}  # product_name → entries (fallback)
-        current_closing = {}   # product_id → closing_stock guardado en arqueo actual
-        current_closing_name = {}  # product_name → closing_stock guardado (fallback)
+        current_opening = {}
+        current_opening_name = {}
+        current_entries = {}
+        current_entries_name = {}
+        current_closing = {}
+        current_closing_name = {}
+        current_audit_product_ids = defaultdict(set)
         current_audit = None
         try:
             current_audit = shift.cash_audits.filter(channel='pos').first()
             if current_audit:
                 for item in current_audit.items.all():
                     if item.product_id:
-                        current_entries[item.product_id] = item.entries
-                        current_closing[item.product_id] = item.closing_stock
-                    current_entries_name[item.product_name] = item.entries
-                    current_closing_name[item.product_name] = item.closing_stock
+                        typed_key = (item.product_type, item.product_id)
+                        current_opening[typed_key] = item.opening_stock
+                        current_entries[typed_key] = item.entries
+                        current_closing[typed_key] = item.closing_stock
+                        current_audit_product_ids[item.product_type].add(item.product_id)
+                    typed_name = (item.product_type, item.product_name)
+                    current_opening_name[typed_name] = item.opening_stock
+                    current_entries_name[typed_name] = item.entries
+                    current_closing_name[typed_name] = item.closing_stock
         except Exception:
             pass
 
@@ -284,7 +292,9 @@ class CashAuditViewSet(viewsets.ModelViewSet):
         sales_ids  = set(SaleItem.objects.filter(
             sale__in=pos_inventory_sales, cup_size__isnull=False
         ).values_list('cup_size_id', flat=True))
-        cups_to_process = CupSize.objects.filter(id__in=active_ids | sales_ids)
+        cups_to_process = CupSize.objects.filter(
+            id__in=active_ids | sales_ids | current_audit_product_ids['cup']
+        )
 
         cup_revenue = {}
         for cs in cups_to_process:
@@ -329,11 +339,22 @@ class CashAuditViewSet(viewsets.ModelViewSet):
                                              'regular_qty': 0, 'regular_revenue': 0,
                                              'promo_qty': 0, 'promo_revenue': 0, 'promo_unit': None,
                                              'plat_qty': 0})
-            entries = current_entries.get(cs.pk, current_entries_name.get(name, movement_entries.get(cs.pk, 0)))
-            prev = prev_closing.get(cs.pk, prev_closing_name.get(name))
+            cup_key = ('cup', cs.pk)
+            cup_name_key = ('cup', name)
+            entries = current_entries.get(
+                cup_key,
+                current_entries_name.get(cup_name_key, movement_entries.get(cs.pk, 0))
+            )
+            prev = current_opening.get(
+                cup_key,
+                current_opening_name.get(
+                    cup_name_key,
+                    prev_closing.get(cup_key, prev_closing_name.get(cup_name_key))
+                )
+            )
             if prev is None:
                 prev = max(0, int(stock) + int(revenue['sales_qty'] or 0) - int(entries or 0))
-            closing = current_closing.get(cs.pk, current_closing_name.get(name))
+            closing = current_closing.get(cup_key, current_closing_name.get(cup_name_key))
             catalog.append({
                 'product_name':  name,
                 'product_type':  'cup',
@@ -346,13 +367,28 @@ class CashAuditViewSet(viewsets.ModelViewSet):
                 **revenue,
             })
 
-        for t in Topping.objects.filter(is_active=True).order_by('name'):
+        active_topping_ids = set(Topping.objects.filter(is_active=True).values_list('id', flat=True))
+        topping_sales_ids = set(SaleItem.objects.filter(
+            sale__in=pos_inventory_sales, cup_size__isnull=True, topping__isnull=False
+        ).values_list('topping_id', flat=True))
+        toppings_to_process = Topping.objects.filter(
+            id__in=active_topping_ids | topping_sales_ids | current_audit_product_ids['topping']
+        )
+        for t in toppings_to_process.order_by('name'):
             try:    stock = t.stock.quantity
             except: stock = 0
             t_agg = SaleItem.objects.filter(
                 sale__in=pos_inventory_sales, topping=t, cup_size__isnull=True
             ).aggregate(qty=Sum('quantity'), rev=Sum('subtotal'))
-            prev_t = prev_closing.get(t.pk, prev_closing_name.get(t.name, 0))
+            topping_key = ('topping', t.pk)
+            topping_name_key = ('topping', t.name)
+            prev_t = current_opening.get(
+                topping_key,
+                current_opening_name.get(
+                    topping_name_key,
+                    prev_closing.get(topping_key, prev_closing_name.get(topping_name_key, 0))
+                )
+            )
             catalog.append({
                 'product_name':  t.name,
                 'product_type':  'topping',
