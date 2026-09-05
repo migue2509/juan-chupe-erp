@@ -400,6 +400,36 @@ class CashAuditViewSet(viewsets.ModelViewSet):
                 'sales_revenue': int(t_agg['rev'] or 0),
             })
 
+        catalog_keys = {
+            (row['product_type'], row['product_id']) if row.get('product_id')
+            else (row['product_type'], row['product_name'])
+            for row in catalog
+        }
+        if current_audit:
+            for item in current_audit.items.all():
+                key = (item.product_type, item.product_id) if item.product_id else (item.product_type, item.product_name)
+                if key in catalog_keys:
+                    continue
+                catalog.append({
+                    'product_name':  item.product_name,
+                    'product_type':  item.product_type,
+                    'product_id':    item.product_id,
+                    'unit_price':    int(item.unit_price),
+                    'current_stock': 0,
+                    'prev_closing':  item.opening_stock,
+                    'entries':       item.entries,
+                    'closing_stock': item.closing_stock,
+                    'regular_qty':   0,
+                    'regular_revenue': 0,
+                    'promo_qty':     0,
+                    'promo_revenue': 0,
+                    'promo_unit':    None,
+                    'plat_qty':      0,
+                    'sales_qty':     item.sold,
+                    'sales_revenue': 0,
+                })
+                catalog_keys.add(key)
+
         return Response({
             'shift_id': shift.id,
             # POS

@@ -133,6 +133,42 @@ class CashAuditSaveTests(TestCase):
         self.assertEqual(row['entries'], 3)
         self.assertEqual(row['closing_stock'], 4)
 
+    def test_prefill_includes_saved_audit_items_without_product_id(self):
+        audit = CashAudit.objects.create(
+            shift=self.shift,
+            channel='pos',
+            audited_by=self.admin,
+            expected_cash=Decimal('0'),
+            expected_transfer=Decimal('0'),
+            actual_cash=Decimal('0'),
+            actual_transfer=Decimal('0'),
+        )
+        ShiftAuditItem.objects.create(
+            audit=audit,
+            product_name='Vaso antiguo',
+            product_type='cup',
+            unit_price=Decimal('5000'),
+            opening_stock=8,
+            entries=2,
+            closing_stock=3,
+        )
+
+        response = self.client.get(f'/api/cash/prefill/?shift_id={self.shift.pk}')
+
+        self.assertEqual(response.status_code, 200, response.data)
+        row = next(
+            (
+                item for item in response.data['catalog']
+                if item['product_type'] == 'cup' and item['product_name'] == 'Vaso antiguo'
+            ),
+            None,
+        )
+        self.assertIsNotNone(row)
+        self.assertIsNone(row['product_id'])
+        self.assertEqual(row['prev_closing'], 8)
+        self.assertEqual(row['entries'], 2)
+        self.assertEqual(row['closing_stock'], 3)
+
     def test_patch_cash_audit_recalculates_difference(self):
         Expense.objects.create(
             shift=self.shift,
