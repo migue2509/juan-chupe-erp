@@ -126,13 +126,28 @@ class ShiftLifecycleTests(TestCase):
     def test_has_audit_requires_all_close_audits(self):
         shift = Shift.objects.create(opened_by=self.admin)
 
-        self.assertFalse(ShiftSerializer(shift).data['has_audit'])
+        data = ShiftSerializer(shift).data
+        self.assertFalse(data['has_audit'])
+        self.assertFalse(data['has_pos_audit'])
+        self.assertFalse(data['requires_delivery_audit'])
+        self.assertEqual(data['missing_audits'], ['pos'])
 
         self._create_audit(shift, 'pos')
-        self.assertTrue(ShiftSerializer(shift).data['has_audit'])
+        data = ShiftSerializer(shift).data
+        self.assertTrue(data['has_audit'])
+        self.assertTrue(data['has_pos_audit'])
+        self.assertFalse(data['requires_delivery_audit'])
+        self.assertEqual(data['missing_audits'], [])
 
         self._create_delivery_sale(shift)
-        self.assertFalse(ShiftSerializer(shift).data['has_audit'])
+        data = ShiftSerializer(shift).data
+        self.assertFalse(data['has_audit'])
+        self.assertTrue(data['requires_delivery_audit'])
+        self.assertFalse(data['has_delivery_audit'])
+        self.assertEqual(data['missing_audits'], ['delivery'])
 
         self._create_audit(shift, 'delivery')
-        self.assertTrue(ShiftSerializer(shift).data['has_audit'])
+        data = ShiftSerializer(shift).data
+        self.assertTrue(data['has_audit'])
+        self.assertTrue(data['has_delivery_audit'])
+        self.assertEqual(data['missing_audits'], [])

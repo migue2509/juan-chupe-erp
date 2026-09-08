@@ -51,7 +51,7 @@ class ShiftViewSet(viewsets.ReadOnlyModelViewSet):
                     status=status.HTTP_400_BAD_REQUEST,
                 )
             shift.close(user=request.user)
-        # Cerrar automáticamente todas las asistencias abiertas de esta jornada
+            # Cerrar automaticamente todas las asistencias abiertas de esta jornada
             from apps.attendance.models import AttendanceRecord
             AttendanceRecord.objects.filter(shift=shift, check_out__isnull=True).update(
                 check_out=timezone.now()

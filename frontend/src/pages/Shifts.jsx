@@ -3,6 +3,26 @@ import { getShifts, openShift, closeShift, getActiveShift, getShiftDetail, getCa
 import { salePaidTotal, saleTransferAmount } from '../utils/sales'
 import toast from 'react-hot-toast'
 
+const AUDIT_SHORT_LABELS = { pos: 'POS', delivery: 'Dom.' }
+const AUDIT_FULL_LABELS = { pos: 'POS', delivery: 'Domicilios' }
+
+const getShiftAuditBadge = (shift) => {
+  if (shift.has_audit) {
+    return { className: 'badge-cyan', label: 'Listo', title: 'Arqueo completo' }
+  }
+
+  const missing = Array.isArray(shift.missing_audits) ? shift.missing_audits : []
+  if (missing.length > 0) {
+    return {
+      className: 'badge-amber',
+      label: `Falta ${missing.map(ch => AUDIT_SHORT_LABELS[ch] || ch).join(' + ')}`,
+      title: `Falta ${missing.map(ch => AUDIT_FULL_LABELS[ch] || ch).join(' y ')}`,
+    }
+  }
+
+  return { className: 'badge-gray', label: 'Pendiente', title: 'Arqueo pendiente' }
+}
+
 const fmt    = n => `$${Number(n || 0).toLocaleString('es-CO')}`
 const fmtDt  = s => new Date(s).toLocaleString('es-CO', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })
 const fmtHr  = s => new Date(s).toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' })
@@ -2019,7 +2039,7 @@ export default function Shifts() {
         </div>
         {/* Header */}
         <div className="grid px-5 py-2 bg-gray-50 border-b border-gray-100 text-[10px] font-semibold text-gray-400 uppercase tracking-widest"
-          style={{ gridTemplateColumns: '60px minmax(0,1fr) minmax(0,1fr) 90px 90px', minWidth: '650px' }}>
+          style={{ gridTemplateColumns: '60px minmax(0,1fr) minmax(0,1fr) 90px 130px', minWidth: '690px' }}>
           <span>#</span>
           <span>Apertura</span>
           <span>Cierre</span>
@@ -2032,7 +2052,7 @@ export default function Shifts() {
               key={s.id}
               onClick={() => setSelected(s)}
               className="grid px-5 py-3.5 items-center cursor-pointer hover:bg-gray-50 transition-colors"
-              style={{ gridTemplateColumns: '60px minmax(0,1fr) minmax(0,1fr) 90px 90px', minWidth: '650px' }}
+              style={{ gridTemplateColumns: '60px minmax(0,1fr) minmax(0,1fr) 90px 130px', minWidth: '690px' }}
             >
               <span className="text-sm font-semibold text-gray-700">#{s.id}</span>
               <span className="text-sm text-gray-600">{fmtDt(s.opened_at)}</span>
@@ -2043,7 +2063,14 @@ export default function Shifts() {
                 </span>
               </span>
               <span className="text-center text-xs text-gray-400">
-                {s.has_audit ? <span className="badge-cyan">Listo</span> : '—'}
+                {(() => {
+                  const auditBadge = getShiftAuditBadge(s)
+                  return (
+                    <span className={auditBadge.className} title={auditBadge.title}>
+                      {auditBadge.label}
+                    </span>
+                  )
+                })()}
               </span>
             </div>
           ))}
