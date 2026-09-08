@@ -101,6 +101,7 @@ function POSResumenModal({ shiftId, onClose }) {
   const COL = '2fr 110px 70px 110px'
 
   const sellers = p.sellers_breakdown || []
+  const posSellerRows = sellers.filter(s => s.seller_id !== null)
   const visibleCups = cups.filter(r =>
     (r.sales_qty || 0) > 0 ||
     (r.current_stock || 0) > 0 ||
@@ -111,6 +112,15 @@ function POSResumenModal({ shiftId, onClose }) {
     const parsed = parseInt(value, 10)
     return Number.isFinite(parsed) && parsed >= 0 ? parsed : 0
   }
+  const parseMoney = value => {
+    const parsed = parseInt(value, 10)
+    return Number.isFinite(parsed) && parsed >= 0 ? parsed : 0
+  }
+  const buildSellerDeliveryPayload = () => posSellerRows.map(s => ({
+    seller_id:     s.seller_id,
+    seller_name:   s.seller_name,
+    net_delivered: parseMoney(deliveries[String(s.seller_id)]),
+  }))
   const cupAuditValues = row => {
     const key = String(row.product_id)
     const opening = Number(row.prev_closing || 0)
@@ -139,11 +149,7 @@ function POSResumenModal({ shiftId, onClose }) {
   const handleSaveDeliveries = async () => {
     setSavingDeliveries(true)
     try {
-      const payload = sellers.map(s => ({
-        seller_id:     s.seller_id,
-        seller_name:   s.seller_name,
-        net_delivered: parseInt(deliveries[String(s.seller_id ?? 'null')] || '0') || 0,
-      }))
+      const payload = buildSellerDeliveryPayload()
       await saveSellerDeliveries({ shift_id: shiftId, deliveries: payload })
       toast.success('Entregas guardadas')
       reload()
@@ -171,14 +177,27 @@ function POSResumenModal({ shiftId, onClose }) {
       return
     }
 
+    const missingDeliveries = posSellerRows.filter(s => {
+      const value = deliveries[String(s.seller_id)]
+      return value === undefined || value === ''
+    })
+    if (missingDeliveries.length > 0) {
+      setActiveTab('sellers')
+      toast.error('Registra cuanto entrego cada vendedora antes de marcar POS')
+      return
+    }
+
     setSaving(true)
     try {
+      const sellerDeliveryPayload = buildSellerDeliveryPayload()
+      const actualPOSCash = sellerDeliveryPayload.reduce((sum, item) => sum + item.net_delivered, 0)
+      await saveSellerDeliveries({ shift_id: shiftId, deliveries: sellerDeliveryPayload })
       await createCashAudit({
         shift:             shiftId,
         channel:           'pos',
         expected_cash:     p.pos_cash || p.expected_cash || 0,
         expected_transfer: p.pos_transfer,
-        actual_cash:       p.net_expected_cash,
+        actual_cash:       actualPOSCash,
         actual_transfer:   0,
         items:             buildAuditItems(),
       })
@@ -245,13 +264,13 @@ function POSResumenModal({ shiftId, onClose }) {
             </div>
 
             {/* Card por vendedora (solo seller_id no nulo) */}
-            {sellers.filter(s => s.seller_id !== null).length === 0 && (
+            {posSellerRows.length === 0 && (
               <div className="text-center py-10 text-gray-400 text-sm">
                 No hay ventas asignadas a vendedoras en esta jornada.
               </div>
             )}
 
-            {sellers.filter(s => s.seller_id !== null).map(s => {
+            {posSellerRows.map(s => {
               const key        = String(s.seller_id)
               const totalVenta = s.pos_cash + s.pos_transfer
               const expCash    = s.expenses_cash || 0          // gastos que ella pagó de su caja
@@ -312,6 +331,7 @@ function POSResumenModal({ shiftId, onClose }) {
                           <p className="text-[10px] text-gray-400 uppercase tracking-wide mb-1">¿Cuánto entregó?</p>
                           <input
                             type="number"
+                            min="0"
                             placeholder="0"
                             className="input text-right py-1.5 text-sm w-36"
                             value={delivered ?? ''}
@@ -339,7 +359,7 @@ function POSResumenModal({ shiftId, onClose }) {
               )
             })}
 
-            {sellers.filter(s => s.seller_id !== null).length > 0 && (
+            {posSellerRows.length > 0 && (
               <div className="flex items-center justify-between pt-1">
                 <button disabled={savingDeliveries} onClick={handleSaveDeliveries}
                   className="btn-primary text-sm py-1.5">
