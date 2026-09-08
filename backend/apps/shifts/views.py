@@ -7,6 +7,7 @@ from django.utils import timezone
 from core.permissions import IsAdmin, IsOperative
 from .models import Shift
 from .serializers import ShiftSerializer
+from .services import get_missing_close_audits
 
 
 class ShiftViewSet(viewsets.ReadOnlyModelViewSet):
@@ -38,6 +39,17 @@ class ShiftViewSet(viewsets.ReadOnlyModelViewSet):
             shift = Shift.objects.select_for_update().filter(status='open').first()
             if not shift:
                 return Response({'detail': 'No hay jornada activa.'}, status=status.HTTP_400_BAD_REQUEST)
+            missing_audits = get_missing_close_audits(shift)
+            if missing_audits:
+                labels = {'pos': 'POS', 'delivery': 'Domicilios'}
+                channels = ' y '.join(labels[channel] for channel in missing_audits)
+                return Response(
+                    {
+                        'detail': f'Antes de cerrar la jornada debes marcar como entregado: {channels}.',
+                        'missing_audits': missing_audits,
+                    },
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
             shift.close(user=request.user)
         # Cerrar automáticamente todas las asistencias abiertas de esta jornada
             from apps.attendance.models import AttendanceRecord

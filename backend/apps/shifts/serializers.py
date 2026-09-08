@@ -1,5 +1,6 @@
 from rest_framework import serializers
 from .models import Shift
+from .services import get_missing_close_audits
 
 
 class ShiftSerializer(serializers.ModelSerializer):
@@ -8,7 +9,7 @@ class ShiftSerializer(serializers.ModelSerializer):
     has_audit      = serializers.SerializerMethodField()
 
     def get_has_audit(self, obj):
-        return obj.cash_audits.exists()
+        return not get_missing_close_audits(obj)
 
     class Meta:
         model = Shift
