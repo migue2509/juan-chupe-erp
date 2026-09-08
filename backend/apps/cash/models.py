@@ -1,4 +1,5 @@
 from django.db import models
+from django.db.models import Q
 from decimal import Decimal
 
 
@@ -97,6 +98,18 @@ class SellerCashDelivery(models.Model):
     class Meta:
         verbose_name          = 'Entrega de caja por vendedora'
         verbose_name_plural   = 'Entregas de caja por vendedora'
+        constraints = [
+            models.UniqueConstraint(
+                fields=['shift', 'seller_id'],
+                condition=Q(seller_id__isnull=False),
+                name='uniq_seller_cash_per_shift_seller',
+            ),
+            models.UniqueConstraint(
+                fields=['shift'],
+                condition=Q(seller_id__isnull=True),
+                name='uniq_delivery_cash_per_shift',
+            ),
+        ]
 
     def __str__(self):
         return f'Jornada #{self.shift_id} — {self.seller_name or "Domicilios"}: {self.net_delivered}'

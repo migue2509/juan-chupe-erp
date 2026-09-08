@@ -3,7 +3,7 @@ from decimal import Decimal
 from django.test import TestCase
 from rest_framework.test import APIClient
 
-from apps.cash.models import CashAudit, ShiftAuditItem
+from apps.cash.models import CashAudit, SellerCashDelivery, ShiftAuditItem
 from apps.expenses.models import Expense
 from apps.inventory.models import CupStock
 from apps.products.models import CupSize
@@ -240,3 +240,90 @@ class CashAuditSaveTests(TestCase):
         self.assertEqual(response.status_code, 200, response.data)
         audit.refresh_from_db()
         self.assertEqual(audit.cash_difference, Decimal('1000'))
+
+    def test_save_seller_deliveries_updates_existing_record(self):
+        first = self.client.post(
+            '/api/cash/save-seller-deliveries/',
+            {
+                'shift_id': self.shift.pk,
+                'deliveries': [
+                    {
+                        'seller_id': self.admin.pk,
+                        'seller_name': self.admin.full_name,
+                        'net_delivered': 5000,
+                    },
+                ],
+            },
+            format='json',
+        )
+        second = self.client.post(
+            '/api/cash/save-seller-deliveries/',
+            {
+                'shift_id': self.shift.pk,
+                'deliveries': [
+                    {
+                        'seller_id': self.admin.pk,
+                        'seller_name': 'Admin editado',
+                        'net_delivered': 7000,
+                    },
+                ],
+            },
+            format='json',
+        )
+
+        self.assertEqual(first.status_code, 200, first.data)
+        self.assertEqual(second.status_code, 200, second.data)
+        self.assertEqual(SellerCashDelivery.objects.count(), 1)
+        delivery = SellerCashDelivery.objects.get()
+        self.assertEqual(delivery.seller_id, self.admin.pk)
+        self.assertEqual(delivery.seller_name, 'Admin editado')
+        self.assertEqual(delivery.net_delivered, Decimal('7000'))
+
+    def test_save_seller_deliveries_rejects_negative_amounts(self):
+        response = self.client.post(
+            '/api/cash/save-seller-deliveries/',
+            {
+                'shift_id': self.shift.pk,
+                'deliveries': [
+                    {
+                        'seller_id': self.admin.pk,
+                        'seller_name': self.admin.full_name,
+                        'net_delivered': -1,
+                    },
+                ],
+            },
+            format='json',
+        )
+
+        self.assertEqual(response.status_code, 400, response.data)
+        self.assertEqual(SellerCashDelivery.objects.count(), 0)
+
+    def test_save_delivery_amount_updates_single_channel_record(self):
+        first = self.client.post(
+            '/api/cash/save-delivery-amount/',
+            {'shift_id': self.shift.pk, 'net_delivered': 3000},
+            format='json',
+        )
+        second = self.client.post(
+            '/api/cash/save-delivery-amount/',
+            {'shift_id': self.shift.pk, 'net_delivered': 4500},
+            format='json',
+        )
+
+        self.assertEqual(first.status_code, 200, first.data)
+        self.assertEqual(second.status_code, 200, second.data)
+        self.assertEqual(SellerCashDelivery.objects.count(), 1)
+        delivery = SellerCashDelivery.objects.get()
+        self.assertIsNone(delivery.seller_id)
+        self.assertEqual(delivery.seller_name, 'Domicilios')
+        self.assertEqual(delivery.net_delivered, Decimal('4500'))
+
+    def test_save_delivery_amount_rejects_negative_amount(self):
+        response = self.client.post(
+            '/api/cash/save-delivery-amount/',
+            {'shift_id': self.shift.pk, 'net_delivered': -1},
+            format='json',
+        )
+
+        self.assertEqual(response.status_code, 400, response.data)
+        self.assertEqual(SellerCashDelivery.objects.count(), 0)

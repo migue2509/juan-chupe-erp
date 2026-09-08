@@ -1,9 +1,10 @@
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
 from collections import defaultdict
 from django.core.exceptions import ObjectDoesNotExist
+from django.db import transaction
 from django.db.models import Sum
 from core.permissions import IsAdmin
 from apps.shifts.models import Shift
@@ -16,6 +17,15 @@ from .serializers import CashAuditSerializer
 class CashAuditViewSet(viewsets.ModelViewSet):
     serializer_class   = CashAuditSerializer
     permission_classes = [IsAdmin]
+
+    def _non_negative_decimal(self, value, field_name):
+        try:
+            amount = Decimal(str(value if value not in (None, '') else 0))
+        except (InvalidOperation, TypeError, ValueError):
+            raise ValueError(f'{field_name} debe ser un numero valido.')
+        if amount < 0:
+            raise ValueError(f'{field_name} no puede ser negativo.')
+        return amount
 
     def get_queryset(self):
         qs = CashAudit.objects.select_related('shift', 'audited_by').prefetch_related('items').all()
@@ -32,52 +42,61 @@ class CashAuditViewSet(viewsets.ModelViewSet):
         """Guarda el monto entregado por cada vendedora (canal POS)."""
         shift_id   = request.data.get('shift_id')
         deliveries = request.data.get('deliveries', [])
+        if not isinstance(deliveries, list):
+            return Response({'detail': 'deliveries debe ser una lista.'}, status=status.HTTP_400_BAD_REQUEST)
         try:
             shift = Shift.objects.get(pk=shift_id)
         except Shift.DoesNotExist:
             return Response({'detail': 'Jornada no encontrada.'}, status=status.HTTP_404_NOT_FOUND)
 
-        for d in deliveries:
-            sid = d.get('seller_id')  # puede ser None
-            if sid is None:
-                obj = SellerCashDelivery.objects.filter(shift=shift, seller_id__isnull=True).first()
-            else:
-                obj = SellerCashDelivery.objects.filter(shift=shift, seller_id=sid).first()
-
-            if obj:
-                obj.net_delivered = d.get('net_delivered', 0)
-                obj.seller_name   = d.get('seller_name', '')
-                obj.save(update_fields=['net_delivered', 'seller_name', 'updated_at'])
-            else:
-                SellerCashDelivery.objects.create(
-                    shift=shift,
-                    seller_id=sid,
-                    seller_name=d.get('seller_name', ''),
-                    net_delivered=d.get('net_delivered', 0),
-                )
+        try:
+            with transaction.atomic():
+                for d in deliveries:
+                    if not isinstance(d, dict):
+                        raise ValueError('Cada entrega debe ser un objeto.')
+                    sid = d.get('seller_id')
+                    if sid in (None, ''):
+                        raise ValueError('seller_id es requerido para entregas POS.')
+                    try:
+                        seller_id = int(sid)
+                    except (TypeError, ValueError):
+                        raise ValueError('seller_id debe ser un numero valido.')
+                    if seller_id <= 0:
+                        raise ValueError('seller_id debe ser mayor a cero.')
+                    net_delivered = self._non_negative_decimal(d.get('net_delivered', 0), 'net_delivered')
+                    SellerCashDelivery.objects.update_or_create(
+                        shift=shift,
+                        seller_id=seller_id,
+                        defaults={
+                            'seller_name': d.get('seller_name', ''),
+                            'net_delivered': net_delivered,
+                        },
+                    )
+        except ValueError as exc:
+            return Response({'detail': str(exc)}, status=status.HTTP_400_BAD_REQUEST)
         return Response({'ok': True})
 
     @action(detail=False, methods=['post'], url_path='save-delivery-amount')
     def save_delivery_amount(self, request):
         """Guarda el monto entregado del canal domicilios (seller_id=None)."""
-        shift_id      = request.data.get('shift_id')
-        net_delivered = request.data.get('net_delivered', 0)
+        shift_id = request.data.get('shift_id')
+        try:
+            net_delivered = self._non_negative_decimal(request.data.get('net_delivered', 0), 'net_delivered')
+        except ValueError as exc:
+            return Response({'detail': str(exc)}, status=status.HTTP_400_BAD_REQUEST)
         try:
             shift = Shift.objects.get(pk=shift_id)
         except Shift.DoesNotExist:
             return Response({'detail': 'Jornada no encontrada.'}, status=status.HTTP_404_NOT_FOUND)
 
-        obj = SellerCashDelivery.objects.filter(shift=shift, seller_id__isnull=True).first()
-        if obj:
-            obj.net_delivered = net_delivered
-            obj.seller_name   = 'Domicilios'
-            obj.save(update_fields=['net_delivered', 'seller_name', 'updated_at'])
-        else:
-            SellerCashDelivery.objects.create(
+        with transaction.atomic():
+            SellerCashDelivery.objects.update_or_create(
                 shift=shift,
                 seller_id=None,
-                seller_name='Domicilios',
-                net_delivered=net_delivered,
+                defaults={
+                    'seller_name': 'Domicilios',
+                    'net_delivered': net_delivered,
+                },
             )
         return Response({'ok': True})
 
