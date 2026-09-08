@@ -3,10 +3,12 @@ from decimal import Decimal
 from django.test import TestCase
 from rest_framework.test import APIClient
 
+from apps.billing.models import Invoice
 from apps.cash.models import CashAudit, SellerCashDelivery, ShiftAuditItem
 from apps.expenses.models import Expense
 from apps.inventory.models import CupStock
 from apps.products.models import CupSize
+from apps.sales.models import Sale
 from apps.shifts.models import Shift
 from apps.users.models import User
 
@@ -233,6 +235,44 @@ class CashAuditSaveTests(TestCase):
         self.assertEqual(seller['pos_transfer'], 0)
         self.assertEqual(seller['expenses_cash'], 3000)
         self.assertIsNone(seller['net_delivered'])
+
+    def test_prefill_reports_unassigned_pos_sales_separately_from_delivery_cash(self):
+        sale = Sale.objects.create(
+            shift=self.shift,
+            payment_method='cash',
+            cash_received=Decimal('9000'),
+            total=Decimal('9000'),
+        )
+        Invoice.objects.create(sale=sale, shift=self.shift)
+        SellerCashDelivery.objects.create(
+            shift=self.shift,
+            seller_id=None,
+            seller_name='Domicilios',
+            net_delivered=Decimal('5000'),
+        )
+        Expense.objects.create(
+            shift=self.shift,
+            registered_by=None,
+            category='business',
+            origin='pos',
+            description='Gasto sin responsable',
+            amount=Decimal('2000'),
+            from_daily_cash=True,
+            payment_method='cash',
+        )
+
+        response = self.client.get(f'/api/cash/prefill/?shift_id={self.shift.pk}')
+
+        self.assertEqual(response.status_code, 200, response.data)
+        self.assertFalse(
+            any(item['seller_id'] is None for item in response.data['sellers_breakdown'])
+        )
+        self.assertEqual(response.data['delivery_net_delivered'], 5000)
+        self.assertEqual(response.data['unassigned_pos']['sales_count'], 1)
+        self.assertEqual(response.data['unassigned_pos']['cash'], 9000)
+        self.assertEqual(response.data['unassigned_pos']['transfer'], 0)
+        self.assertEqual(response.data['unassigned_pos']['total'], 9000)
+        self.assertEqual(response.data['unassigned_pos']['expenses_cash'], 2000)
 
     def test_patch_cash_audit_recalculates_difference(self):
         Expense.objects.create(

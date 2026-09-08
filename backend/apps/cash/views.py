@@ -217,11 +217,17 @@ class CashAuditViewSet(viewsets.ModelViewSet):
             }
 
         # ── Cuadre por vendedora (solo canal POS) ──
-        seller_groups = defaultdict(lambda: {'name': 'Sin vendedora', 'cash': Decimal('0'), 'transfer': Decimal('0')})
+        seller_groups = defaultdict(lambda: {
+            'name': 'Sin vendedora',
+            'cash': Decimal('0'),
+            'transfer': Decimal('0'),
+            'sales_count': 0,
+        })
         for s in pos_sales:
             key = s.seller_id
             if key is not None:
                 seller_groups[key]['name'] = s.seller_name or '—'
+            seller_groups[key]['sales_count'] += 1
             seller_groups[key]['cash']     += s.cash_amount
             seller_groups[key]['transfer'] += s.transfer_paid
 
@@ -235,6 +241,7 @@ class CashAuditViewSet(viewsets.ModelViewSet):
 
         # Gastos en efectivo POS por vendedora (quien los registró pagó de su caja)
         seller_expenses_cash = defaultdict(Decimal)
+        unassigned_expenses_cash = Decimal('0')
         for e in shift.expenses.filter(
             from_daily_cash=True, payment_method='cash', origin='pos'
         ).select_related('registered_by'):
@@ -244,21 +251,31 @@ class CashAuditViewSet(viewsets.ModelViewSet):
                         e.registered_by.full_name if e.registered_by else '-'
                     )
                 seller_expenses_cash[e.registered_by_id] += e.amount
+            else:
+                unassigned_expenses_cash += e.amount
 
         for seller_id, seller_name in saved_names.items():
             if seller_groups[seller_id]['name'] == 'Sin vendedora':
                 seller_groups[seller_id]['name'] = seller_name or '-'
 
+        unassigned_info = seller_groups.get(None, {
+            'cash': Decimal('0'),
+            'transfer': Decimal('0'),
+            'sales_count': 0,
+        })
+
         sellers_breakdown = sorted([
             {
                 'seller_id':    sid,
                 'seller_name':  info['name'],
+                'sales_count':  info['sales_count'],
                 'pos_cash':     int(info['cash']),
                 'pos_transfer': int(info['transfer']),
                 'expenses_cash': int(seller_expenses_cash.get(sid, 0)),
                 'net_delivered': int(saved_map[sid]) if sid in saved_map and saved_map[sid] is not None else None,
             }
             for sid, info in seller_groups.items()
+            if sid is not None
         ], key=lambda x: x['seller_name'] or '')
 
         # Monto entregado del canal domicilios
@@ -487,6 +504,13 @@ class CashAuditViewSet(viewsets.ModelViewSet):
             'delivery_breakdown': delivery_breakdown,
             # Cuadre por vendedora
             'sellers_breakdown': sellers_breakdown,
+            'unassigned_pos': {
+                'sales_count': int(unassigned_info['sales_count']),
+                'cash': int(unassigned_info['cash']),
+                'transfer': int(unassigned_info['transfer']),
+                'total': int(unassigned_info['cash'] + unassigned_info['transfer']),
+                'expenses_cash': int(unassigned_expenses_cash),
+            },
             # Catálogo (liquidación solo POS)
             'catalog': catalog,
             # Estado de arqueos

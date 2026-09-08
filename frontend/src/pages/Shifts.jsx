@@ -102,6 +102,9 @@ function POSResumenModal({ shiftId, onClose }) {
 
   const sellers = p.sellers_breakdown || []
   const posSellerRows = sellers.filter(s => s.seller_id !== null)
+  const unassignedPOS = p.unassigned_pos || {}
+  const hasUnassignedPOS = Number(unassignedPOS.sales_count || 0) > 0
+    || Number(unassignedPOS.expenses_cash || 0) > 0
   const visibleCups = cups.filter(r =>
     (r.sales_qty || 0) > 0 ||
     (r.current_stock || 0) > 0 ||
@@ -174,6 +177,12 @@ function POSResumenModal({ shiftId, onClose }) {
     if (negativeExpected) {
       setActiveTab('liquidacion')
       toast.error('Hay vasos vendidos mayores que lo disponible; revisa las entradas')
+      return
+    }
+
+    if (hasUnassignedPOS) {
+      setActiveTab('sellers')
+      toast.error('Hay ventas o gastos POS sin responsable. Corrige antes de marcar POS')
       return
     }
 
@@ -262,6 +271,16 @@ function POSResumenModal({ shiftId, onClose }) {
                 <p className="text-lg font-bold text-blue-700">{fmt(p.net_expected_cash)}</p>
               </div>
             </div>
+
+            {hasUnassignedPOS && (
+              <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                <p className="font-semibold">Hay ventas o gastos POS sin responsable</p>
+                <p className="text-xs mt-1">
+                  {unassignedPOS.sales_count || 0} venta{unassignedPOS.sales_count !== 1 ? 's' : ''} por {fmt(unassignedPOS.total || 0)}
+                  {Number(unassignedPOS.expenses_cash || 0) > 0 && ` y ${fmt(unassignedPOS.expenses_cash)} en gastos efectivo`}.
+                </p>
+              </div>
+            )}
 
             {/* Card por vendedora (solo seller_id no nulo) */}
             {posSellerRows.length === 0 && (
