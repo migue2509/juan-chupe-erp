@@ -209,6 +209,31 @@ class CashAuditSaveTests(TestCase):
         self.assertEqual(row['entries'], 2)
         self.assertEqual(row['closing_stock'], 3)
 
+    def test_prefill_includes_pos_cash_expense_responsible_without_sales(self):
+        Expense.objects.create(
+            shift=self.shift,
+            registered_by=self.admin,
+            category='business',
+            origin='pos',
+            description='Hielo',
+            amount=Decimal('3000'),
+            from_daily_cash=True,
+            payment_method='cash',
+        )
+
+        response = self.client.get(f'/api/cash/prefill/?shift_id={self.shift.pk}')
+
+        self.assertEqual(response.status_code, 200, response.data)
+        seller = next(
+            item for item in response.data['sellers_breakdown']
+            if item['seller_id'] == self.admin.pk
+        )
+        self.assertEqual(seller['seller_name'], self.admin.full_name)
+        self.assertEqual(seller['pos_cash'], 0)
+        self.assertEqual(seller['pos_transfer'], 0)
+        self.assertEqual(seller['expenses_cash'], 3000)
+        self.assertIsNone(seller['net_delivered'])
+
     def test_patch_cash_audit_recalculates_difference(self):
         Expense.objects.create(
             shift=self.shift,
