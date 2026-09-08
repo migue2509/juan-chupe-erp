@@ -1,8 +1,19 @@
+from decimal import Decimal
+
+from django.db import transaction
 from rest_framework import serializers
 from .models import CashAudit, ShiftAuditItem
 
 
 class ShiftAuditItemSerializer(serializers.ModelSerializer):
+    product_id = serializers.IntegerField(required=False, allow_null=True, min_value=1)
+    unit_price = serializers.DecimalField(
+        max_digits=10, decimal_places=0, min_value=Decimal('0'),
+        required=False, default=Decimal('0')
+    )
+    opening_stock = serializers.IntegerField(min_value=0)
+    entries = serializers.IntegerField(min_value=0)
+    closing_stock = serializers.IntegerField(min_value=0)
     available = serializers.ReadOnlyField()
     sold      = serializers.ReadOnlyField()
 
@@ -33,9 +44,10 @@ class CashAuditSerializer(serializers.ModelSerializer):
         read_only_fields = ['id', 'created_at', 'audited_by', 'cash_difference']
         validators = []
 
+    @transaction.atomic
     def create(self, validated_data):
         items_data = validated_data.pop('items', [])
-        audit = CashAudit.objects.filter(
+        audit = CashAudit.objects.select_for_update().filter(
             shift=validated_data.get('shift'),
             channel=validated_data.get('channel', 'pos'),
         ).first()
@@ -49,6 +61,7 @@ class CashAuditSerializer(serializers.ModelSerializer):
         self._create_items(audit, items_data)
         return audit
 
+    @transaction.atomic
     def update(self, instance, validated_data):
         items_data = validated_data.pop('items', None)
         for attr, val in validated_data.items():

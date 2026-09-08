@@ -65,6 +65,46 @@ class CashAuditSaveTests(TestCase):
         self.assertEqual(audit.items.count(), 1)
         self.assertEqual(audit.items.first().closing_stock, 4)
 
+    def test_cash_audit_rejects_negative_inventory_counts(self):
+        payload = self._payload(actual_cash=10000, closing_stock=-1)
+
+        response = self.client.post('/api/cash/', payload, format='json')
+
+        self.assertEqual(response.status_code, 400, response.data)
+        self.assertEqual(CashAudit.objects.count(), 0)
+
+    def test_invalid_audit_update_keeps_existing_items(self):
+        audit = CashAudit.objects.create(
+            shift=self.shift,
+            channel='pos',
+            audited_by=self.admin,
+            expected_cash=Decimal('10000'),
+            expected_transfer=Decimal('0'),
+            actual_cash=Decimal('10000'),
+            actual_transfer=Decimal('0'),
+        )
+        ShiftAuditItem.objects.create(
+            audit=audit,
+            product_name='Vaso 12oz',
+            product_type='cup',
+            product_id=1,
+            unit_price=Decimal('7000'),
+            opening_stock=10,
+            entries=2,
+            closing_stock=6,
+        )
+        payload = self._payload(actual_cash=9000, closing_stock=4)
+        payload['items'][0]['entries'] = -5
+
+        response = self.client.post('/api/cash/', payload, format='json')
+
+        self.assertEqual(response.status_code, 400, response.data)
+        audit.refresh_from_db()
+        self.assertEqual(audit.items.count(), 1)
+        item = audit.items.first()
+        self.assertEqual(item.entries, 2)
+        self.assertEqual(item.closing_stock, 6)
+
     def test_post_cash_audit_compares_net_actual_against_gross_cash_less_expenses(self):
         Expense.objects.create(
             shift=self.shift,
