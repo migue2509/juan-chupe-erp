@@ -7,6 +7,7 @@ from apps.attendance.models import AttendanceRecord
 from apps.billing.models import Invoice
 from apps.cash.models import CashAudit
 from apps.deliveries.models import Delivery
+from apps.expenses.models import Expense
 from apps.sales.models import Sale
 from apps.shifts.models import Shift
 from apps.shifts.serializers import ShiftSerializer
@@ -52,6 +53,18 @@ class ShiftLifecycleTests(TestCase):
             address='Calle 1',
             status=status,
         )
+        return sale
+
+    def _create_pos_sale(self, shift, total=Decimal('100000')):
+        sale = Sale.objects.create(
+            shift=shift,
+            seller=self.admin,
+            seller_name=self.admin.full_name,
+            payment_method='cash',
+            cash_received=total,
+            total=total,
+        )
+        Invoice.objects.create(sale=sale, shift=shift)
         return sale
 
     def test_open_shift_does_not_create_duplicate_when_active_exists(self):
@@ -151,3 +164,48 @@ class ShiftLifecycleTests(TestCase):
         self.assertTrue(data['has_audit'])
         self.assertTrue(data['has_delivery_audit'])
         self.assertEqual(data['missing_audits'], [])
+
+    def test_shift_detail_net_cash_discounts_only_cash_expenses_from_daily_cash(self):
+        shift = Shift.objects.create(opened_by=self.admin)
+        self._create_pos_sale(shift)
+        Expense.objects.create(
+            shift=shift,
+            registered_by=self.admin,
+            category='business',
+            origin='pos',
+            description='Gasto efectivo',
+            amount=Decimal('15000'),
+            from_daily_cash=True,
+            payment_method='cash',
+        )
+        Expense.objects.create(
+            shift=shift,
+            registered_by=self.admin,
+            category='business',
+            origin='pos',
+            description='Gasto transferencia',
+            amount=Decimal('7000'),
+            from_daily_cash=True,
+            payment_method='transfer',
+        )
+        Expense.objects.create(
+            shift=shift,
+            registered_by=self.admin,
+            category='personal',
+            origin='pos',
+            description='Gasto no caja',
+            amount=Decimal('5000'),
+            from_daily_cash=False,
+            payment_method='cash',
+        )
+
+        response = self.client.get(f'/api/shifts/{shift.pk}/detail/')
+
+        self.assertEqual(response.status_code, 200, response.data)
+        summary = response.data['summary']
+        self.assertEqual(summary['total_cash'], 100000)
+        self.assertEqual(summary['total_expenses'], 27000)
+        self.assertEqual(summary['cash_expenses_from_daily'], 15000)
+        self.assertEqual(summary['transfer_expenses_from_daily'], 7000)
+        self.assertEqual(summary['net_cash'], 85000)
+        self.assertEqual(summary['net_transfer'], -7000)

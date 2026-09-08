@@ -101,7 +101,6 @@ class ShiftViewSet(viewsets.ReadOnlyModelViewSet):
         total_sales    = sum(s.paid_total for s in sales_qs)
         total_transfer = sum(s.transfer_paid for s in sales_qs)
         total_cash     = sum(s.cash_amount for s in sales_qs)
-        total_expenses = sum(e.amount for e in expenses_qs)
 
         # ── Desglose completo por canal (siempre, independiente del filtro) ──
         all_sales_qs = base_sales_qs.select_related('promotion')
@@ -131,6 +130,9 @@ class ShiftViewSet(viewsets.ReadOnlyModelViewSet):
         all_total       = pos_total + dom_total  # NO incluye plataformas
 
         expenses_list         = list(expenses_qs)
+        total_expenses        = sum(e.amount for e in expenses_list)
+        expenses_cash         = sum(e.amount for e in expenses_list if e.payment_method == 'cash' and e.from_daily_cash)
+        expenses_transfer     = sum(e.amount for e in expenses_list if e.payment_method == 'transfer' and e.from_daily_cash)
         expenses_pos          = sum(e.amount for e in expenses_list if e.origin == 'pos')
         expenses_dom          = sum(e.amount for e in expenses_list if e.origin == 'delivery')
         # Solo gastos que afectan caja (from_daily_cash=True) se descuentan del efectivo
@@ -208,7 +210,10 @@ class ShiftViewSet(viewsets.ReadOnlyModelViewSet):
                 'total_cash':     int(total_cash),
                 'total_transfer': int(total_transfer),
                 'total_expenses': int(total_expenses),
-                'net_cash':       int(total_cash - total_expenses),
+                'cash_expenses_from_daily':     int(expenses_cash),
+                'transfer_expenses_from_daily': int(expenses_transfer),
+                'net_cash':       int(total_cash - expenses_cash),
+                'net_transfer':   int(total_transfer - expenses_transfer),
                 'sales_count':    sales_qs.count(),
                 # desglose completo (independiente del filtro)
                 'all_total':      int(all_total),
