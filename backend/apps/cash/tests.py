@@ -118,6 +118,12 @@ class CashAuditSaveTests(TestCase):
             from_daily_cash=True,
             payment_method='cash',
         )
+        SellerCashDelivery.objects.create(
+            shift=self.shift,
+            seller_id=self.admin.pk,
+            seller_name=self.admin.full_name,
+            net_delivered=Decimal('8000'),
+        )
 
         response = self.client.post(
             '/api/cash/',
@@ -311,6 +317,54 @@ class CashAuditSaveTests(TestCase):
         audit = CashAudit.objects.get()
         self.assertEqual(audit.channel, 'delivery')
 
+    def test_pos_cash_audit_rejects_missing_seller_delivery(self):
+        sale = Sale.objects.create(
+            shift=self.shift,
+            seller=self.admin,
+            seller_name=self.admin.full_name,
+            payment_method='cash',
+            cash_received=Decimal('9000'),
+            total=Decimal('9000'),
+        )
+        Invoice.objects.create(sale=sale, shift=self.shift)
+
+        response = self.client.post(
+            '/api/cash/',
+            self._payload(actual_cash=9000, closing_stock=6),
+            format='json',
+        )
+
+        self.assertEqual(response.status_code, 400, response.data)
+        self.assertIn('entrego cada vendedora', str(response.data))
+        self.assertEqual(CashAudit.objects.count(), 0)
+
+    def test_pos_cash_audit_rejects_actual_cash_different_from_seller_deliveries(self):
+        sale = Sale.objects.create(
+            shift=self.shift,
+            seller=self.admin,
+            seller_name=self.admin.full_name,
+            payment_method='cash',
+            cash_received=Decimal('9000'),
+            total=Decimal('9000'),
+        )
+        Invoice.objects.create(sale=sale, shift=self.shift)
+        SellerCashDelivery.objects.create(
+            shift=self.shift,
+            seller_id=self.admin.pk,
+            seller_name=self.admin.full_name,
+            net_delivered=Decimal('8000'),
+        )
+
+        response = self.client.post(
+            '/api/cash/',
+            self._payload(actual_cash=9000, closing_stock=6),
+            format='json',
+        )
+
+        self.assertEqual(response.status_code, 400, response.data)
+        self.assertIn('debe coincidir', str(response.data))
+        self.assertEqual(CashAudit.objects.count(), 0)
+
     def test_patch_cash_audit_recalculates_difference(self):
         Expense.objects.create(
             shift=self.shift,
@@ -321,6 +375,12 @@ class CashAuditSaveTests(TestCase):
             amount=Decimal('2000'),
             from_daily_cash=True,
             payment_method='cash',
+        )
+        SellerCashDelivery.objects.create(
+            shift=self.shift,
+            seller_id=self.admin.pk,
+            seller_name=self.admin.full_name,
+            net_delivered=Decimal('9000'),
         )
         audit = CashAudit.objects.create(
             shift=self.shift,
