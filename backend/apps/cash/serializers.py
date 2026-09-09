@@ -2,6 +2,10 @@ from decimal import Decimal
 
 from django.db import transaction
 from rest_framework import serializers
+
+from apps.sales.models import Sale
+from apps.sales.selectors import active_sales
+
 from .models import CashAudit, ShiftAuditItem
 
 
@@ -44,6 +48,20 @@ class CashAuditSerializer(serializers.ModelSerializer):
         read_only_fields = ['id', 'created_at', 'audited_by', 'cash_difference']
         validators = []
 
+    def validate(self, attrs):
+        attrs = super().validate(attrs)
+        shift = attrs.get('shift') or getattr(self.instance, 'shift', None)
+        channel = attrs.get('channel') or getattr(self.instance, 'channel', 'pos')
+
+        if shift and channel == 'pos' and self._has_unassigned_pos_cash_entries(shift):
+            raise serializers.ValidationError({
+                'detail': (
+                    'No puedes marcar POS como entregado mientras existan '
+                    'ventas o gastos POS sin responsable.'
+                )
+            })
+        return attrs
+
     @transaction.atomic
     def create(self, validated_data):
         items_data = validated_data.pop('items', [])
@@ -75,3 +93,24 @@ class CashAuditSerializer(serializers.ModelSerializer):
     def _create_items(self, audit, items_data):
         for item in items_data:
             ShiftAuditItem.objects.create(audit=audit, **item)
+
+    def _has_unassigned_pos_cash_entries(self, shift):
+        has_unassigned_sales = active_sales(
+            Sale.objects.filter(
+                shift=shift,
+                is_delivery=False,
+                seller__isnull=True,
+            )
+        ).exclude(
+            promotion__category__in=['rappi', 'didi']
+        ).exists()
+
+        if has_unassigned_sales:
+            return True
+
+        return shift.expenses.filter(
+            from_daily_cash=True,
+            payment_method='cash',
+            origin='pos',
+            registered_by__isnull=True,
+        ).exists()

@@ -274,6 +274,43 @@ class CashAuditSaveTests(TestCase):
         self.assertEqual(response.data['unassigned_pos']['total'], 9000)
         self.assertEqual(response.data['unassigned_pos']['expenses_cash'], 2000)
 
+    def test_pos_cash_audit_rejects_unassigned_pos_sales(self):
+        sale = Sale.objects.create(
+            shift=self.shift,
+            payment_method='cash',
+            cash_received=Decimal('9000'),
+            total=Decimal('9000'),
+        )
+        Invoice.objects.create(sale=sale, shift=self.shift)
+
+        response = self.client.post(
+            '/api/cash/',
+            self._payload(actual_cash=9000, closing_stock=6),
+            format='json',
+        )
+
+        self.assertEqual(response.status_code, 400, response.data)
+        self.assertIn('sin responsable', str(response.data))
+        self.assertEqual(CashAudit.objects.count(), 0)
+
+    def test_delivery_cash_audit_allows_unassigned_pos_sales(self):
+        sale = Sale.objects.create(
+            shift=self.shift,
+            payment_method='cash',
+            cash_received=Decimal('9000'),
+            total=Decimal('9000'),
+        )
+        Invoice.objects.create(sale=sale, shift=self.shift)
+        payload = self._payload(actual_cash=0, closing_stock=6)
+        payload['channel'] = 'delivery'
+        payload['expected_cash'] = 0
+
+        response = self.client.post('/api/cash/', payload, format='json')
+
+        self.assertEqual(response.status_code, 201, response.data)
+        audit = CashAudit.objects.get()
+        self.assertEqual(audit.channel, 'delivery')
+
     def test_patch_cash_audit_recalculates_difference(self):
         Expense.objects.create(
             shift=self.shift,
