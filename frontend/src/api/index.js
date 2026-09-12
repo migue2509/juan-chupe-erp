@@ -2,8 +2,8 @@ import api from './client'
 
 // Shifts
 export const getActiveShift = () => api.get('/shifts/active/')
-export const openShift = () => api.post('/shifts/open/')
-export const closeShift = () => api.post('/shifts/close/')
+export const openShift = (config) => api.post('/shifts/open/', null, config)
+export const closeShift = (config) => api.post('/shifts/close/', null, config)
 export const getShifts = () => api.get('/shifts/')
 
 // Products

@@ -3,6 +3,7 @@ import { getActiveShift, getTodaySales, getInventoryAlerts, getTodayExpenses, op
 import { useAuth } from '../context/AuthContext'
 import { Icon } from '../components/Icons'
 import { isActiveSale, isPlatformSale, saleCashAmount, salePaidTotal, saleTransferAmount } from '../utils/sales'
+import { getApiErrorMessage, getShiftCloseErrorMessage } from '../utils/apiErrors'
 import toast from 'react-hot-toast'
 
 const fmt  = (n) => `$${Number(n).toLocaleString('es-CO')}`
@@ -55,11 +56,25 @@ export default function Dashboard() {
   }, [])
 
   const handleOpenShift = async () => {
-    try { await openShift(); toast.success('Jornada abierta'); load() } catch {}
+    try {
+      await openShift({ skipGlobalToast: true })
+      toast.success('Jornada abierta')
+      await load()
+    } catch (err) {
+      toast.error(getApiErrorMessage(err, 'No se pudo abrir la jornada'), { duration: 6000 })
+      await load()
+    }
   }
   const handleCloseShift = async () => {
     if (!confirm('¿Cerrar la jornada actual?')) return
-    try { await closeShift(); toast.success('Jornada cerrada'); load() } catch {}
+    try {
+      await closeShift({ skipGlobalToast: true })
+      toast.success('Jornada cerrada')
+      await load()
+    } catch (err) {
+      toast.error(getShiftCloseErrorMessage(err), { duration: 7000 })
+      await load()
+    }
   }
 
   // ── Filter sales by jornada activa + categoría ──

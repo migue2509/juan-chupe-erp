@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { getShifts, openShift, closeShift, getActiveShift, getShiftDetail, getCashAuditPrefill, createCashAudit, getCashAudit, saveSellerDeliveries, saveDeliveryAmount } from '../api'
 import { salePaidTotal, saleTransferAmount } from '../utils/sales'
+import { getApiErrorMessage, getShiftCloseErrorMessage } from '../utils/apiErrors'
 import toast from 'react-hot-toast'
 
 const AUDIT_SHORT_LABELS = { pos: 'POS', delivery: 'Dom.' }
@@ -2026,11 +2027,25 @@ export default function Shifts() {
   useEffect(() => { load() }, [])
 
   const handleOpen = async () => {
-    try { await openShift(); toast.success('Jornada abierta'); load() } catch {}
+    try {
+      await openShift({ skipGlobalToast: true })
+      toast.success('Jornada abierta')
+      await load()
+    } catch (err) {
+      toast.error(getApiErrorMessage(err, 'No se pudo abrir la jornada'), { duration: 6000 })
+      await load()
+    }
   }
   const handleClose = async () => {
     if (!confirm('¿Cerrar jornada actual?')) return
-    try { await closeShift(); toast.success('Jornada cerrada'); load() } catch {}
+    try {
+      await closeShift({ skipGlobalToast: true })
+      toast.success('Jornada cerrada')
+      await load()
+    } catch (err) {
+      toast.error(getShiftCloseErrorMessage(err), { duration: 7000 })
+      await load()
+    }
   }
 
   if (loading) return (

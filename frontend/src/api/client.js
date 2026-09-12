@@ -1,5 +1,6 @@
 import axios from 'axios'
 import toast from 'react-hot-toast'
+import { getApiErrorMessage } from '../utils/apiErrors'
 
 const api = axios.create({
   baseURL: '/api',
@@ -35,12 +36,9 @@ api.interceptors.response.use(
         window.location.href = '/login'
       }
     }
-    const d = error.response?.data
-    const msg = d?.detail
-      || (Array.isArray(d?.non_field_errors) ? d.non_field_errors[0] : null)
-      || (typeof d === 'string' ? d : null)
-      || 'Error del servidor'
-    toast.error(msg)
+    if (!error.config?.skipGlobalToast) {
+      toast.error(getApiErrorMessage(error))
+    }
     return Promise.reject(error)
   }
 )
