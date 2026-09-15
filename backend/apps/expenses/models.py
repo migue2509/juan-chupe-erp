@@ -1,4 +1,5 @@
 from django.db import models
+from django.core.validators import MinValueValidator
 from decimal import Decimal
 
 
@@ -26,7 +27,11 @@ class Expense(models.Model):
     origin = models.CharField(max_length=10, choices=ORIGIN_CHOICES, default='pos',
         help_text='¿Este gasto es del punto de venta o de domicilios?')
     description = models.CharField(max_length=200)
-    amount = models.DecimalField(max_digits=10, decimal_places=0)
+    amount = models.DecimalField(
+        max_digits=10,
+        decimal_places=0,
+        validators=[MinValueValidator(Decimal('0'))],
+    )
     from_daily_cash = models.BooleanField(
         default=True,
         help_text='¿Este gasto sale de la plata del negocio del día?'

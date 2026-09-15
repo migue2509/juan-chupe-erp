@@ -1,250 +1,223 @@
-# 🧊 Juan Chupe Granizados — ERP
+# Juan Chupe ERP
 
-Sistema de gestión completo para tiendas de granizados.  
-**Stack:** React + Vite + Tailwind · Django + DRF · PostgreSQL · VPS (Nginx + Gunicorn)
+Sistema web para digitalizar y administrar la operación diaria de Juan Chupe Granizados.
 
----
+El proyecto nació para reemplazar un proceso manual en papel por una herramienta centralizada para ventas, jornadas, inventario, caja, domicilios, facturación, reportes, asistencia y nómina.
 
-## Ejecución Local (tu PC)
+## Demo
+
+Estado: no disponible aún.
+
+Espacio reservado para demo del proyecto:
+
+- URL de la aplicación:
+- Video demo:
+- Capturas principales:
+
+## Descripción
+
+Juan Chupe ERP permite controlar la operación completa de una tienda de granizados desde una sola aplicación. El sistema organiza el flujo diario desde la apertura de jornada hasta el cierre de caja, conectando ventas, inventario, gastos, domicilios y reportes.
+
+El objetivo principal es reducir registros manuales, evitar inconsistencias operativas y mantener trazabilidad sobre el dinero, los productos vendidos y el stock disponible.
+
+## Funcionalidades Principales
+
+- Apertura y cierre de jornadas operativas.
+- Punto de venta para registrar ventas de granizados, toppings, promociones y cortesías.
+- Control automático de inventario por vasos, sabores y toppings.
+- Facturación automática por cada venta.
+- Anulación de facturas con devolución de inventario.
+- Gestión de domicilios, estados y domiciliarios.
+- Arqueo de caja por POS y domicilios.
+- Cuadre de dinero entregado por vendedora.
+- Registro de gastos y compras.
+- Reportes diarios, semanales, mensuales, por rango y por plataformas.
+- Mapa de domicilios y puntos de calor.
+- Gestión de usuarios, roles y permisos.
+- Control de asistencia y nómina básica.
+- Configuración de métodos de transferencia y QR de pago.
+
+## Módulos Del Sistema
+
+| Módulo | Descripción |
+| --- | --- |
+| Dashboard | Estado de jornada, ventas del día, gastos, alertas de stock y resumen operativo. |
+| POS | Registro de ventas, sabores, vasos, toppings, promociones, cortesías y pagos. |
+| Facturación | Consulta de facturas, filtros, detalle de venta y anulación administrativa. |
+| Domicilios | Seguimiento de pedidos, estados, domiciliarios y datos de entrega. |
+| Gastos | Registro de gastos por origen, categoría, medio de pago y afectación de caja. |
+| Jornadas | Apertura, cierre y detalle financiero de cada día operativo. |
+| Productos | Administración de sabores, tamaños de vaso, productos y toppings. |
+| Inventario | Stock de bolsas, vasos y toppings, entradas, ajustes y movimientos. |
+| Promociones | Promociones POS, Rappi y DiDi con cálculo proporcional y comisión. |
+| Arqueo | Validación de efectivo, transferencias, inventario vendido y entregas por vendedora. |
+| Reportes | Reportes financieros, comerciales, de inventario y de plataformas. |
+| Mapa | Visualización de domicilios con coordenadas y mapa de calor. |
+| Usuarios | Administración de usuarios, roles, contraseñas y estado de cuenta. |
+| Asistencia | Registro de entrada, salida, horas trabajadas y métricas por empleada. |
+| Nómina | Horarios laborales, tarifas por día, días trabajados y pagos. |
+| Configuración POS | Métodos de transferencia, cuentas y códigos QR de pago. |
+
+## Reglas De Negocio Relevantes
+
+- Solo puede existir una jornada activa a la vez.
+- Una venta solo puede registrarse si existe una jornada activa.
+- Cada venta genera una factura automáticamente.
+- Las facturas anuladas no cuentan para caja, reportes ni ventas activas.
+- Al anular una factura se devuelve el inventario consumido.
+- Los domicilios cancelados no cuentan como ventas activas.
+- El cierre de jornada requiere arqueo POS.
+- Si existen domicilios activos, el cierre requiere arqueo de domicilios.
+- El efectivo POS debe coincidir con la suma entregada por las vendedoras.
+- Los gastos pueden afectar o no afectar la caja diaria.
+- Los gastos se separan por origen: POS o domicilios.
+- Las ventas pueden ser en efectivo, transferencia o pago mixto.
+- Las cortesías registran el valor pagado y generan gasto por la parte no cobrada.
+- El consumo de sabores se calcula en mililitros y se divide entre los sabores seleccionados.
+- Los vasos, sabores y toppings se descuentan automáticamente al vender.
+- El topping automático solo se descuenta cuando todos los sabores del vaso pertenecen a la misma categoría vinculada.
+- Las promociones calculan precio unitario proporcional.
+- Las promociones de plataforma separan valor bruto, comisión y valor neto.
+- El cambio de precio de un vaso desactiva promociones activas vinculadas.
+
+## Stack Tecnológico
+
+**Frontend**
+
+- React 18
+- Vite
+- Tailwind CSS
+- React Router
+- Recharts
+
+**Backend**
+
+- Django 4.2
+- Django REST Framework
+- Simple JWT
+- Django Filter
+
+**Base de datos**
+
+- PostgreSQL
+
+**Infraestructura**
+
+- Gunicorn
+- Nginx
+- VPS Ubuntu
+
+## Arquitectura General
+
+El sistema está dividido en dos aplicaciones principales:
+
+- `frontend`: aplicación React encargada de la interfaz de usuario.
+- `backend`: API Django encargada de reglas de negocio, datos, autenticación y operaciones críticas.
+
+La API expone los módulos del sistema bajo `/api/` y el frontend consume esos endpoints desde una configuración centralizada.
+
+## Ejecución Local
 
 ### Requisitos
-- Python 3.11+
-- Node.js 18+
-- PostgreSQL 15+
 
-### 1. Backend
+- Python 3.11 o superior.
+- Node.js 18 o superior.
+- PostgreSQL 15 o superior.
+
+### Backend
 
 ```bash
 cd backend
-
-# Crear entorno virtual
 python -m venv venv
-venv\Scripts\activate          # Windows
-# source venv/bin/activate     # Mac/Linux
-
-# Instalar dependencias
+venv\Scripts\activate
 pip install -r requirements.txt
-
-# Configurar variables de entorno
 copy .env.example .env
-# Edita .env con tus datos de BD
-
-# Crear base de datos en PostgreSQL
-# En psql:
-#   CREATE USER juanchupe_user WITH PASSWORD 'tu_password';
-#   CREATE DATABASE juanchupe_db OWNER juanchupe_user;
-
-# Migraciones
 python manage.py migrate
-
-# Cargar datos iniciales (sabores, usuarios, vasos)
 python manage.py shell < ../scripts/seed_data.py
-
-# Iniciar servidor
 python manage.py runserver
-# Backend disponible en: http://localhost:8000
 ```
 
-### 2. Frontend
+Backend disponible en:
+
+```text
+http://localhost:8000
+```
+
+### Frontend
 
 ```bash
 cd frontend
-
-# Instalar dependencias
 npm install
-
-# Iniciar servidor de desarrollo
 npm run dev
-# Frontend disponible en: http://localhost:5173
 ```
 
-### 3. Acceder
+Frontend disponible en:
 
-Abrir `http://localhost:5173` en el navegador.
+```text
+http://localhost:5173
+```
 
-**Credenciales iniciales:**
-| Usuario | Contraseña | Rol |
-|---------|-----------|-----|
-| `juanchupe` | `admin123` | Administrador |
-| `mafe` | `vendedora123` | Vendedora |
-| `sofia` | `vendedora123` | Vendedora |
-| `catalina` | `vendedora123` | Vendedora |
+## Variables De Entorno
 
-> ⚠️ Cambia las contraseñas desde el panel de Usuarios antes de usar en producción.
+El backend utiliza variables de entorno para configurar la base de datos, seguridad, CORS y servicios externos.
 
----
+Archivo base:
 
-## Despliegue en VPS (Ubuntu 22.04)
+```text
+backend/.env.example
+```
 
-### Requisitos del servidor
-- VPS Ubuntu 22.04 (mínimo $10/mes en DigitalOcean o Hetzner)
-- Acceso SSH
+Variables principales:
 
-### 1. Conectar al servidor
+```text
+SECRET_KEY=
+DEBUG=
+ALLOWED_HOSTS=
+DB_NAME=
+DB_USER=
+DB_PASSWORD=
+DB_HOST=
+DB_PORT=
+CORS_ALLOWED_ORIGINS=
+```
+
+El frontend puede configurar la URL del backend con:
+
+```text
+VITE_API_URL=
+```
+
+Si no se define, el frontend usa `/api` para trabajar con el proxy local de Vite.
+
+## Comandos Útiles
+
+### Backend
 
 ```bash
-ssh root@TU_IP_DEL_VPS
-```
-
-### 2. Instalar dependencias del sistema
-
-```bash
-apt update && apt upgrade -y
-apt install -y python3 python3-pip python3-venv nodejs npm postgresql nginx git
-```
-
-### 3. Configurar PostgreSQL
-
-```bash
-sudo -u postgres psql
-```
-```sql
-CREATE USER juanchupe_user WITH PASSWORD 'tu_password_seguro';
-CREATE DATABASE juanchupe_db OWNER juanchupe_user;
-\q
-```
-
-### 4. Clonar el proyecto
-
-```bash
-mkdir -p /var/www
-cd /var/www
-git clone https://github.com/TU_USUARIO/juan-chupe-erp.git
-cd juan-chupe-erp
-```
-
-> Si no usas Git, sube los archivos con `scp -r ./juan-chupe-erp root@TU_IP:/var/www/`
-
-### 5. Configurar backend
-
-```bash
-cd /var/www/juan-chupe-erp/backend
-python3 -m venv /var/www/juan-chupe-erp/venv
-source /var/www/juan-chupe-erp/venv/bin/activate
-
-pip install -r requirements.txt
-
-cp .env.example .env
-nano .env
-# Editar: SECRET_KEY, DEBUG=False, ALLOWED_HOSTS=TU_IP, DB_PASSWORD
-```
-
-```bash
+python manage.py check
+python manage.py makemigrations
 python manage.py migrate
-python manage.py collectstatic --no-input
-python manage.py shell < ../scripts/seed_data.py
+python manage.py test
 ```
 
-### 6. Configurar Gunicorn
+### Frontend
 
 ```bash
-cp /var/www/juan-chupe-erp/infra/systemd/gunicorn.service /etc/systemd/system/
-systemctl daemon-reload
-systemctl enable gunicorn
-systemctl start gunicorn
-```
-
-### 7. Compilar frontend
-
-```bash
-cd /var/www/juan-chupe-erp/frontend
-npm install
+npm run dev
 npm run build
+npm run preview
 ```
 
-### 8. Configurar Nginx
+## Despliegue
 
-```bash
-cp /var/www/juan-chupe-erp/infra/nginx/default.conf /etc/nginx/sites-available/juanchupe
-ln -s /etc/nginx/sites-available/juanchupe /etc/nginx/sites-enabled/
-rm -f /etc/nginx/sites-enabled/default
-nginx -t
-systemctl reload nginx
-```
+El proyecto incluye archivos de infraestructura para despliegue en VPS con Gunicorn y Nginx.
 
-### 9. Acceder
+También puede adaptarse a un despliegue separado, con frontend en un servicio estático y backend en un servicio Python, configurando correctamente `VITE_API_URL`, `ALLOWED_HOSTS` y `CORS_ALLOWED_ORIGINS`.
 
-Abre `http://TU_IP` desde cualquier navegador (PC, celular, tablet).
+## Estado Del Proyecto
 
----
+El sistema cuenta con los módulos principales implementados y se encuentra en proceso de mejora continua, especialmente en validaciones de negocio, pruebas automatizadas, consistencia de caja, control de jornadas y preparación para despliegue.
 
-## Actualizaciones (desde tu PC)
+## Autoría
 
-Cada vez que hagas cambios:
-
-```bash
-# Opción 1: Con Git (recomendado)
-# En el servidor:
-cd /var/www/juan-chupe-erp
-bash infra/scripts/deploy.sh
-
-# Opción 2: Manual
-# Sube archivos con scp y ejecuta en el servidor:
-cd /var/www/juan-chupe-erp/backend
-source ../venv/bin/activate
-python manage.py migrate
-python manage.py collectstatic --no-input
-sudo systemctl restart gunicorn
-
-# Para cambios de frontend:
-cd /var/www/juan-chupe-erp/frontend
-npm run build
-sudo systemctl reload nginx
-```
-
----
-
-## Backup automático
-
-```bash
-# Agregar al cron del servidor:
-crontab -e
-# Agregar esta línea (backup cada día a las 2 AM):
-0 2 * * * /var/www/juan-chupe-erp/infra/scripts/backup.sh
-```
-
----
-
-## Módulos del sistema
-
-| Módulo | Descripción |
-|--------|-------------|
-| 🏠 Dashboard | Estado de jornada, ventas del día, alertas de stock |
-| 🧊 POS | Punto de venta táctil: sabores, tamaños, toppings, promociones |
-| 🧾 Facturación | Historial de facturas, reimpresión, anulación (solo admin) |
-| 🛵 Domicilios | Gestión de pedidos a domicilio y su estado |
-| 💸 Gastos | Registro de gastos con validación de origen |
-| 📅 Jornadas | Apertura y cierre manual del día operativo |
-| 🍧 Productos | Sabores, tamaños de vaso, toppings |
-| 📦 Inventario | Stock de bolsas (ml) y vasos, alertas de mínimos |
-| 🎉 Promociones | CRUD de promociones con liquidación proporcional |
-| 💰 Arqueo | Arqueo de caja al cierre: vasos, bolsas y efectivo |
-| 📊 Reportes | Diario, semanal y mensual con gráficas |
-| 👥 Usuarios | CRUD de usuarios y roles |
-| 🕐 Asistencia | Control de tiempo de vendedoras |
-
----
-
-## Reglas de negocio implementadas
-
-- **RN-001/002**: Cierre manual de jornada (cierre automático 2AM como fallback)
-- **RN-003**: Toppings afectan inventario pero no precio
-- **RN-004**: Liquidación proporcional de promociones (precio ÷ cantidad)
-- **RN-006**: Anulación de facturas solo por administrador
-- **RN-008/009**: Motor de consumo oz→ml con distribución proporcional entre sabores
-
----
-
-## Tecnologías
-
-```
-Frontend:  React 18 · Vite · Tailwind CSS · Recharts · React Router
-Backend:   Django 4.2 · DRF · Simple JWT · Django Filter
-Base datos: PostgreSQL 15
-Servidor:  Ubuntu 22.04 · Nginx · Gunicorn
-Email:     Resend (envío automático de reportes)
-```
-
----
-
-*Desarrollado por ARQEL TECH para Juan Chupe Granizados · 2026*
+Desarrollador: Miguel Ospina (OPIA SYSTEMS).

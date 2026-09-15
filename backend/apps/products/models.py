@@ -11,7 +11,7 @@ class Flavor(models.Model):
 
     name = models.CharField(max_length=100, unique=True)
     description = models.TextField(blank=True)
-    category = models.CharField(max_length=20, choices=CATEGORY_CHOICES, default='water')
+    category = models.CharField(max_length=20, choices=CATEGORY_CHOICES, default='creamy')
     color = models.CharField(max_length=7, default='#00E5FF', help_text='Color hex para UI')
     emoji = models.CharField(max_length=10, blank=True)
     licores = models.CharField(max_length=300, blank=True, default='', help_text='Licores separados por coma, ej: Ron, Aguardiente')

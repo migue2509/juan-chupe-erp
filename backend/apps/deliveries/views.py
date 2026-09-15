@@ -3,6 +3,7 @@ from rest_framework.decorators import action
 from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
 from django.db import transaction
+from django.utils import timezone
 from core.permissions import IsOperative, IsAdmin
 from apps.shifts.models import Shift
 from .models import Delivery, Domiciliario, HeatmapPoint
@@ -53,8 +54,15 @@ class DeliveryViewSet(viewsets.ModelViewSet):
 
     def perform_update(self, serializer):
         old_status = serializer.instance.status
+        new_status = serializer.validated_data.get('status', old_status)
+        if old_status == 'cancelled' and new_status != 'cancelled':
+            raise ValidationError({'status': 'Un domicilio cancelado no puede reactivarse.'})
+
         with transaction.atomic():
             instance = serializer.save()
+            if instance.status == 'delivered' and not instance.delivered_at:
+                instance.delivered_at = timezone.now()
+                instance.save(update_fields=['delivered_at'])
             if instance.status == 'cancelled' and old_status != 'cancelled':
                 self._void_invoice_and_reverse_inventory(instance, self.request.user)
 

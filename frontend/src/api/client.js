@@ -2,8 +2,27 @@ import axios from 'axios'
 import toast from 'react-hot-toast'
 import { getApiErrorMessage } from '../utils/apiErrors'
 
+const API_PREFIX = '/api'
+
+const normalizeApiBaseURL = (value) => {
+  const baseURL = value?.trim()
+  if (!baseURL) return API_PREFIX
+
+  const cleanedBaseURL = baseURL.replace(/\/+$/, '')
+  return cleanedBaseURL.endsWith(API_PREFIX)
+    ? cleanedBaseURL
+    : `${cleanedBaseURL}${API_PREFIX}`
+}
+
+const apiBaseURL = normalizeApiBaseURL(import.meta.env.VITE_API_URL)
+
 const api = axios.create({
-  baseURL: '/api',
+  baseURL: apiBaseURL,
+  headers: { 'Content-Type': 'application/json' },
+})
+
+const refreshClient = axios.create({
+  baseURL: apiBaseURL,
   headers: { 'Content-Type': 'application/json' },
 })
 
@@ -27,7 +46,7 @@ api.interceptors.response.use(
       original._retry = true
       try {
         const refresh = localStorage.getItem('refresh_token')
-        const { data } = await axios.post('/api/auth/refresh/', { refresh })
+        const { data } = await refreshClient.post('/auth/refresh/', { refresh })
         localStorage.setItem('access_token', data.access)
         original.headers.Authorization = `Bearer ${data.access}`
         return api(original)

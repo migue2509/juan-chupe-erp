@@ -1,11 +1,17 @@
 from django.db import models
+from django.core.validators import MinValueValidator
+from decimal import Decimal
 
 
 class Purchase(models.Model):
     shift = models.ForeignKey('shifts.Shift', on_delete=models.PROTECT, related_name='purchases')
     registered_by = models.ForeignKey('users.User', on_delete=models.SET_NULL, null=True)
     description = models.CharField(max_length=200)
-    amount = models.DecimalField(max_digits=10, decimal_places=0)
+    amount = models.DecimalField(
+        max_digits=10,
+        decimal_places=0,
+        validators=[MinValueValidator(Decimal('0'))],
+    )
     from_daily_cash = models.BooleanField(
         default=True,
         help_text='¿Este gasto sale de la plata del negocio del día?'

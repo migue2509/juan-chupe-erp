@@ -240,18 +240,18 @@ class SaleViewSet(viewsets.ReadOnlyModelViewSet):
 
             # Resolve FK
             seller = None
-            if data.get('seller_id'):
+            if data.get('seller_id') is not None:
                 try:
                     seller = User.objects.get(id=data['seller_id'])
                 except (User.DoesNotExist, ValueError, TypeError):
-                    pass
+                    raise ValidationError({'seller_id': 'Vendedor no encontrado.'})
 
             promotion = None
-            if data.get('promotion_id'):
+            if data.get('promotion_id') is not None:
                 try:
                     promotion = Promotion.objects.get(id=data['promotion_id'], is_active=True)
-                except Promotion.DoesNotExist:
-                    pass
+                except (Promotion.DoesNotExist, ValueError, TypeError):
+                    raise ValidationError({'promotion_id': 'Promocion no encontrada o inactiva.'})
 
             is_courtesy   = data.get('is_courtesy', False)
             courtesy_paid = Decimal(str(data.get('courtesy_paid', 0) or 0))
@@ -347,6 +347,11 @@ class SaleViewSet(viewsets.ReadOnlyModelViewSet):
     @action(detail=True, methods=['patch'], url_path='edit', permission_classes=[IsOperative])
     def edit_sale(self, request, pk=None):
         sale = self.get_object()
+        try:
+            if sale.invoice.voided:
+                raise ValidationError({'detail': 'No se puede editar una factura anulada.'})
+        except ObjectDoesNotExist:
+            pass
 
         with transaction.atomic():
             # ── Campos sin impacto en inventario ──
@@ -385,21 +390,24 @@ class SaleViewSet(viewsets.ReadOnlyModelViewSet):
 
             if 'seller_id' in request.data:
                 seller_id = request.data['seller_id']
-                if seller_id:
+                if seller_id not in (None, ''):
                     try:
-                        sale.seller = User.objects.get(id=seller_id)
+                        seller = User.objects.get(id=seller_id)
                     except (User.DoesNotExist, ValueError, TypeError):
-                        sale.seller = None
+                        raise ValidationError({'seller_id': 'Vendedor no encontrado.'})
+                    sale.seller = seller
+                    sale.seller_name = seller.full_name
                 else:
                     sale.seller = None
+                    sale.seller_name = ''
 
             if 'promotion_id' in request.data:
                 promo_id = request.data['promotion_id']
-                if promo_id:
+                if promo_id not in (None, ''):
                     try:
                         sale.promotion = Promotion.objects.get(id=promo_id, is_active=True)
                     except (Promotion.DoesNotExist, ValueError, TypeError):
-                        sale.promotion = None
+                        raise ValidationError({'promotion_id': 'Promocion no encontrada o inactiva.'})
                 else:
                     sale.promotion = None
 
