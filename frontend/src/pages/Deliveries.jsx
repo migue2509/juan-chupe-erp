@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { getDeliveries, updateDelivery, cancelDeliveryReq, getDomiciliarios, createDomiciliario, updateDomiciliario, getShifts, getExpenses } from '../api'
 import { Icon } from '../components/Icons'
 import { isActiveSale, saleCashAmount, salePaidTotal, saleTransferAmount } from '../utils/sales'
+import { confirmAction } from '../utils/confirmAction'
 import toast from 'react-hot-toast'
 
 const fmt     = n  => `$${Number(n).toLocaleString('es-CO')}`
@@ -83,7 +84,13 @@ export default function Deliveries() {
   }
 
   const cancelDelivery = async (d) => {
-    if (!confirm('¿Cancelar este domicilio? Se revertirá el inventario y se anulará la factura.')) return
+    const confirmed = await confirmAction({
+      title: 'Cancelar domicilio',
+      message: 'Se revertirá el inventario y se anulará la factura asociada.',
+      confirmText: 'Cancelar domicilio',
+      tone: 'danger',
+    })
+    if (!confirmed) return
     try {
       await cancelDeliveryReq(d.id)
       toast.success('Domicilio cancelado — inventario revertido')

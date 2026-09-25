@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { getExpenses, createExpense, updateExpense, deleteExpense, getShifts, getActiveShift } from '../api'
 import { Icon } from '../components/Icons'
 import { useAuth } from '../context/AuthContext'
+import { confirmAction } from '../utils/confirmAction'
 import toast from 'react-hot-toast'
 
 const fmt     = n  => `$${Number(n).toLocaleString('es-CO')}`
@@ -153,7 +154,13 @@ export default function Expenses() {
   }
 
   const handleDelete = async (e) => {
-    if (!confirm(`¿Eliminar "${e.description}"?`)) return
+    const confirmed = await confirmAction({
+      title: 'Eliminar gasto',
+      message: `Se eliminará "${e.description}".`,
+      confirmText: 'Eliminar gasto',
+      tone: 'danger',
+    })
+    if (!confirmed) return
     try {
       await deleteExpense(e.id)
       toast.success('Gasto eliminado')

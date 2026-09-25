@@ -1,500 +1,423 @@
-# Guía de Despliegue en la Nube — Juan Chupe ERP
-### Guía paso a paso para principiantes
+# Guia de despliegue - Juan Chupe ERP
 
----
+Fecha de referencia de costos: 2026-09-25.
 
-## ¿Qué es desplegar y por qué hacerlo?
+Esta guia explica como desplegar el frontend y el backend del sistema, que se debe pagar, como funciona el almacenamiento y que opcion conviene mas para este proyecto.
 
-Ahora el sistema solo funciona en tu computador. **Desplegar** significa subirlo a internet para que:
-- Los vendedores accedan desde su celular o cualquier PC
-- El sistema esté disponible 24/7 sin depender de tu computador
-- Múltiples personas puedan usarlo al mismo tiempo
+Los precios pueden cambiar, no incluyen impuestos y pueden variar segun pais, moneda, consumo real, banco y proveedor.
 
----
+Conversion usada como referencia:
 
-## La arquitectura: qué va dónde
+- 1 USD = COP 3.329,61 segun TRM vigente del 2026-09-25.
+- 1 EUR = COP 3.810 aproximadamente, tomado como referencia de mercado medio.
 
-Tu sistema tiene **dos partes separadas** que se suben a lugares distintos:
+Para presupuestar en Colombia conviene redondear hacia arriba, porque la tarjeta, el banco, impuestos o comisiones pueden cambiar el valor final.
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│                    INTERNET                                  │
-│                                                             │
-│   FRONTEND (React)          BACKEND (Django + Base datos)   │
-│   ┌─────────────────┐       ┌─────────────────────────────┐ │
-│   │  Vercel          │ ────▶ │  Railway / Render / VPS     │ │
-│   │  (GRATIS)        │       │  (~$5–10 / mes)             │ │
-│   │                  │       │                             │ │
-│   │  Lo que el       │       │  La lógica, los datos,      │ │
-│   │  usuario ve      │       │  las ventas, los usuarios   │ │
-│   └─────────────────┘       └─────────────────────────────┘ │
-└─────────────────────────────────────────────────────────────┘
-```
+## Resumen del sistema
 
-| Parte | ¿Qué es? | ¿Dónde va? | Costo |
-|-------|----------|-----------|-------|
-| **Frontend** | Las pantallas (React) | Vercel o Netlify | **Gratis** |
-| **Backend** | La API y la lógica (Django) | Railway, Render, o VPS | $5–10/mes |
-| **Base de datos** | PostgreSQL | Incluida en Railway/Render | Incluida |
+Juan Chupe ERP tiene dos partes principales:
 
----
+- **Frontend:** aplicacion React con Vite. Se compila como archivos estaticos en `frontend/dist`.
+- **Backend:** API Django con Django REST Framework, autenticacion JWT, PostgreSQL y archivos media en `backend/media`.
 
-## OPCIÓN A — La más fácil: Vercel + Railway
+En desarrollo local el frontend usa el proxy de Vite para comunicarse con `http://localhost:8000/api`. En produccion se debe configurar la variable `VITE_API_URL` para apuntar al backend real.
 
-> Recomendada si nunca has desplegado antes. Todo se hace desde el navegador.
+## Volumen esperado del negocio
 
----
+El negocio esta en Colombia y cobra en pesos colombianos. Segun el uso esperado:
 
-### PARTE 1: Subir el código a GitHub
+- dias de semana: 60 o mas ventas diarias;
+- fines de semana: alrededor de 150 facturas por fin de semana.
 
-> ⚠️ **Desde tu computador**, en la terminal (PowerShell o CMD), dentro de la carpeta del proyecto.
+Este volumen no exige una infraestructura grande al inicio, pero si exige tratar el sistema como produccion real. Lo importante no es solo soportar la cantidad de facturas, sino proteger ventas, jornadas, inventario, gastos, usuarios y cierres de caja.
 
-Primero necesitas el código en GitHub para que Vercel y Railway lo lean:
+## Recomendacion corta
 
-```powershell
-# Ir a la carpeta del proyecto
-cd "C:\Users\Miguel\OneDrive\Documentos\Juan chupe granizados\juan-chupe-erp"
+Para este proyecto recomendaria una de estas dos rutas:
 
-# Inicializar git si no lo has hecho
-git init
-git add .
-git commit -m "Initial commit"
-```
+1. **VPS todo en uno si quieres pagar menos y tener control:** frontend, backend, PostgreSQL y media en un servidor propio. Es la opcion mas economica a largo plazo, pero exige administrar Linux, Nginx, backups y seguridad.
+2. **Vercel + Railway si quieres facilidad:** frontend en Vercel y backend/PostgreSQL en Railway. Es mas simple de operar, pero cuesta mas y hay que controlar el uso.
 
-Luego:
-1. Ve a **https://github.com** → inicia sesión → **New repository**
-2. Nómbralo `juan-chupe-erp` → **Create repository**
-3. Copia los comandos que GitHub te muestra y pégalos en la terminal:
+Si el sistema va a manejar ventas reales del negocio, no usaria planes gratuitos para produccion.
 
-```powershell
-git remote add origin https://github.com/TU_USUARIO/juan-chupe-erp.git
-git branch -M main
-git push -u origin main
-```
+## Como funciona el almacenamiento
 
-✅ El código ya está en GitHub.
+### Frontend
 
----
-
-### PARTE 2: Desplegar el Backend en Railway
-
-> 🌐 **Desde el navegador**, en railway.app
-
-Railway es una plataforma que corre Django y PostgreSQL automáticamente.
-
-**Paso 1 — Crear cuenta**
-1. Ve a **https://railway.app**
-2. Haz clic en **Login with GitHub** (usa la misma cuenta de GitHub)
-
-**Paso 2 — Crear proyecto**
-1. Haz clic en **New Project**
-2. Selecciona **Deploy from GitHub repo**
-3. Busca y selecciona `juan-chupe-erp`
-4. Railway detectará que hay un backend en `/backend`
-
-**Paso 3 — Agregar PostgreSQL**
-1. En tu proyecto de Railway, haz clic en **+ New**
-2. Selecciona **Database → Add PostgreSQL**
-3. Railway crea la base de datos y la conecta automáticamente
-
-**Paso 4 — Configurar variables de entorno**
-
-Haz clic en tu servicio Django → pestaña **Variables** → agrega cada una:
-
-```
-SECRET_KEY        = (genera una en https://djecrety.ir/)
-DEBUG             = False
-ALLOWED_HOSTS     = tuproyecto.up.railway.app
-DB_NAME           = ${{Postgres.PGDATABASE}}
-DB_USER           = ${{Postgres.PGUSER}}
-DB_PASSWORD       = ${{Postgres.PGPASSWORD}}
-DB_HOST           = ${{Postgres.PGHOST}}
-DB_PORT           = ${{Postgres.PGPORT}}
-CORS_ALLOWED_ORIGINS = https://tu-app.vercel.app
-```
-
-> Las variables con `${{Postgres...}}` Railway las rellena solas — no las cambies.
-
-**Paso 5 — Configurar el comando de inicio**
-
-En tu servicio Django → **Settings** → **Start Command**:
-
-```
-cd backend && gunicorn config.wsgi:application --bind 0.0.0.0:$PORT
-```
-
-**Paso 6 — Ejecutar migraciones**
-
-En Railway → tu servicio → pestaña **Deploy** → **New Deployment** → cuando termine:
-
-Haz clic en los tres puntos `...` → **Run Command** → escribe:
-
-```
-cd backend && python manage.py migrate && python manage.py createsuperuser
-```
-
-Sigue las instrucciones para crear el usuario administrador.
-
-✅ El backend ya está en internet. Railway te da una URL como `https://juan-chupe-erp-production.up.railway.app`
-
----
-
-### PARTE 3: Desplegar el Frontend en Vercel
-
-> 🌐 **Desde el navegador**, en vercel.com
-
-**Paso 1 — Crear cuenta**
-1. Ve a **https://vercel.com**
-2. Haz clic en **Continue with GitHub**
-
-**Paso 2 — Importar proyecto**
-1. Haz clic en **Add New → Project**
-2. Busca `juan-chupe-erp` → **Import**
-3. En **Root Directory** escribe `frontend` (⚠️ importante)
-4. En **Framework Preset** selecciona **Vite**
-
-**Paso 3 — Configurar la URL del backend**
-
-En **Environment Variables** agrega:
-
-```
-VITE_API_URL = https://juan-chupe-erp-production.up.railway.app
-```
-
-> Reemplaza con la URL real que Railway te asignó.
-
-**Paso 4 — Desplegar**
-
-Haz clic en **Deploy**. Vercel compila React y en ~2 minutos te da una URL como:
-
-`https://juan-chupe-erp.vercel.app`
-
-✅ ¡El sistema ya está en internet con dominio gratis!
-
----
-
-### Dominios gratis que obtienes
-
-| Servicio | Dominio gratuito | Ejemplo |
-|----------|-----------------|---------|
-| Vercel | `*.vercel.app` | `juan-chupe.vercel.app` |
-| Netlify | `*.netlify.app` | `juan-chupe.netlify.app` |
-| Railway | `*.up.railway.app` | `juan-chupe-api.up.railway.app` |
-
-Si quieres un dominio propio (ej. `juanchupe.com`), cuesta ~$12/año en Namecheap o Google Domains y lo conectas en 5 minutos.
-
----
-
-## OPCIÓN B — VPS (más control, más barato a largo plazo)
-
-> Para cuando quieras todo en un solo servidor que controlas tú.  
-> Costo: desde €3.79/mes en Hetzner.  
-> Requiere más conocimiento técnico.
-
-### ¿Qué es un VPS?
-
-Es un computador en la nube que rentas por mes. Tú instalas todo lo que necesitas. Es como tener un PC virtual en internet funcionando 24/7.
-
-**Proveedores recomendados:**
-- **Hetzner** (https://hetzner.com) — Mejor precio para Colombia, servidores en Europa
-- **DigitalOcean** (https://digitalocean.com) — Muy fácil de usar, $6/mes
-- **AWS Lightsail** (https://aws.amazon.com/lightsail) — $3.50/mes, con Free Tier
-
----
-
-### Paso 1 — Crear el servidor
-
-En Hetzner (ejemplo):
-1. Crea cuenta en https://hetzner.com/cloud
-2. **New Project** → dale un nombre
-3. **Add Server**:
-   - **Location**: cualquiera (Falkenstein o Helsinki son los más baratos)
-   - **Image**: Ubuntu 22.04
-   - **Type**: CX11 (1 vCPU, 2 GB RAM) — €3.79/mes
-   - **SSH Key**: haz clic en "Add SSH Key" (explicado abajo)
-4. **Create & Buy Now**
-
-**Crear tu clave SSH** (desde PowerShell en tu computador):
-
-```powershell
-ssh-keygen -t ed25519 -C "juanchupe-deploy"
-# Presiona Enter 3 veces (sin contraseña está bien)
-
-# Ver la clave pública para copiarla a Hetzner:
-cat $env:USERPROFILE\.ssh\id_ed25519.pub
-```
-
-Copia todo el texto que aparece y pégalo en Hetzner al agregar la SSH Key.
-
----
-
-### Paso 2 — Conectarse al servidor
-
-> ⚠️ **Desde PowerShell en tu computador**
-
-```powershell
-ssh root@IP_DEL_SERVIDOR
-# Ejemplo: ssh root@65.21.143.22
-```
-
-Verás algo como `root@ubuntu-2gb-hel1-1:~#` — ya estás dentro del servidor.
-
----
-
-### Paso 3 — Instalar todo (dentro del servidor)
-
-> ⚠️ **Todos estos comandos se ejecutan EN EL SERVIDOR**, no en tu computador.
+El frontend no guarda datos del negocio. Cuando se ejecuta:
 
 ```bash
-# Actualizar el sistema
-apt update && apt upgrade -y
-
-# Instalar dependencias
-apt install -y python3.11 python3.11-venv python3-pip python3.11-dev \
-               postgresql postgresql-contrib nginx redis-server \
-               libpq-dev build-essential libjpeg-dev zlib1g-dev git curl
-
-# Instalar Node.js 20
-curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
-apt install -y nodejs
+npm run build
 ```
 
----
+Vite genera archivos HTML, CSS y JavaScript dentro de `frontend/dist`. Esos archivos se pueden servir desde Vercel, Netlify, Nginx o cualquier hosting de archivos estaticos.
 
-### Paso 4 — Configurar la base de datos (dentro del servidor)
+Si se borra el frontend compilado, se puede volver a generar desde el codigo fuente.
 
-```bash
-sudo -u postgres psql
+### Base de datos
+
+La base de datos PostgreSQL guarda la informacion critica:
+
+- usuarios;
+- productos;
+- inventario;
+- compras;
+- ventas;
+- jornadas;
+- gastos;
+- promociones;
+- clientes;
+- domicilios;
+- configuraciones del negocio.
+
+Esta es la parte que mas se debe proteger. Debe tener persistencia, backups y credenciales seguras.
+
+### Archivos media
+
+Actualmente Django guarda los archivos subidos en:
+
+```text
+backend/media
 ```
 
-Se abre una consola especial de PostgreSQL. Escribe esto (cambia el password):
+Segun el codigo actual, estos archivos se sirven con:
 
-```sql
-CREATE DATABASE juanchupe_db;
-CREATE USER juanchupe_user WITH PASSWORD 'ELIGE_UN_PASSWORD_SEGURO';
-GRANT ALL PRIVILEGES ON DATABASE juanchupe_db TO juanchupe_user;
-\c juanchupe_db
-GRANT ALL ON SCHEMA public TO juanchupe_user;
-\q
+```python
+MEDIA_URL = '/media/'
+MEDIA_ROOT = BASE_DIR / 'media'
 ```
 
----
+Esto funciona bien en local o en un VPS, siempre que el disco sea persistente y tenga backups.
 
-### Paso 5 — Descargar el proyecto (dentro del servidor)
+En plataformas tipo PaaS, los archivos locales pueden perderse si el contenedor se reinicia, se redepliega o no tiene volumen persistente. Para produccion estable, los media deberian ir a una de estas opciones:
 
-```bash
-mkdir -p /var/www/juan-chupe-erp
-cd /var/www/juan-chupe-erp
-git clone https://github.com/TU_USUARIO/juan-chupe-erp.git .
-```
+- disco persistente del servidor o volumen del proveedor;
+- almacenamiento de objetos como Cloudflare R2, DigitalOcean Spaces o S3 compatible.
 
----
+El proyecto todavia no tiene configurado almacenamiento de objetos en Django, asi que si se elige R2/S3/Spaces habria que desarrollar esa integracion.
 
-### Paso 6 — Configurar el backend (dentro del servidor)
+## Opcion A: VPS todo en uno
 
-```bash
-# Crear entorno virtual de Python
-python3.11 -m venv /var/www/juan-chupe-erp/venv
-source /var/www/juan-chupe-erp/venv/bin/activate
+Esta opcion usa un servidor Linux para ejecutar todo:
 
-# Instalar paquetes Python
-pip install -r /var/www/juan-chupe-erp/backend/requirements.txt
+- Nginx sirve el frontend compilado;
+- Gunicorn ejecuta Django;
+- PostgreSQL vive en el mismo servidor;
+- Nginx sirve `/static/` y `/media/`;
+- Certbot o el proveedor gestionan HTTPS;
+- backups programados protegen la base de datos y los archivos media.
 
-# Crear el archivo de configuración
-cp /var/www/juan-chupe-erp/backend/.env.example /var/www/juan-chupe-erp/backend/.env
-nano /var/www/juan-chupe-erp/backend/.env
-```
+El proyecto ya trae archivos que apuntan a este tipo de despliegue:
 
-Edita el archivo y rellena los valores:
+- `infra/nginx/default.conf`
+- `infra/systemd/gunicorn.service`
+
+### Costos aproximados
+
+Opciones de entrada:
+
+- Hetzner CX23 en Europa: desde aproximadamente **EUR 5.49/mes**, cerca de **COP 21.000/mes** antes de impuestos y comisiones.
+- DigitalOcean Basic Droplet de 2 GB: desde aproximadamente **USD 12/mes**, cerca de **COP 40.000/mes** antes de impuestos y comisiones.
+- DigitalOcean Basic Droplet de USD 6/mes: cerca de **COP 20.000/mes**, pero lo dejaria solo para pruebas o cargas muy pequenas.
+
+Costos adicionales recomendables:
+
+- backups del proveedor o snapshots;
+- dominio;
+- posible almacenamiento externo si los archivos media crecen.
+- margen para comisiones, impuestos y variacion de tasa de cambio.
+
+Para este negocio, presupuestaria una VPS entre **COP 25.000 y COP 60.000/mes** dependiendo del proveedor, backups y margen de conversion.
+
+### Ventajas
+
+- Costo mensual bajo y predecible.
+- Control completo del servidor.
+- Los archivos media pueden vivir en el disco del servidor.
+- La arquitectura coincide con los archivos `infra` que ya existen en el proyecto.
+
+### Desventajas
+
+- Hay que administrar el servidor.
+- Hay que configurar firewall, HTTPS, backups y actualizaciones.
+- Si el servidor falla y no hay backups, se puede perder informacion.
+
+### Pasos generales de despliegue
+
+1. Crear un VPS Ubuntu.
+2. Instalar Python, Node.js, PostgreSQL, Nginx y dependencias del sistema.
+3. Crear la base de datos PostgreSQL.
+4. Copiar el proyecto al servidor.
+5. Crear el archivo de variables de entorno del backend.
+6. Instalar dependencias del backend.
+7. Ejecutar migraciones y `collectstatic`.
+8. Compilar el frontend.
+9. Configurar Gunicorn con systemd.
+10. Configurar Nginx.
+11. Activar HTTPS.
+12. Configurar backups.
+
+### Variables del backend
+
+En produccion el backend debe usar un `.env` similar a este:
 
 ```env
-SECRET_KEY=pega-aqui-una-clave-larga-y-aleatoria
+SECRET_KEY=clave-secreta-larga-y-unica
 DEBUG=False
-ALLOWED_HOSTS=IP_DEL_SERVIDOR,tudominio.com
-
+ALLOWED_HOSTS=api.tudominio.com,tudominio.com,IP_DEL_SERVIDOR
 DB_NAME=juanchupe_db
 DB_USER=juanchupe_user
-DB_PASSWORD=EL_PASSWORD_QUE_ELEGISTE
-DB_HOST=127.0.0.1
+DB_PASSWORD=password_seguro
+DB_HOST=localhost
 DB_PORT=5432
-
-CORS_ALLOWED_ORIGINS=http://IP_DEL_SERVIDOR,https://tudominio.com
+CORS_ALLOWED_ORIGINS=https://tudominio.com,https://www.tudominio.com
 ```
 
-Guarda con `Ctrl+O`, `Enter`, `Ctrl+X`.
+No se debe reutilizar la `SECRET_KEY` de desarrollo.
+
+### Comandos base del backend
+
+Desde `backend`:
 
 ```bash
-cd /var/www/juan-chupe-erp/backend
-
-# Crear tablas en la base de datos
+python -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
 python manage.py migrate
-
-# Copiar archivos estáticos (CSS/JS del admin)
-python manage.py collectstatic --no-input
-
-# Crear usuario administrador
+python manage.py collectstatic --noinput
 python manage.py createsuperuser
 ```
 
----
+### Comandos base del frontend
 
-### Paso 7 — Compilar el frontend (dentro del servidor)
+Desde `frontend`:
 
 ```bash
-cd /var/www/juan-chupe-erp/frontend
 npm install
 npm run build
-# Los archivos quedan en /var/www/juan-chupe-erp/frontend/dist/
 ```
 
----
+Si el backend queda en `https://api.tudominio.com`, configurar:
 
-### Paso 8 — Configurar Gunicorn como servicio automático
-
-```bash
-# Copiar el archivo de servicio incluido en el proyecto
-cp /var/www/juan-chupe-erp/infra/systemd/gunicorn.service /etc/systemd/system/gunicorn.service
-
-# Activar e iniciar
-systemctl daemon-reload
-systemctl enable gunicorn
-systemctl start gunicorn
-
-# Verificar que esté corriendo
-systemctl status gunicorn
-# Debe decir "active (running)"
+```env
+VITE_API_URL=https://api.tudominio.com
 ```
 
----
+El cliente del frontend ya normaliza la URL y agrega `/api` cuando corresponde.
 
-### Paso 9 — Configurar Nginx
+## Opcion B: Vercel + Railway
 
-```bash
-# Copiar la configuración de Nginx incluida en el proyecto
-cp /var/www/juan-chupe-erp/infra/nginx/default.conf /etc/nginx/sites-available/juanchupe
+Esta opcion separa responsabilidades:
 
-# Editar y poner tu IP o dominio
-nano /etc/nginx/sites-available/juanchupe
-# Cambia: server_name _;
-# Por:    server_name IP_DEL_SERVIDOR;  (o tudominio.com si tienes dominio)
+- Vercel sirve el frontend.
+- Railway ejecuta Django.
+- Railway aloja PostgreSQL.
+- Los media se deben manejar con volumen persistente o almacenamiento externo.
 
-# Activar el sitio
-ln -s /etc/nginx/sites-available/juanchupe /etc/nginx/sites-enabled/
-rm -f /etc/nginx/sites-enabled/default
+### Costos aproximados
 
-# Verificar y aplicar
-nginx -t
-systemctl reload nginx
+Vercel:
+
+- Hobby: gratis, pensado para uso personal y no comercial.
+- Pro: aproximadamente **USD 20/mes**, cerca de **COP 67.000/mes** antes de impuestos y comisiones.
+
+Railway:
+
+- Free: USD 0/mes con credito muy limitado.
+- Hobby: **USD 5/mes**, cerca de **COP 17.000/mes**, incluye USD 5 de uso.
+- Pro: **USD 20/mes**, cerca de **COP 67.000/mes**.
+
+Railway cobra recursos por consumo. Como referencia:
+
+- RAM: aproximadamente USD 10 por GB/mes, cerca de COP 33.000.
+- CPU: aproximadamente USD 20 por vCPU/mes, cerca de COP 67.000.
+- egress de red: aproximadamente USD 0.05 por GB, cerca de COP 170.
+- volumen: aproximadamente USD 0.15 por GB/mes, cerca de COP 500.
+
+Para un negocio real, el punto de entrada razonable seria:
+
+- Vercel Pro: USD 20/mes, cerca de COP 67.000.
+- Railway Hobby: desde USD 5/mes mas consumo, cerca de COP 17.000 base.
+
+Total inicial estimado: desde **USD 25/mes mas consumo**, cerca de **COP 83.000/mes**, sin contar dominio, impuestos, comisiones ni almacenamiento externo.
+
+Para presupuestar con margen en Colombia, calcularia esta opcion entre **COP 90.000 y COP 150.000/mes** al inicio.
+
+### Ventajas
+
+- Menos administracion de servidor.
+- Despliegues mas simples.
+- HTTPS, builds y variables de entorno son mas faciles de manejar.
+- Buen camino si se quiere mover rapido.
+
+### Desventajas
+
+- Costo mensual mayor que un VPS pequeno.
+- Hay que vigilar el consumo.
+- Los archivos media requieren una decision clara de almacenamiento.
+- Si el proyecto crece, probablemente haya que subir de plan.
+
+### Backend en Railway
+
+Configuracion recomendada:
+
+1. Crear un proyecto en Railway.
+2. Crear un servicio PostgreSQL.
+3. Crear un servicio para el backend Django.
+4. Configurar el directorio raiz del backend si Railway lo requiere.
+5. Agregar variables de entorno.
+6. Ejecutar migraciones.
+7. Configurar dominio propio si aplica.
+
+Variables necesarias:
+
+```env
+SECRET_KEY=clave-secreta-larga-y-unica
+DEBUG=False
+ALLOWED_HOSTS=nombre-del-backend.up.railway.app,api.tudominio.com
+DB_NAME=...
+DB_USER=...
+DB_PASSWORD=...
+DB_HOST=...
+DB_PORT=5432
+CORS_ALLOWED_ORIGINS=https://frontend.vercel.app,https://tudominio.com
 ```
 
----
+Railway normalmente entrega las credenciales de PostgreSQL desde sus variables de entorno. Hay que mapearlas a los nombres que espera `backend/config/settings.py`.
 
-### Paso 10 — SSL gratuito con Let's Encrypt (solo si tienes dominio)
+### Frontend en Vercel
 
-```bash
-apt install -y certbot python3-certbot-nginx
+Configuracion recomendada:
 
-# Reemplaza con tu dominio real
-certbot --nginx -d tudominio.com -d www.tudominio.com
+- Framework: Vite.
+- Root directory: `frontend`.
+- Build command: `npm run build`.
+- Output directory: `dist`.
+
+Variable de entorno:
+
+```env
+VITE_API_URL=https://nombre-del-backend.up.railway.app
 ```
 
-Certbot configura HTTPS automáticamente. El certificado se renueva solo.
+Cuando se configure dominio propio, cambiarla por:
 
----
-
-### Paso 11 — Configurar firewall
-
-```bash
-ufw allow OpenSSH
-ufw allow 'Nginx Full'
-ufw enable
+```env
+VITE_API_URL=https://api.tudominio.com
 ```
 
-✅ El sistema ya está en línea en `http://IP_DEL_SERVIDOR`
+### Media en Railway
 
----
+Para archivos subidos por usuarios o generados por el sistema, no conviene depender de almacenamiento temporal.
 
-## Actualizaciones: cómo subir cambios nuevos
+Opciones:
 
-Cuando hagas cambios en el código y quieras actualizarlos en producción:
+1. Usar volumen persistente en Railway para `/media`.
+2. Implementar almacenamiento de objetos con Cloudflare R2, DigitalOcean Spaces o S3 compatible.
 
-**Desde tu computador:**
-```powershell
-git add .
-git commit -m "descripción del cambio"
-git push origin main
-```
+Si se usa volumen, hay que confirmar que `MEDIA_ROOT` apunte al path montado por Railway.
 
-**Luego:**
+Si se usa almacenamiento de objetos, hay que agregar soporte en Django con una libreria como `django-storages` y configurar credenciales.
 
-- **Si usas Vercel + Railway**: los cambios se despliegan automáticamente al hacer `git push` ✨
-- **Si usas VPS**: conéctate al servidor y ejecuta:
+## Opcion C: Render
 
-```bash
-ssh root@IP_DEL_SERVIDOR
-cd /var/www/juan-chupe-erp
-bash infra/scripts/deploy.sh
-```
+Render tambien puede servir para desplegar Django y PostgreSQL, pero no recomendaria su capa gratuita para produccion.
 
-El script hace todo: descarga el código nuevo, migra la BD, recompila el frontend y reinicia los servicios.
+Puntos importantes:
 
----
+- Los servicios web gratuitos pueden dormirse por inactividad.
+- El filesystem gratuito es efimero.
+- PostgreSQL gratuito tiene limites fuertes y no es una base confiable para operacion real.
 
-## Limpiar datos de prueba antes de salir en vivo
+Render puede funcionar en planes pagos, pero para este proyecto elegiria antes VPS o Vercel + Railway.
 
-Cuando el sistema esté en la nube y quieras borrar los datos de prueba:
+## Almacenamiento externo recomendado
 
-**En Railway/Render:** desde el panel → tu servicio → **Run Command**:
-```
-cd backend && python manage.py reset_operational_data --confirmar
-```
+Si los archivos media empiezan a crecer o se quiere separar el backend del almacenamiento, las dos opciones mas claras son:
 
-**En VPS:** conectado al servidor:
-```bash
-cd /var/www/juan-chupe-erp/backend
-source ../venv/bin/activate
-python manage.py reset_operational_data --confirmar
-```
+### Cloudflare R2
 
----
+- Tiene capa gratuita para bajo uso.
+- El almacenamiento estandar ronda USD 0.015 por GB/mes, cerca de COP 50 por GB/mes.
+- No cobra egress hacia internet.
+- Es buena opcion para imagenes, comprobantes, archivos subidos y media del sistema.
 
-## Comparativa de opciones
+### DigitalOcean Spaces
 
-| | Vercel + Railway | VPS Hetzner |
-|--|--|--|
-| **Dificultad** | ⭐ Fácil | ⭐⭐⭐ Técnico |
-| **Costo mensual** | $5–10 | €3.79 |
-| **Dominio gratis** | ✅ Sí (vercel.app) | ❌ Solo IP |
-| **Deploys automáticos** | ✅ Sí (git push) | ❌ Manual |
-| **Control total** | ❌ Limitado | ✅ Total |
-| **Copias de seguridad BD** | ✅ Automáticas | ❌ Manual |
-| **Escalar si crece** | ✅ Fácil | ⭐⭐ Posible |
+- Costo base aproximado de USD 5/mes, cerca de COP 17.000/mes.
+- Incluye una cantidad amplia de almacenamiento y transferencia.
+- Es simple si tambien se usa DigitalOcean para el servidor.
 
-**Recomendación:** empieza con **Vercel + Railway** para salir rápido. Si el negocio crece o quieres reducir costos, migra al VPS.
+Para este proyecto, si se usa VPS y el volumen de archivos es pequeno, empezaria con disco local mas backups. Si despues los media crecen o se busca mas robustez, migraria a Cloudflare R2.
 
----
+## Comparacion rapida
 
-## Preguntas frecuentes
+| Opcion | Costo inicial aproximado | Dificultad | Recomendacion |
+| --- | ---: | --- | --- |
+| VPS Hetzner todo en uno | EUR 5.49/mes, cerca de COP 21.000/mes | Media | Mejor costo y control |
+| VPS DigitalOcean 2 GB | USD 12/mes, cerca de COP 40.000/mes | Media | Mas simple que Hetzner, mas caro |
+| Vercel + Railway | Desde USD 25/mes, cerca de COP 83.000/mes mas consumo | Baja | Mejor facilidad |
+| Render free | USD 0/mes | Baja | No recomendado para produccion |
+| Render pago | Variable | Baja/media | Alternativa valida, no primera opcion |
 
-**¿Necesito dominio propio?**
-No. Tanto Vercel como Railway te dan dominios gratuitos (`*.vercel.app`, `*.railway.app`) que funcionan perfectamente. Si quieres un dominio como `juanchupe.com`, cuesta ~$12/año.
+## Cual recomendaria pagar
 
-**¿Qué pasa si se va la luz en el servidor?**
-En Vercel y Railway los servidores son de ellos — no les afecta tu luz. En un VPS, el servidor sigue corriendo independientemente.
+Para Juan Chupe ERP recomendaria pagar **un VPS pequeno con backups activados** si el objetivo es reducir costos y tener una operacion estable.
 
-**¿Se pierden los datos si el servidor se reinicia?**
-No. Los datos están en PostgreSQL que persiste en disco. Un reinicio del servicio no borra nada.
+Motivo:
 
-**¿Cómo hago copia de seguridad de los datos?**
-En Railway: automático (Railway hace backups diarios en el plan pagado).
-En VPS: ejecuta periódicamente:
-```bash
-pg_dump -U juanchupe_user juanchupe_db > backup_$(date +%Y%m%d).sql
-```
+- el sistema necesita base de datos persistente;
+- las ventas, jornadas e inventario no deben depender de planes gratuitos;
+- el proyecto ya tiene configuracion para Nginx y Gunicorn;
+- el costo mensual es bajo;
+- los archivos media pueden vivir inicialmente en el mismo servidor;
+- se puede crecer despues a almacenamiento externo.
 
-**¿Puedo probarlo gratis antes de pagar?**
-Sí. Railway tiene un plan gratuito con $5 de crédito mensual que es suficiente para pruebas. Vercel es siempre gratis para proyectos pequeños.
+Con el volumen actual de 60 o mas ventas diarias y picos de fin de semana, mi recomendacion concreta seria:
 
----
+1. **Hetzner CX23 + backups** si se quiere el menor costo mensual. Presupuesto base: cerca de **COP 25.000 a COP 45.000/mes** con margen.
+2. **DigitalOcean 2 GB + backups** si se quiere una experiencia mas amigable aunque cueste mas. Presupuesto base: cerca de **COP 45.000 a COP 70.000/mes** con margen.
 
-*Última actualización: julio 2026*
+Si prefieres facilidad sobre costo, pagaria:
+
+- **Vercel Pro** para el frontend, porque el proyecto es comercial;
+- **Railway Hobby o Pro** para backend y PostgreSQL;
+- **Cloudflare R2** si los archivos media se vuelven importantes.
+
+En ese caso presupuestaria desde **COP 90.000 a COP 150.000/mes** al inicio.
+
+## Checklist antes de produccion
+
+Antes de poner el sistema en uso real, revisaria estos puntos:
+
+- `DEBUG=False`.
+- `SECRET_KEY` nueva y segura.
+- `ALLOWED_HOSTS` con dominios reales.
+- `CORS_ALLOWED_ORIGINS` solo con dominios del frontend.
+- HTTPS activo.
+- Backups automaticos de PostgreSQL.
+- Backup de `backend/media`.
+- Logs del backend configurados.
+- Usuario administrador creado.
+- Migraciones ejecutadas.
+- `collectstatic` ejecutado.
+- Variables de correo configuradas si se usaran notificaciones.
+- Revisar configuracion segura de cookies y HTTPS en Django.
+- Probar login, ventas, cierre de jornada, inventario, compras, gastos y reportes en el entorno desplegado.
+
+## Fuentes consultadas
+
+- Vercel Plans: https://vercel.com/docs/plans
+- Vercel Pro Plan: https://vercel.com/docs/plans/pro-plan
+- Vercel Hobby Plan: https://vercel.com/docs/plans/hobby
+- Railway Pricing: https://docs.railway.com/pricing/plans
+- Railway Storage Buckets Billing: https://docs.railway.com/storage-buckets/billing
+- Render Free Plans: https://render.com/docs/free
+- Render Pricing: https://render.com/pricing
+- Hetzner price adjustment: https://docs.hetzner.com/general/infrastructure-and-availability/price-adjustment/
+- DigitalOcean Droplets: https://www.digitalocean.com/products/droplets
+- DigitalOcean Spaces pricing: https://www.digitalocean.com/pricing/spaces-object-storage
+- Cloudflare R2 pricing: https://developers.cloudflare.com/r2/pricing/
+- TRM Superfinanciera: https://www.superfinanciera.gov.co/publicaciones/10115773/market-representative-exchange-rate-trm/
+- API publica Dolar en Colombia: https://dolarencolombia.co/api-publica
+- Wise EUR/COP: https://wise.com/us/currency-converter/eur-to-cop-rate

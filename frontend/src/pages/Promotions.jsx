@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { getPromotions, createPromotion, updatePromotion, togglePromotion, deletePromotion, setPromotionItems, getCupSizes } from '../api'
+import { confirmAction } from '../utils/confirmAction'
 import toast from 'react-hot-toast'
 
 const fmt = n => `$${Number(n).toLocaleString('es-CO')}`
@@ -135,7 +136,13 @@ export default function Promotions() {
   }
 
   const handleDelete = async (p) => {
-    if (!window.confirm(`¿Eliminar la promoción "${p.name}"? Esta acción no se puede deshacer.`)) return
+    const confirmed = await confirmAction({
+      title: 'Eliminar promoción',
+      message: `Se eliminará la promoción "${p.name}". Esta acción no se puede deshacer.`,
+      confirmText: 'Eliminar promoción',
+      tone: 'danger',
+    })
+    if (!confirmed) return
     try {
       await deletePromotion(p.id)
       toast.success('Promoción eliminada')

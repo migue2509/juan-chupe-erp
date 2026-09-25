@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { getShifts, openShift, closeShift, getActiveShift, getShiftDetail, getCashAuditPrefill, createCashAudit, getCashAudit, saveSellerDeliveries, saveDeliveryAmount } from '../api'
 import { salePaidTotal, saleTransferAmount } from '../utils/sales'
 import { getApiErrorMessage, getShiftCloseErrorMessage } from '../utils/apiErrors'
+import { confirmAction } from '../utils/confirmAction'
 import toast from 'react-hot-toast'
 
 const AUDIT_SHORT_LABELS = { pos: 'POS', delivery: 'Dom.' }
@@ -2037,7 +2038,13 @@ export default function Shifts() {
     }
   }
   const handleClose = async () => {
-    if (!confirm('¿Cerrar jornada actual?')) return
+    const confirmed = await confirmAction({
+      title: 'Cerrar jornada',
+      message: 'Se cerrará la jornada actual y se guardará el cierre con los datos registrados.',
+      confirmText: 'Cerrar jornada',
+      tone: 'warning',
+    })
+    if (!confirmed) return
     try {
       await closeShift({ skipGlobalToast: true })
       toast.success('Jornada cerrada')

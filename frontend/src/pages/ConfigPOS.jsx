@@ -6,6 +6,7 @@ import {
   updateTransferMethod,
   deleteTransferMethod,
 } from '../api/index'
+import { confirmAction } from '../utils/confirmAction'
 import toast from 'react-hot-toast'
 
 const PROVIDERS = [
@@ -239,7 +240,13 @@ export default function ConfigPOS() {
   useEffect(() => { load() }, [])
 
   const handleDelete = async (m) => {
-    if (!window.confirm(`¿Eliminar "${m.display_name}"?`)) return
+    const confirmed = await confirmAction({
+      title: 'Eliminar método',
+      message: `Se eliminará "${m.display_name}".`,
+      confirmText: 'Eliminar método',
+      tone: 'danger',
+    })
+    if (!confirmed) return
     try {
       await deleteTransferMethod(m.id)
       toast.success('Eliminado')

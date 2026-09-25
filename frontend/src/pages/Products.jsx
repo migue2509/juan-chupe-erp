@@ -8,6 +8,7 @@ import {
   updateBag,
 } from '../api'
 import { Icon } from '../components/Icons'
+import { confirmAction } from '../utils/confirmAction'
 import toast from 'react-hot-toast'
 
 const FLAVOR_CATS = [
@@ -166,7 +167,12 @@ export default function Products() {
   const filteredFlavors  = q ? flavors.filter(f  => f.name.toLowerCase().includes(q))  : flavors
   const filteredCups     = q ? cups.filter(c    => c.size.toLowerCase().includes(q))    : cups
   const filteredToppings = q ? toppings.filter(t => t.name.toLowerCase().includes(q))   : toppings
-  const confirmDelete = (name) => confirm(`¿Eliminar "${name}"? Esta acción no se puede deshacer.`)
+  const confirmDelete = (name) => confirmAction({
+    title: 'Eliminar producto',
+    message: `Se eliminará "${name}". Esta acción no se puede deshacer.`,
+    confirmText: 'Eliminar',
+    tone: 'danger',
+  })
 
   // ── FLAVORS ──
   const handleFlavorCreate = async (e) => {
@@ -190,7 +196,7 @@ export default function Products() {
     setSaving(false)
   }
   const handleFlavorDelete = async (f) => {
-    if (!confirmDelete(f.name)) return
+    if (!(await confirmDelete(f.name))) return
     try { await deleteFlavor(f.id); toast.success(`"${f.name}" eliminado`); load() }
     catch { toast.error('No se puede eliminar si tiene stock o ventas asociadas') }
   }
@@ -218,7 +224,7 @@ export default function Products() {
     setSaving(false)
   }
   const handleCupDelete = async (c) => {
-    if (!confirmDelete(c.size)) return
+    if (!(await confirmDelete(c.size))) return
     try { await deleteCupSize(c.id); toast.success(`"${c.size}" eliminado`); load() }
     catch { toast.error('No se puede eliminar si tiene ventas asociadas') }
   }
@@ -251,7 +257,7 @@ export default function Products() {
     setSaving(false)
   }
   const handleToppingDelete = async (t) => {
-    if (!confirmDelete(t.name)) return
+    if (!(await confirmDelete(t.name))) return
     try { await deleteTopping(t.id); toast.success(`"${t.name}" eliminado`); load() }
     catch { toast.error('No se puede eliminar si está en uso') }
   }

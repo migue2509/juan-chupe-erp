@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext'
 import { Icon } from '../components/Icons'
 import { isActiveSale, isPlatformSale, saleCashAmount, salePaidTotal, saleTransferAmount } from '../utils/sales'
 import { getApiErrorMessage, getShiftCloseErrorMessage } from '../utils/apiErrors'
+import { confirmAction } from '../utils/confirmAction'
 import toast from 'react-hot-toast'
 
 const fmt  = (n) => `$${Number(n).toLocaleString('es-CO')}`
@@ -66,7 +67,13 @@ export default function Dashboard() {
     }
   }
   const handleCloseShift = async () => {
-    if (!confirm('¿Cerrar la jornada actual?')) return
+    const confirmed = await confirmAction({
+      title: 'Cerrar jornada',
+      message: 'Se cerrará la jornada actual y se guardará el cierre con los datos registrados.',
+      confirmText: 'Cerrar jornada',
+      tone: 'warning',
+    })
+    if (!confirmed) return
     try {
       await closeShift({ skipGlobalToast: true })
       toast.success('Jornada cerrada')
