@@ -27,7 +27,8 @@ class InvoiceViewSet(viewsets.ReadOnlyModelViewSet):
         invoice_id = self.get_object().pk
         try:
             with transaction.atomic():
-                invoice = self.get_queryset().select_for_update().get(pk=invoice_id)
+                # Nullable joined relations cannot be locked by PostgreSQL.
+                invoice = self.get_queryset().select_for_update(of=('self',)).get(pk=invoice_id)
                 if invoice.voided:
                     return Response({'detail': 'La factura ya está anulada.'}, status=status.HTTP_400_BAD_REQUEST)
                 invoice.void_and_restore_inventory(

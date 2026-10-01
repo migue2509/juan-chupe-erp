@@ -96,6 +96,24 @@ class InvoiceInventoryRestoreTests(TestCase):
         self.assertEqual(self.cup_stock.quantity, 5)
         self.assertEqual(self.bag.stock_ml, Decimal('1360.00'))
 
+    def test_void_invoice_does_not_restore_inventory_twice(self):
+        _, invoice, _ = self._sale_with_invoice()
+        url = f'/api/billing/{invoice.pk}/void/'
+
+        first = self.client.post(url, {'reason': 'Prueba'}, format='json')
+        second = self.client.post(url, {'reason': 'Prueba'}, format='json')
+
+        self.assertEqual(first.status_code, 200, first.data)
+        self.assertEqual(second.status_code, 400, second.data)
+        self.cup_stock.refresh_from_db()
+        self.bag.refresh_from_db()
+        self.assertEqual(self.cup_stock.quantity, 5)
+        self.assertEqual(self.bag.stock_ml, Decimal('1360.00'))
+        self.assertEqual(
+            StockMovement.objects.filter(cup_stock=self.cup_stock, movement_type='adjustment').count(),
+            1,
+        )
+
     def test_cancel_delivery_does_not_restore_inventory_twice(self):
         _, invoice, delivery = self._sale_with_invoice(is_delivery=True)
         url = f'/api/deliveries/{delivery.pk}/cancel/'

@@ -115,7 +115,8 @@ class DeliveryViewSet(viewsets.ModelViewSet):
     def cancel(self, request, pk=None):
         delivery_id = self.get_object().pk
         with transaction.atomic():
-            delivery = self.get_queryset().select_for_update().get(pk=delivery_id)
+            # Lock the delivery, not its nullable joined relations.
+            delivery = self.get_queryset().select_for_update(of=('self',)).get(pk=delivery_id)
             if delivery.status != 'cancelled':
                 delivery.status = 'cancelled'
                 delivery.save(update_fields=['status'])

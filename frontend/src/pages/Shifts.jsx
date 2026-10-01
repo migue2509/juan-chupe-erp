@@ -319,7 +319,7 @@ function POSResumenModal({ shiftId, onClose }) {
 
                   <div className="p-5 space-y-4">
                     {/* Stats */}
-                    <div className="grid grid-cols-4 gap-3">
+                    <div className="grid grid-cols-3 gap-3">
                       <div className="text-center">
                         <p className="text-[10px] text-gray-400 uppercase tracking-wide mb-1">Total vendido</p>
                         <p className="text-base font-bold text-gray-800">{fmt(totalVenta)}</p>
@@ -327,10 +327,6 @@ function POSResumenModal({ shiftId, onClose }) {
                       <div className="text-center">
                         <p className="text-[10px] text-gray-400 uppercase tracking-wide mb-1">Transferencias</p>
                         <p className="text-base font-bold text-cyan-600">{s.pos_transfer > 0 ? fmt(s.pos_transfer) : <span className="text-gray-300">—</span>}</p>
-                      </div>
-                      <div className="text-center">
-                        <p className="text-[10px] text-gray-400 uppercase tracking-wide mb-1">Efectivo recibido</p>
-                        <p className="text-base font-bold text-gray-700">{fmt(s.pos_cash)}</p>
                       </div>
                       <div className="text-center">
                         <p className="text-[10px] text-gray-400 uppercase tracking-wide mb-1">Gastos registrados</p>
