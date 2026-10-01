@@ -813,7 +813,7 @@ export default function POS() {
                   <button onClick={() => setShowMapPicker(true)}
                     className="w-full flex items-center justify-center gap-2 bg-white border-2 border-dashed border-cyan-300 rounded-xl py-2.5 text-sm text-cyan-600 hover:bg-cyan-50 hover:border-cyan-400 transition-all">
                     <Icon name="pin" className="w-4 h-4" />
-                    Seleccionar en mapa
+                    Buscar dirección
                   </button>
                 )}
               </div>

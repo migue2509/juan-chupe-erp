@@ -5,82 +5,27 @@ const MED_LAT      = 6.2442
 const MED_LNG      = -75.5812
 const DEFAULT_ZOOM = 14
 
-// ── Normalización de direcciones colombianas ──────────────────────────────────
-// "Calle 92 #66-65" → "Calle 92 66-65"  (los motores no entienden el #)
-function normalizeAddr(q) {
-  return q.replace(/#/g, ' ').replace(/\s+/g, ' ').trim()
+async function searchAddress(query, signal) {
+  const params = new URLSearchParams({ q: query.trim(), lat: String(MED_LAT), lon: String(MED_LNG), limit: '6', countrycode: 'CO' })
+  const response = await fetch(`https://photon.komoot.io/api/?${params}`, { signal })
+  if (!response.ok) throw new Error('search_unavailable')
+  const data = await response.json()
+  if (!Array.isArray(data.features)) throw new Error('invalid_response')
+  return data.features.flatMap(feature => {
+    const p = feature?.properties || {}
+    const coordinates = feature?.geometry?.coordinates
+    if (!Array.isArray(coordinates)) return []
+    const [lng, lat] = coordinates
+    if (!Number.isFinite(lat) || !Number.isFinite(lng) || Math.abs(lat) > 90 || Math.abs(lng) > 180) return []
+    if (String(p.countrycode || '').toUpperCase() !== 'CO') return []
+    const parts = [p.name, p.street !== p.name ? p.street : null,
+      typeof p.housenumber === 'string' ? `# ${p.housenumber}` : null,
+      p.locality || p.suburb || p.district, p.city || p.town || p.village, p.state]
+      .filter(value => typeof value === 'string' && value.trim())
+    return [{ lat, lng, display_name: [...new Set(parts)].join(', ') || query, approximate: !p.housenumber }]
+  })
 }
 
-// ── Photon (OSM + location bias hacia Medellín) ───────────────────────────────
-async function searchPhoton(query) {
-  const url = `https://photon.komoot.io/api/?q=${encodeURIComponent(query)}&lat=${MED_LAT}&lon=${MED_LNG}&limit=6&lang=es`
-  try {
-    const res  = await fetch(url)
-    if (!res.ok) return []
-    const data = await res.json()
-    return (data.features || [])
-      .filter(f => /colombia/i.test(f.properties?.country || '') || !f.properties?.country)
-      .map(f => {
-        const p     = f.properties || {}
-        const parts = [
-          p.name,
-          p.housenumber ? `#${p.housenumber}` : null,
-          p.street && p.street !== p.name ? p.street : null,
-          p.suburb || p.neighbourhood || p.district,
-          p.city || p.town || p.village,
-        ].filter(Boolean)
-        return {
-          display_name: parts.join(', ') || query,
-          lat: f.geometry.coordinates[1],
-          lng: f.geometry.coordinates[0],
-        }
-      })
-  } catch { return [] }
-}
-
-// ── Nominatim (fallback) ──────────────────────────────────────────────────────
-const MED_VIEWBOX = '-75.72,6.42,-75.44,6.10'
-async function searchNominatim(query) {
-  const withCity = /medell/i.test(query) ? query : query + ', Medellín, Colombia'
-  const base     = `https://nominatim.openstreetmap.org/search?format=json&countrycodes=co&limit=6&addressdetails=1&viewbox=${MED_VIEWBOX}&bounded=0`
-  try {
-    const r = await fetch(`${base}&q=${encodeURIComponent(withCity)}`, { headers: { 'Accept-Language': 'es' } })
-    const d = r.ok ? await r.json() : []
-    return d.map(x => ({ display_name: x.display_name, lat: parseFloat(x.lat), lng: parseFloat(x.lon) }))
-  } catch { return [] }
-}
-
-// ── Búsqueda combinada: Photon → Nominatim → solo calle ──────────────────────
-async function searchAddress(rawQuery) {
-  const norm = normalizeAddr(rawQuery)
-
-  let res = await searchPhoton(norm)
-  if (res.length) return res
-
-  res = await searchNominatim(norm)
-  if (res.length) return res
-
-  // Último intento: quitar número de casa y buscar solo la calle
-  const street = rawQuery.includes('#') ? rawQuery.split('#')[0].trim() : null
-  if (street) {
-    res = await searchPhoton(normalizeAddr(street))
-    if (res.length) return res
-    res = await searchNominatim(street)
-  }
-  return res
-}
-
-// ── Reverse geocoding ─────────────────────────────────────────────────────────
-async function reverseGeocode(lat, lng) {
-  try {
-    const url = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&addressdetails=1`
-    const res = await fetch(url, { headers: { 'Accept-Language': 'es' } })
-    if (!res.ok) return null
-    return (await res.json()).display_name || null
-  } catch { return null }
-}
-
-// ── Detector de coordenadas pegadas ──────────────────────────────────────────
 const COORD_RE = /^\s*(-?\d{1,3}(?:\.\d+)?)\s*,\s*(-?\d{1,3}(?:\.\d+)?)\s*$/
 function parseCoords(val) {
   const m = val.match(COORD_RE)
@@ -104,7 +49,8 @@ export default function MapPickerModal({ onConfirm, onClose, initialLat, initial
   const mapRef      = useRef(null)
   const mapObjRef   = useRef(null)
   const markerRef   = useRef(null)
-  const searchTimer = useRef(null)
+  const requestRef = useRef(null)
+  const searchRef = useRef(initialAddress || '')
 
   const [mapReady,       setMapReady]       = useState(false)
   const [mapError,       setMapError]       = useState('')
@@ -112,7 +58,7 @@ export default function MapPickerModal({ onConfirm, onClose, initialLat, initial
   const [results,        setResults]        = useState([])
   const [searching,      setSearching]      = useState(false)
   const [noResults,      setNoResults]      = useState(false)
-  const [reverseLoading, setReverseLoading] = useState(false)
+  const [searchError, setSearchError] = useState('')
   const [selected,       setSelected]       = useState(
     initialLat && initialLng
       ? { lat: parseFloat(initialLat), lng: parseFloat(initialLng), address: initialAddress || '' }
@@ -151,68 +97,84 @@ export default function MapPickerModal({ onConfirm, onClose, initialLat, initial
 
       mapObjRef.current = map
       setMapReady(true)
-      setTimeout(() => map.invalidateSize(), 0)
+      setTimeout(() => { if (!cancelled) map.invalidateSize() }, 0)
     }).catch((e) => {
       console.error('Selector mapa: error cargando Leaflet', e)
+      if (cancelled) return
       setMapError('No se pudo cargar el mapa. Revisa la conexion e intenta de nuevo.')
     })
     return () => {
       cancelled = true
+      requestRef.current?.abort()
+      requestRef.current = null
       if (mapObjRef.current) { mapObjRef.current.remove(); mapObjRef.current = null; markerRef.current = null }
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  const handleMarkerMove = useCallback(async (L, { lat, lng }) => {
-    setReverseLoading(true)
-    const addr = await reverseGeocode(lat, lng)
-    setReverseLoading(false)
-    const shortAddr = addr
-      ? addr.split(',').slice(0, 3).join(',').trim()
-      : `${lat.toFixed(5)}, ${lng.toFixed(5)}`
-    setSelected({ lat, lng, address: shortAddr })
-    setSearch(shortAddr)
+  const handleMarkerMove = useCallback((L, { lat, lng }) => {
+    requestRef.current?.abort()
+    requestRef.current = null
+    setSearching(false)
+    setSelected({ lat, lng, address: searchRef.current.trim(), approximate: false })
     setResults([])
     setNoResults(false)
+    setSearchError('')
   }, [])
 
   const handleSearchInput = (val) => {
+    requestRef.current?.abort()
+    requestRef.current = null
+    searchRef.current = val
     setSearch(val)
+    setSelected(null)
+    markerRef.current?.remove()
+    markerRef.current = null
+    setResults([])
     setNoResults(false)
-    clearTimeout(searchTimer.current)
-    if (val.length < 3) { setResults([]); return }
+    setSearching(false)
+    setSearchError('')
+  }
 
-    // Coordenadas pegadas desde Google Maps u otro origen
-    const coords = parseCoords(val)
-    if (coords) {
-      const L = window.L
-      if (L && mapObjRef.current) {
-        if (markerRef.current) {
-          markerRef.current.setLatLng([coords.lat, coords.lng])
-        } else {
-          markerRef.current = L.marker([coords.lat, coords.lng], { icon: makePinIcon(L), draggable: true }).addTo(mapObjRef.current)
-          markerRef.current.on('dragend', () => handleMarkerMove(L, markerRef.current.getLatLng()))
-        }
-        mapObjRef.current.flyTo([coords.lat, coords.lng], 17, { duration: 1 })
-        handleMarkerMove(L, coords)
+  const handleSearch = async () => {
+    const query = search.trim()
+    if (query.length < 3 || !mapReady || requestRef.current) return
+    const controller = new AbortController()
+    requestRef.current = controller
+    setSelected(null)
+    markerRef.current?.remove()
+    markerRef.current = null
+    setResults([])
+    setNoResults(false)
+    setSearchError('')
+    setSearching(true)
+    const timeout = setTimeout(() => controller.abort(), 15000)
+    try {
+      const coords = parseCoords(query)
+      const found = coords ? [{ ...coords, display_name: query, approximate: false }]
+        : await searchAddress(query, controller.signal)
+      if (requestRef.current !== controller) return
+      if (found.length === 1) selectResult(found[0])
+      else setResults(found)
+      setNoResults(found.length === 0)
+    } catch {
+      if (requestRef.current === controller) {
+        setSearchError('No se pudo consultar el buscador. Revisa la conexión y vuelve a intentar.')
       }
-      return
+    } finally {
+      clearTimeout(timeout)
+      if (requestRef.current === controller) {
+        requestRef.current = null
+        setSearching(false)
+      }
     }
-
-    searchTimer.current = setTimeout(async () => {
-      setSearching(true)
-      const res = await searchAddress(val)
-      setResults(res)
-      setNoResults(res.length === 0)
-      setSearching(false)
-    }, 400)
   }
 
   const selectResult = useCallback((item) => {
     const L = window.L
     if (!L || !mapObjRef.current) return
     const { lat, lng } = item
-    const address = item.display_name.split(',').slice(0, 3).join(',').trim()
+    const address = searchRef.current.trim() || item.display_name
     if (markerRef.current) {
       markerRef.current.setLatLng([lat, lng])
     } else {
@@ -220,13 +182,14 @@ export default function MapPickerModal({ onConfirm, onClose, initialLat, initial
       markerRef.current.on('dragend', () => handleMarkerMove(L, markerRef.current.getLatLng()))
     }
     mapObjRef.current.flyTo([lat, lng], 17, { duration: 1 })
-    setSelected({ lat, lng, address })
+    setSelected({ lat, lng, address, approximate: item.approximate, matchedAddress: item.display_name })
     setSearch(address)
+    searchRef.current = address
     setResults([])
     setNoResults(false)
   }, [handleMarkerMove])
 
-  const handleConfirm = () => { if (selected) onConfirm(selected) }
+  const handleConfirm = () => { if (selected?.address && !searching) onConfirm({ lat: selected.lat, lng: selected.lng, address: selected.address }) }
 
   return (
     <div className="fixed inset-0 z-[100] flex flex-col bg-black/50">
@@ -235,33 +198,28 @@ export default function MapPickerModal({ onConfirm, onClose, initialLat, initial
         {/* Header */}
         <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between flex-shrink-0">
           <div>
-            <h2 className="font-bold text-gray-900">Seleccionar ubicación</h2>
-            <p className="text-xs text-gray-400 mt-0.5">Busca el barrio o calle, luego arrastra el pin al punto exacto</p>
+            <h2 className="font-bold text-gray-900">Buscar dirección del domicilio</h2>
+            <p className="text-xs text-gray-400 mt-0.5">Escribe la dirección y el municipio para ubicarla en el mapa</p>
           </div>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl leading-none px-2">✕</button>
-        </div>
-
-        {/* Tip coordenadas */}
-        <div className="px-4 pt-3 pb-1 flex-shrink-0">
-          <div className="bg-blue-50 border border-blue-100 rounded-xl px-3 py-2 flex items-start gap-2">
-            <span className="text-sm leading-none mt-0.5">📍</span>
-            <p className="text-xs text-blue-700 leading-relaxed">
-              <span className="font-semibold">Ubicación exacta:</span> en Google Maps, mantén presionado el punto → copia las coordenadas → pégalas en el buscador.
-            </p>
-          </div>
+          <button type="button" onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl leading-none px-2">✕</button>
         </div>
 
         {/* Barra de búsqueda */}
         <div className="px-4 pt-2 pb-2 flex-shrink-0 relative">
-          <div className="relative">
+          <label htmlFor="delivery-address-search" className="block text-sm font-medium text-gray-700 mb-2">Dirección y municipio</label>
+          <div className="flex gap-2">
+          <div className="relative flex-1 min-w-0">
             <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
             </svg>
             <input
+              id="delivery-address-search"
+              maxLength={250}
               className="input pl-9 pr-4 text-sm w-full"
-              placeholder="Barrio, calle, o coordenadas: 6.2651, -75.5936"
+              placeholder="Ej.: Calle 10 # 43A-25, Medellín"
               value={search}
               onChange={e => handleSearchInput(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); handleSearch() } }}
               autoFocus
             />
             {searching && (
@@ -269,15 +227,23 @@ export default function MapPickerModal({ onConfirm, onClose, initialLat, initial
             )}
           </div>
 
+          <button type="button" onClick={handleSearch} disabled={!mapReady || searching || search.trim().length < 3}
+            className="btn-primary disabled:opacity-50 disabled:cursor-not-allowed">
+            {searching ? 'Buscando…' : 'Buscar'}
+          </button>
+          </div>
+          <p className="text-xs text-gray-500 mt-2">Apartamento, piso e indicaciones van en el campo de referencia del pedido.</p>
+          {searchError && <p role="alert" className="text-sm text-red-600 mt-2">{searchError}</p>}
           {results.length > 0 && (
             <div className="absolute left-4 right-4 mt-1 bg-white rounded-xl shadow-xl border border-gray-100 z-[9999] overflow-hidden max-h-60 overflow-y-auto">
+              <p className="px-4 py-2 text-xs font-semibold text-gray-500">Elige la coincidencia correcta</p>
               {results.map((r, i) => (
-                <button key={i} onClick={() => selectResult(r)}
+                <button type="button" key={i} onClick={() => selectResult(r)}
                   className="w-full text-left px-4 py-2.5 text-sm hover:bg-gray-50 border-b border-gray-50 last:border-0 flex items-start gap-2">
                   <svg className="w-3.5 h-3.5 text-brand-pink mt-0.5 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                     <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/>
                   </svg>
-                  <span className="line-clamp-2 text-gray-700">{r.display_name}</span>
+                  <span className="text-gray-700">{r.display_name}{r.approximate && <span className="block text-xs text-amber-700">Ubicación aproximada: verifica el punto en el mapa</span>}</span>
                 </button>
               ))}
             </div>
@@ -285,8 +251,7 @@ export default function MapPickerModal({ onConfirm, onClose, initialLat, initial
           {noResults && !searching && search.length >= 3 && (
             <div className="absolute left-4 right-4 mt-1 bg-white rounded-xl shadow border border-gray-100 z-[9999] px-4 py-3 text-xs text-gray-500 space-y-1">
               <p className="font-medium text-gray-700">No se encontró esa dirección</p>
-              <p>• Prueba solo con la calle: <span className="font-mono text-gray-600">"Calle 92"</span> o el barrio</p>
-              <p>• O pega coordenadas de Google Maps: <span className="font-mono text-gray-600">6.265, -75.591</span></p>
+              <p>Revisa la nomenclatura e incluye el municipio. Si la dirección no está registrada, puedes marcar el punto en el mapa.</p>
             </div>
           )}
         </div>
@@ -312,7 +277,7 @@ export default function MapPickerModal({ onConfirm, onClose, initialLat, initial
           )}
           {mapReady && !selected && (
             <div className="absolute top-3 left-1/2 -translate-x-1/2 bg-white/90 backdrop-blur-sm px-4 py-2 rounded-full shadow text-xs text-gray-600 pointer-events-none">
-              Haz clic en el mapa o busca el barrio / calle
+              Escribe la dirección y pulsa Buscar
             </div>
           )}
           {selected && mapReady && (
@@ -332,19 +297,20 @@ export default function MapPickerModal({ onConfirm, onClose, initialLat, initial
                     <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/>
                   </svg>
                   <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Ubicación seleccionada</span>
-                  {reverseLoading && <div className="w-3 h-3 border border-gray-300 border-t-transparent rounded-full animate-spin" />}
                 </div>
                 <p className="text-sm text-gray-800 font-medium truncate">{selected.address}</p>
-                <p className="text-[11px] text-gray-400 font-mono">{selected.lat.toFixed(6)}, {selected.lng.toFixed(6)}</p>
+                {selected.matchedAddress && <p className="text-xs text-gray-500">Resultado: {selected.matchedAddress}</p>}
+                {selected.approximate && <p className="text-xs text-amber-700 mt-1">Ubicación aproximada. Verifica y ajusta el marcador antes de confirmar.</p>}
+                {!selected.address && <p className="text-xs text-amber-700">Escribe primero la dirección del domicilio.</p>}
               </div>
-              <button onClick={handleConfirm} className="btn-primary flex-shrink-0">
+              <button type="button" onClick={handleConfirm} disabled={!selected.address || searching} className="btn-primary flex-shrink-0 disabled:opacity-50 disabled:cursor-not-allowed">
                 Confirmar ubicación
               </button>
             </div>
           ) : (
             <div className="flex items-center justify-between">
               <p className="text-sm text-gray-400">Busca o haz clic en el mapa para marcar</p>
-              <button onClick={onClose} className="btn-secondary">Cancelar</button>
+              <button type="button" onClick={onClose} className="btn-secondary">Cancelar</button>
             </div>
           )}
         </div>
