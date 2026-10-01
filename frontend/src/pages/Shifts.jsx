@@ -31,6 +31,30 @@ const fmtHr  = s => new Date(s).toLocaleTimeString('es-CO', { hour: '2-digit', m
 
 const fmtDtShort = s => new Date(s).toLocaleString('es-CO', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })
 
+function ExpenseSummary({ title, affectsCash, outsideCash, cash, transfer }) {
+  const columns = [
+    { label: 'Total gastos', value: affectsCash + outsideCash, hint: 'Todos los gastos registrados', color: 'text-red-700' },
+    { label: 'No afectan caja', value: outsideCash, hint: 'No se descuentan de esta jornada', color: 'text-gray-500' },
+    { label: 'Afectan caja', value: affectsCash, hint: 'Efectivo + transferencias', color: 'text-red-500' },
+    { label: 'Efectivo', value: cash, hint: 'Se descuenta del efectivo a entregar', color: 'text-gray-700' },
+    { label: 'Transferencia', value: transfer, hint: 'Afecta caja, pero no el efectivo', color: 'text-cyan-600' },
+  ]
+  return (
+    <div className="card p-4 border-l-4 border-red-300">
+      <p className="text-[10px] font-bold text-red-500 uppercase tracking-widest mb-3">{title}</p>
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+        {columns.map((column, index) => (
+          <div key={column.label} className={`text-center ${index === 0 ? 'col-span-2 md:col-span-1 rounded-lg bg-red-50 p-2' : 'py-2'}`}>
+            <p className="text-xs text-gray-500 uppercase tracking-wide mb-1">{column.label}</p>
+            <p className={`text-lg font-bold ${column.color}`}>{fmt(column.value)}</p>
+            <p className="text-[11px] text-gray-400 mt-1">{column.hint}</p>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Hook compartido: carga prefill de la jornada
 // ─────────────────────────────────────────────────────────────────────────────
@@ -315,28 +339,13 @@ function POSResumenModal({ shiftId, onClose }) {
                 <p className="text-xs text-gray-400">Solo resta gastos en efectivo</p>
               </div>
             </div>
-            {/* Gastos POS breakdown */}
-            <div className="card p-4 border-l-4 border-red-200">
-              <p className="text-[10px] font-bold text-red-500 uppercase tracking-widest mb-3">Gastos POS</p>
-              <div className="grid grid-cols-4 gap-3">
-                <div className="text-center">
-                  <p className="text-xs text-gray-400 uppercase tracking-wide mb-1">Afectan caja</p>
-                  <p className="text-base font-bold text-red-500">- {fmt((p.expenses_from_cash || 0) + (p.expenses_pos_transfer || 0))}</p>
-                </div>
-                <div className="text-center">
-                  <p className="text-xs text-gray-400 uppercase tracking-wide mb-1">No afectan caja</p>
-                  <p className="text-base font-bold text-gray-400">- {fmt(p.expenses_pos_no_cash || 0)}</p>
-                </div>
-                <div className="text-center">
-                  <p className="text-xs text-gray-400 uppercase tracking-wide mb-1">Efectivo (descuenta)</p>
-                  <p className="text-base font-bold text-red-600">- {fmt(p.expenses_from_cash || 0)}</p>
-                </div>
-                <div className="text-center">
-                  <p className="text-xs text-gray-400 uppercase tracking-wide mb-1">Transferencia</p>
-                  <p className="text-base font-bold text-cyan-600">- {fmt(p.expenses_pos_transfer || 0)}</p>
-                </div>
-              </div>
-            </div>
+            <ExpenseSummary
+              title="Gastos POS"
+              affectsCash={Number(p.expenses_from_cash || 0) + Number(p.expenses_pos_transfer || 0)}
+              outsideCash={Number(p.expenses_pos_no_cash || 0)}
+              cash={Number(p.expenses_from_cash || 0)}
+              transfer={Number(p.expenses_pos_transfer || 0)}
+            />
 
           {/* Tabla liquidación */}
           {(cups.length > 0 || toppings.length > 0) && (
@@ -1435,7 +1444,6 @@ function ShiftDetail({ shift, onBack, onShiftUpdate }) {
           {channel === 'all' && (() => {
             const expAfecta   = detail.expenses.filter(e => e.from_daily_cash).reduce((s,e) => s+Number(e.amount), 0)
             const expNoAfecta = detail.expenses.filter(e => !e.from_daily_cash).reduce((s,e) => s+Number(e.amount), 0)
-            const expTotalG   = expAfecta + expNoAfecta
             const expEfectivo = detail.expenses.filter(e => e.from_daily_cash && e.payment_method === 'cash').reduce((s,e) => s+Number(e.amount), 0)
             const expTransfer = detail.expenses.filter(e => e.from_daily_cash && e.payment_method === 'transfer').reduce((s,e) => s+Number(e.amount), 0)
             return (
@@ -1512,31 +1520,8 @@ function ShiftDetail({ shift, onBack, onShiftUpdate }) {
                   </div>
                 )}
                 {/* Gastos Jornada breakdown */}
-                <div className="card p-4 border-l-4 border-red-300">
-                  <p className="text-[10px] font-bold text-red-500 uppercase tracking-widest mb-3">Gastos Jornada</p>
-                  <div className="grid grid-cols-5 gap-3">
-                    <div className="text-center">
-                      <p className="text-xs text-gray-400 uppercase tracking-wide mb-1">Afectan caja</p>
-                      <p className="text-lg font-bold text-red-500">- {fmt(expAfecta)}</p>
-                    </div>
-                    <div className="text-center">
-                      <p className="text-xs text-gray-400 uppercase tracking-wide mb-1">No afectan caja</p>
-                      <p className="text-lg font-bold text-gray-400">- {fmt(expNoAfecta)}</p>
-                    </div>
-                    <div className="text-center border-x border-gray-100">
-                      <p className="text-xs text-gray-400 uppercase tracking-wide mb-1">Total gastos</p>
-                      <p className="text-lg font-bold text-red-700">- {fmt(expTotalG)}</p>
-                    </div>
-                    <div className="text-center">
-                      <p className="text-xs text-gray-400 uppercase tracking-wide mb-1">Efectivo</p>
-                      <p className="text-lg font-bold text-gray-700">- {fmt(expEfectivo)}</p>
-                    </div>
-                    <div className="text-center">
-                      <p className="text-xs text-gray-400 uppercase tracking-wide mb-1">Transferencia</p>
-                      <p className="text-lg font-bold text-cyan-600">- {fmt(expTransfer)}</p>
-                    </div>
-                  </div>
-                </div>
+                <ExpenseSummary title="Gastos Jornada" affectsCash={expAfecta}
+                  outsideCash={expNoAfecta} cash={expEfectivo} transfer={expTransfer} />
               </>
             )
           })()}
@@ -1562,16 +1547,8 @@ function ShiftDetail({ shift, onBack, onShiftUpdate }) {
                     <p className="text-xl font-bold text-indigo-600 tabular-nums">{fmt(detail.summary.pos_transfer)}</p>
                   </div>
                 </div>
-                <div className="card p-4 border-l-4 border-red-300">
-                  <p className="text-[10px] font-bold text-red-500 uppercase tracking-widest mb-3">Gastos POS</p>
-                  <div className="grid grid-cols-5 gap-3">
-                    <div className="text-center"><p className="text-xs text-gray-400 uppercase tracking-wide mb-1">Afectan caja</p><p className="text-lg font-bold text-red-500">- {fmt(expAfecta)}</p></div>
-                    <div className="text-center"><p className="text-xs text-gray-400 uppercase tracking-wide mb-1">No afectan caja</p><p className="text-lg font-bold text-gray-400">- {fmt(expNoAfecta)}</p></div>
-                    <div className="text-center border-x border-gray-100"><p className="text-xs text-gray-400 uppercase tracking-wide mb-1">Total gastos</p><p className="text-lg font-bold text-red-700">- {fmt(expAfecta + expNoAfecta)}</p></div>
-                    <div className="text-center"><p className="text-xs text-gray-400 uppercase tracking-wide mb-1">Efectivo</p><p className="text-lg font-bold text-gray-700">- {fmt(expEfectivo)}</p></div>
-                    <div className="text-center"><p className="text-xs text-gray-400 uppercase tracking-wide mb-1">Transferencia</p><p className="text-lg font-bold text-cyan-600">- {fmt(expTransfer)}</p></div>
-                  </div>
-                </div>
+                <ExpenseSummary title="Gastos POS" affectsCash={expAfecta}
+                  outsideCash={expNoAfecta} cash={expEfectivo} transfer={expTransfer} />
               </>
             )
           })()}
@@ -1597,16 +1574,8 @@ function ShiftDetail({ shift, onBack, onShiftUpdate }) {
                     <p className="text-xl font-bold text-indigo-600 tabular-nums">{fmt(detail.summary.dom_transfer)}</p>
                   </div>
                 </div>
-                <div className="card p-4 border-l-4 border-red-300">
-                  <p className="text-[10px] font-bold text-red-500 uppercase tracking-widest mb-3">Gastos Domicilios</p>
-                  <div className="grid grid-cols-5 gap-3">
-                    <div className="text-center"><p className="text-xs text-gray-400 uppercase tracking-wide mb-1">Afectan caja</p><p className="text-lg font-bold text-red-500">- {fmt(expAfecta)}</p></div>
-                    <div className="text-center"><p className="text-xs text-gray-400 uppercase tracking-wide mb-1">No afectan caja</p><p className="text-lg font-bold text-gray-400">- {fmt(expNoAfecta)}</p></div>
-                    <div className="text-center border-x border-gray-100"><p className="text-xs text-gray-400 uppercase tracking-wide mb-1">Total gastos</p><p className="text-lg font-bold text-red-700">- {fmt(expAfecta + expNoAfecta)}</p></div>
-                    <div className="text-center"><p className="text-xs text-gray-400 uppercase tracking-wide mb-1">Efectivo</p><p className="text-lg font-bold text-gray-700">- {fmt(expEfectivo)}</p></div>
-                    <div className="text-center"><p className="text-xs text-gray-400 uppercase tracking-wide mb-1">Transferencia</p><p className="text-lg font-bold text-cyan-600">- {fmt(expTransfer)}</p></div>
-                  </div>
-                </div>
+                <ExpenseSummary title="Gastos Domicilios" affectsCash={expAfecta}
+                  outsideCash={expNoAfecta} cash={expEfectivo} transfer={expTransfer} />
               </>
             )
           })()}
