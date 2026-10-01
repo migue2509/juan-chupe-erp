@@ -1,3 +1,4 @@
+from .inventory_rules import automatic_topping_requirement
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.exceptions import ValidationError
@@ -134,6 +135,13 @@ class SaleViewSet(viewsets.ReadOnlyModelViewSet):
         data = serializer.validated_data
 
         with transaction.atomic():
+            promotion = None
+            if data.get('promotion_id') is not None:
+                try:
+                    promotion = Promotion.objects.get(id=data['promotion_id'], is_active=True)
+                except (Promotion.DoesNotExist, ValueError, TypeError):
+                    raise ValidationError({'promotion_id': 'Promocion no encontrada o inactiva.'})
+
             # ── Pre-cargar objetos en bulk (evitar N+1 en validación y creación) ──
             from apps.inventory.models import FlavorBag, CupStock, ToppingStock
             all_cup_ids    = {d['cup_size_id'] for d in data['items'] if d.get('cup_size_id')}
@@ -220,15 +228,15 @@ class SaleViewSet(viewsets.ReadOnlyModelViewSet):
 
                 # Bolsa de topping automática según categoría
                 categories = {f.category for f in flavor_objs}  # flavor_objs ya es lista
-                if len(categories) == 1:
-                    primary_cat = next(iter(categories))
+                primary_cat, topping_units = automatic_topping_requirement(promotion, categories, qty, cup_size)
+                if primary_cat:
                     try:
                         auto_topping = Topping.objects.get(linked_category=primary_cat, is_active=True)
                         auto_ts = ToppingStock.objects.get(topping=auto_topping)
-                        if auto_ts.quantity < qty:
+                        if auto_ts.quantity < topping_units:
                             return Response(
                                 {'detail': f'Stock insuficiente de {auto_topping.name}. '
-                                           f'Disponible: {auto_ts.quantity}, necesario: {qty}.'},
+                                           f'Disponible: {auto_ts.quantity}, necesario: {topping_units}.'},
                                 status=status.HTTP_400_BAD_REQUEST
                             )
                     except Topping.DoesNotExist:
@@ -245,13 +253,6 @@ class SaleViewSet(viewsets.ReadOnlyModelViewSet):
                     seller = User.objects.get(id=data['seller_id'])
                 except (User.DoesNotExist, ValueError, TypeError):
                     raise ValidationError({'seller_id': 'Vendedor no encontrado.'})
-
-            promotion = None
-            if data.get('promotion_id') is not None:
-                try:
-                    promotion = Promotion.objects.get(id=data['promotion_id'], is_active=True)
-                except (Promotion.DoesNotExist, ValueError, TypeError):
-                    raise ValidationError({'promotion_id': 'Promocion no encontrada o inactiva.'})
 
             is_courtesy   = data.get('is_courtesy', False)
             courtesy_paid = Decimal(str(data.get('courtesy_paid', 0) or 0))
@@ -496,15 +497,15 @@ class SaleViewSet(viewsets.ReadOnlyModelViewSet):
                             raise ValidationError({'detail': f'Sin bolsa para {flavor.name}.'})
 
                     categories = {f.category for f in flavor_objs if f.category}
-                    if len(categories) == 1:
-                        primary_cat = next(iter(categories))
+                    primary_cat, topping_units = automatic_topping_requirement(sale.promotion, categories, qty, cup_size)
+                    if primary_cat:
                         try:
                             auto_topping = Topping.objects.get(linked_category=primary_cat, is_active=True)
                             auto_ts = ToppingStock.objects.get(topping=auto_topping)
-                            if auto_ts.quantity < qty:
+                            if auto_ts.quantity < topping_units:
                                 raise ValidationError({
                                     'detail': f'Stock insuficiente de {auto_topping.name}. '
-                                              f'Disponible: {auto_ts.quantity}, necesario: {qty}.'
+                                              f'Disponible: {auto_ts.quantity}, necesario: {topping_units}.'
                                 })
                         except Topping.DoesNotExist:
                             pass

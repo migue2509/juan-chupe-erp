@@ -451,7 +451,8 @@ export default function Billing() {
               <div className="flex items-center gap-2">
                 {!selected.voided && !editMode && isAdmin && (
                   <>
-                    <button onClick={startEdit} disabled={loadingFlavors} className="btn-secondary py-1.5 text-xs disabled:opacity-50 disabled:cursor-wait">
+                    <button disabled title="La edición de facturas está deshabilitada"
+                      className="btn-secondary py-1.5 text-xs disabled:!bg-gray-100 disabled:!text-gray-400 disabled:!border-gray-200 disabled:cursor-not-allowed disabled:opacity-60">
                       <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                         <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
                         <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>

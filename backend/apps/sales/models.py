@@ -111,6 +111,11 @@ class SaleItem(models.Model):
     topping_price = models.DecimalField(max_digits=10, decimal_places=0, default=0)
     quantity      = models.PositiveIntegerField(default=1)
     subtotal      = models.DecimalField(max_digits=10, decimal_places=0)
+    auto_topping_used = models.ForeignKey(
+        'products.Topping', on_delete=models.PROTECT, null=True, blank=True,
+        related_name='automatic_sale_items',
+    )
+    auto_topping_units = models.PositiveIntegerField(null=True, blank=True)
 
     class Meta:
         verbose_name = 'Ítem de Venta'
@@ -168,7 +173,19 @@ class SaleItem(models.Model):
             created_by=self.sale.seller, shift=shift
         )
 
-        # Revertir topping automático
+        # New sales restore the exact recorded consumption, even if the recipe changes.
+        if self.auto_topping_units is not None:
+            if self.auto_topping_units:
+                stock = self.auto_topping_used.stock
+                stock.add_stock(self.auto_topping_units)
+                StockMovement.objects.create(
+                    movement_type='adjustment', topping_stock=stock,
+                    quantity_units=self.auto_topping_units,
+                    notes=f'{prefix} - topping auto', created_by=self.sale.seller, shift=shift,
+                )
+            return
+
+        # Legacy sales consumed one bag per container under the original rule.
         try:
             from apps.products.models import Topping as ToppingModel
             categories = {sf.flavor.category for sf in sale_flavors if sf.flavor.category}
@@ -241,23 +258,33 @@ class SaleItem(models.Model):
 
         # ── Descuenta bolsa de topping automática según categoría del sabor ──
         from apps.products.models import Topping as ToppingModel
+        from .inventory_rules import automatic_topping_requirement
         categories = {sf.flavor.category for sf in sale_flavors if sf.flavor.category}
-        if len(categories) != 1:
+        primary_cat, topping_units = automatic_topping_requirement(
+            self.sale.promotion, categories, self.quantity, self.cup_size,
+        )
+        self.auto_topping_units = 0
+        self.save(update_fields=['auto_topping_units'])
+        if not primary_cat:
             return
 
-        primary_cat = next(iter(categories))
         try:
             auto_topping = ToppingModel.objects.get(linked_category=primary_cat, is_active=True)
         except ToppingModel.DoesNotExist:
+            if (self.sale.promotion and self.sale.promotion.topping_bags_per_unit) or self.cup_size.topping_bags_per_unit:
+                raise ValueError(f'No hay topping automatico activo para la categoria {primary_cat}.')
             return
         except ToppingModel.MultipleObjectsReturned:
             raise ValueError(f'Hay mas de un topping automatico activo para la categoria {primary_cat}.')
 
         auto_ts = auto_topping.stock
-        auto_ts.consume(self.quantity)
+        auto_ts.consume(topping_units)
+        self.auto_topping_used = auto_topping
+        self.auto_topping_units = topping_units
+        self.save(update_fields=['auto_topping_used', 'auto_topping_units'])
         StockMovement.objects.create(
             movement_type='sale', topping_stock=auto_ts,
-            quantity_units=self.quantity,
+            quantity_units=topping_units,
             sale=self.sale,
             notes=f'Venta #{self.sale_id} — bolsa auto {primary_cat}',
             created_by=self.sale.seller, shift=shift

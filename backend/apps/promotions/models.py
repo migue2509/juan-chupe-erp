@@ -28,6 +28,8 @@ class Promotion(models.Model):
         help_text='% que cobra la plataforma (ej. 30 = 30%)'
     )
     is_active = models.BooleanField(default=True)
+    topping_category = models.CharField(max_length=20, blank=True, default='')
+    topping_bags_per_unit = models.PositiveIntegerField(default=0)
     valid_days = models.CharField(
         max_length=50, blank=True,
         help_text='Ej: lunes,martes o vacío para todos los días'

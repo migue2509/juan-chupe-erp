@@ -29,6 +29,8 @@ class Flavor(models.Model):
 
 
 class CupSize(models.Model):
+    topping_category = models.CharField(max_length=20, blank=True, default='')
+    topping_bags_per_unit = models.PositiveIntegerField(default=0)
     size = models.CharField(max_length=20, unique=True, help_text='Nombre libre, ej: 8oz, Grande, XL')
     ml = models.DecimalField(max_digits=8, decimal_places=2, help_text='Mililitros equivalentes')
     price = models.DecimalField(max_digits=10, decimal_places=0)
