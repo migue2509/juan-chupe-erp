@@ -3,10 +3,10 @@ from decimal import Decimal
 from django.db import transaction
 from rest_framework import serializers
 
-from apps.sales.models import Sale
-from apps.sales.selectors import active_sales
+from apps.users.models import User
 
-from .models import CashAudit, SellerCashDelivery, ShiftAuditItem
+from .models import CashAudit, ShiftAuditItem
+from .services import pos_handover_workers, pos_sales_for_shift
 
 
 class ShiftAuditItemSerializer(serializers.ModelSerializer):
@@ -34,18 +34,24 @@ class CashAuditSerializer(serializers.ModelSerializer):
     audited_by_name  = serializers.CharField(source='audited_by.full_name', read_only=True, default='')
     channel_label    = serializers.CharField(source='get_channel_display', read_only=True)
     items = ShiftAuditItemSerializer(many=True, required=False)
+    delivered_by = serializers.PrimaryKeyRelatedField(
+        queryset=User.objects.all(), required=False, allow_null=True,
+    )
+    actual_cash = serializers.DecimalField(
+        max_digits=12, decimal_places=0, min_value=Decimal('0'), required=False,
+    )
 
     class Meta:
         model = CashAudit
         fields = [
             'id', 'shift', 'channel', 'channel_label',
-            'audited_by', 'audited_by_name',
+            'audited_by', 'audited_by_name', 'delivered_by', 'delivered_by_name',
             'expected_cash', 'expected_transfer',
             'actual_cash', 'actual_transfer',
             'cash_difference', 'notes', 'created_at',
             'items',
         ]
-        read_only_fields = ['id', 'created_at', 'audited_by', 'cash_difference']
+        read_only_fields = ['id', 'created_at', 'audited_by', 'cash_difference', 'delivered_by_name']
         validators = []
 
     def validate(self, attrs):
@@ -54,19 +60,38 @@ class CashAuditSerializer(serializers.ModelSerializer):
         channel = attrs.get('channel') or getattr(self.instance, 'channel', 'pos')
 
         if shift and channel == 'pos':
-            if self._has_unassigned_pos_cash_entries(shift):
+            worker = attrs.get('delivered_by', getattr(self.instance, 'delivered_by', None))
+            if worker is None:
                 raise serializers.ValidationError({
-                    'detail': (
-                        'No puedes marcar POS como entregado mientras existan '
-                        'ventas o gastos POS sin responsable.'
-                    )
+                    'delivered_by': 'Selecciona la trabajadora que entrega el efectivo POS.'
                 })
-            self._validate_pos_seller_deliveries(shift, attrs)
+            # Preserve a historical handover when editing other audit fields.
+            unchanged_worker = (
+                self.instance is not None
+                and self.instance.shift_id == shift.pk
+                and self.instance.delivered_by_id == worker.pk
+            )
+            if not unchanged_worker and not pos_handover_workers(shift).filter(pk=worker.pk).exists():
+                raise serializers.ValidationError({
+                    'delivered_by': 'La trabajadora debe estar activa y tener asistencia o actividad en esta jornada.'
+                })
+            if self.instance is None and 'actual_cash' not in attrs:
+                raise serializers.ValidationError({'actual_cash': 'Ingresa el efectivo entregado.'})
+            if not unchanged_worker:
+                attrs['delivered_by_name'] = worker.full_name
+            sales = list(pos_sales_for_shift(shift))
+            attrs['expected_cash'] = sum((s.cash_amount for s in sales), Decimal('0'))
+            attrs['expected_transfer'] = sum((s.transfer_paid for s in sales), Decimal('0'))
+        elif channel == 'delivery':
+            attrs['delivered_by'] = None
+            attrs['delivered_by_name'] = ''
         return attrs
 
     @transaction.atomic
     def create(self, validated_data):
         items_data = validated_data.pop('items', [])
+        from apps.shifts.models import Shift
+        Shift.objects.select_for_update().get(pk=validated_data['shift'].pk)
         audit = CashAudit.objects.select_for_update().filter(
             shift=validated_data.get('shift'),
             channel=validated_data.get('channel', 'pos'),
@@ -79,6 +104,7 @@ class CashAuditSerializer(serializers.ModelSerializer):
         else:
             audit = CashAudit.objects.create(**validated_data)
         self._create_items(audit, items_data)
+        audit.calculate_difference()
         return audit
 
     @transaction.atomic
@@ -90,84 +116,9 @@ class CashAuditSerializer(serializers.ModelSerializer):
         if items_data is not None:
             instance.items.all().delete()
             self._create_items(instance, items_data)
+        instance.calculate_difference()
         return instance
 
     def _create_items(self, audit, items_data):
         for item in items_data:
             ShiftAuditItem.objects.create(audit=audit, **item)
-
-    def _validate_pos_seller_deliveries(self, shift, attrs):
-        seller_ids = self._pos_responsible_seller_ids(shift)
-        if not seller_ids:
-            return
-
-        deliveries = SellerCashDelivery.objects.filter(
-            shift=shift,
-            seller_id__in=seller_ids,
-        )
-        delivered_by_seller = {
-            d.seller_id: d.net_delivered
-            for d in deliveries
-            if d.net_delivered is not None
-        }
-        missing_seller_ids = seller_ids - set(delivered_by_seller)
-        if missing_seller_ids:
-            raise serializers.ValidationError({
-                'detail': 'Registra cuanto entrego cada vendedora antes de marcar POS.'
-            })
-
-        actual_cash = attrs.get('actual_cash', getattr(self.instance, 'actual_cash', Decimal('0')))
-        delivered_total = sum(delivered_by_seller.values(), Decimal('0'))
-        if actual_cash != delivered_total:
-            raise serializers.ValidationError({
-                'detail': (
-                    'El efectivo POS debe coincidir con la suma entregada '
-                    'por las vendedoras.'
-                )
-            })
-
-    def _pos_responsible_seller_ids(self, shift):
-        sales_seller_ids = set(active_sales(
-            Sale.objects.filter(
-                shift=shift,
-                is_delivery=False,
-                seller__isnull=False,
-            )
-        ).exclude(
-            promotion__category__in=['rappi', 'didi']
-        ).values_list('seller_id', flat=True))
-
-        expense_seller_ids = set(shift.expenses.filter(
-            from_daily_cash=True,
-            payment_method='cash',
-            origin='pos',
-            registered_by__isnull=False,
-        ).values_list('registered_by_id', flat=True))
-
-        saved_seller_ids = set(SellerCashDelivery.objects.filter(
-            shift=shift,
-            seller_id__isnull=False,
-        ).values_list('seller_id', flat=True))
-
-        return sales_seller_ids | expense_seller_ids | saved_seller_ids
-
-    def _has_unassigned_pos_cash_entries(self, shift):
-        has_unassigned_sales = active_sales(
-            Sale.objects.filter(
-                shift=shift,
-                is_delivery=False,
-                seller__isnull=True,
-            )
-        ).exclude(
-            promotion__category__in=['rappi', 'didi']
-        ).exists()
-
-        if has_unassigned_sales:
-            return True
-
-        return shift.expenses.filter(
-            from_daily_cash=True,
-            payment_method='cash',
-            origin='pos',
-            registered_by__isnull=True,
-        ).exists()

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { getShifts, openShift, closeShift, getActiveShift, getShiftDetail, getCashAuditPrefill, createCashAudit, getCashAudit, saveSellerDeliveries, saveDeliveryAmount } from '../api'
+import { getShifts, openShift, closeShift, getActiveShift, getShiftDetail, getCashAuditPrefill, createCashAudit, getCashAudit, saveDeliveryAmount } from '../api'
 import { salePaidTotal, saleTransferAmount } from '../utils/sales'
 import { getApiErrorMessage, getShiftCloseErrorMessage } from '../utils/apiErrors'
 import { confirmAction } from '../utils/confirmAction'
@@ -53,21 +53,18 @@ function usePrefill(shiftId) {
 function POSResumenModal({ shiftId, onClose }) {
   const { data: p, loading, reload } = usePrefill(shiftId)
   const [saving, setSaving]                 = useState(false)
-  const [savingDeliveries, setSavingDeliveries] = useState(false)
-  const [deliveries, setDeliveries]         = useState({})
-  const [activeTab, setActiveTab]           = useState('sellers')
+  const [deliveredBy, setDeliveredBy] = useState('')
+  const [deliveredAmount, setDeliveredAmount] = useState('')
+  const [activeTab, setActiveTab] = useState('entrega')
   const [cupCounts, setCupCounts]           = useState({})  // product_id → conteo real
   const [cupEntries, setCupEntries]         = useState({})
 
   // Pre-carga montos guardados cuando llegan los datos
   useEffect(() => {
-    if (!p?.sellers_breakdown) return
-    const init = {}
-    p.sellers_breakdown.forEach(s => {
-      const key = String(s.seller_id ?? 'null')
-      init[key] = s.net_delivered != null ? String(s.net_delivered) : ''
-    })
-    setDeliveries(init)
+    if (!p) return
+    const saved = p.arqueos?.pos
+    setDeliveredBy(saved?.delivered_by != null ? String(saved.delivered_by) : '')
+    setDeliveredAmount(saved?.actual_cash != null ? String(saved.actual_cash) : '')
   }, [p])
 
   useEffect(() => {
@@ -102,11 +99,15 @@ function POSResumenModal({ shiftId, onClose }) {
   const totalLiq = (p.catalog || []).reduce((s, r) => s + (r.sales_revenue || 0), 0)
   const COL = '2fr 110px 70px 110px'
 
-  const sellers = p.sellers_breakdown || []
-  const posSellerRows = sellers.filter(s => s.seller_id !== null)
-  const unassignedPOS = p.unassigned_pos || {}
-  const hasUnassignedPOS = Number(unassignedPOS.sales_count || 0) > 0
-    || Number(unassignedPOS.expenses_cash || 0) > 0
+  const workers = p.pos_handover_workers || []
+  const savedAudit = p.arqueos?.pos
+  const expectedCash = Number(p.net_expected_cash || 0)
+  const hasAmount = deliveredAmount !== '' && Number.isFinite(Number(deliveredAmount))
+  const validDeliveredAmount = deliveredAmount.trim() !== ''
+    && Number.isSafeInteger(Number(deliveredAmount))
+    && Number(deliveredAmount) >= 0
+    && Number(deliveredAmount) <= 999999999999
+  const cashDifference = hasAmount ? Number(deliveredAmount) - expectedCash : null
   const visibleCups = cups.filter(r =>
     (r.sales_qty || 0) > 0 ||
     (r.current_stock || 0) > 0 ||
@@ -117,15 +118,6 @@ function POSResumenModal({ shiftId, onClose }) {
     const parsed = parseInt(value, 10)
     return Number.isFinite(parsed) && parsed >= 0 ? parsed : 0
   }
-  const parseMoney = value => {
-    const parsed = parseInt(value, 10)
-    return Number.isFinite(parsed) && parsed >= 0 ? parsed : 0
-  }
-  const buildSellerDeliveryPayload = () => posSellerRows.map(s => ({
-    seller_id:     s.seller_id,
-    seller_name:   s.seller_name,
-    net_delivered: parseMoney(deliveries[String(s.seller_id)]),
-  }))
   const cupAuditValues = row => {
     const key = String(row.product_id)
     const opening = Number(row.prev_closing || 0)
@@ -151,19 +143,6 @@ function POSResumenModal({ shiftId, onClose }) {
     }
   })
 
-  const handleSaveDeliveries = async () => {
-    setSavingDeliveries(true)
-    try {
-      const payload = buildSellerDeliveryPayload()
-      await saveSellerDeliveries({ shift_id: shiftId, deliveries: payload })
-      toast.success('Entregas guardadas')
-      reload()
-    } catch (e) {
-      toast.error(e?.response?.data?.detail || 'Error al guardar')
-    }
-    setSavingDeliveries(false)
-  }
-
   const handleMarkPOSDelivered = async () => {
     const missingCounts = visibleCups.filter(row => {
       const value = cupCounts[String(row.product_id)]
@@ -182,40 +161,33 @@ function POSResumenModal({ shiftId, onClose }) {
       return
     }
 
-    if (hasUnassignedPOS) {
-      setActiveTab('sellers')
-      toast.error('Hay ventas o gastos POS sin responsable. Corrige antes de marcar POS')
+    if (!deliveredBy) {
+      setActiveTab('entrega')
+      toast.error('Selecciona quién entrega el efectivo POS')
       return
     }
-
-    const missingDeliveries = posSellerRows.filter(s => {
-      const value = deliveries[String(s.seller_id)]
-      return value === undefined || value === ''
-    })
-    if (missingDeliveries.length > 0) {
-      setActiveTab('sellers')
-      toast.error('Registra cuanto entrego cada vendedora antes de marcar POS')
+    if (!validDeliveredAmount) {
+      setActiveTab('entrega')
+      toast.error('Ingresa un monto entregado válido, en pesos enteros y mayor o igual a cero')
       return
     }
 
     setSaving(true)
     try {
-      const sellerDeliveryPayload = buildSellerDeliveryPayload()
-      const actualPOSCash = sellerDeliveryPayload.reduce((sum, item) => sum + item.net_delivered, 0)
-      await saveSellerDeliveries({ shift_id: shiftId, deliveries: sellerDeliveryPayload })
       await createCashAudit({
         shift:             shiftId,
         channel:           'pos',
-        expected_cash:     p.pos_cash || p.expected_cash || 0,
+        expected_cash:     p.pos_cash ?? 0,
         expected_transfer: p.pos_transfer,
-        actual_cash:       actualPOSCash,
+        actual_cash:       Number(deliveredAmount),
+        delivered_by:      Number(deliveredBy),
         actual_transfer:   0,
         items:             buildAuditItems(),
       })
       toast.success('POS marcado como entregado')
       reload()
     } catch (e) {
-      toast.error(e?.response?.data?.detail || 'Error')
+      toast.error(getApiErrorMessage(e, 'No se pudo guardar la entrega POS'))
     }
     setSaving(false)
   }
@@ -234,7 +206,7 @@ function POSResumenModal({ shiftId, onClose }) {
         {/* ── Tab navigation ── */}
         <div className="px-6 border-b border-gray-100 flex gap-0 flex-shrink-0">
           {[
-            { key: 'sellers',     label: 'Vendedoras' },
+            { key: 'entrega',     label: 'Entrega POS' },
             { key: 'liquidacion', label: 'Liquidación' },
           ].map(tab => (
             <button key={tab.key} onClick={() => setActiveTab(tab.key)}
@@ -250,12 +222,12 @@ function POSResumenModal({ shiftId, onClose }) {
 
         <div className="flex-1 overflow-y-auto">
 
-        {/* ══════════════ TAB: VENDEDORAS ══════════════ */}
-        {activeTab === 'sellers' && (
+        {/* ══════════════ TAB: ENTREGA POS ══════════════ */}
+        {activeTab === 'entrega' && (
           <div className="p-6 space-y-4">
 
             {/* Resumen global compacto */}
-            <div className="grid grid-cols-4 gap-3">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
               <div className="card p-3 text-center">
                 <p className="text-[10px] text-gray-400 uppercase tracking-wide mb-1">Total POS</p>
                 <p className="text-lg font-bold text-blue-700">{fmt(p.pos_total)}</p>
@@ -274,116 +246,52 @@ function POSResumenModal({ shiftId, onClose }) {
               </div>
             </div>
 
-            {hasUnassignedPOS && (
-              <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-                <p className="font-semibold">Hay ventas o gastos POS sin responsable</p>
-                <p className="text-xs mt-1">
-                  {unassignedPOS.sales_count || 0} venta{unassignedPOS.sales_count !== 1 ? 's' : ''} por {fmt(unassignedPOS.total || 0)}
-                  {Number(unassignedPOS.expenses_cash || 0) > 0 && ` y ${fmt(unassignedPOS.expenses_cash)} en gastos efectivo`}.
-                </p>
+            <div className="card p-5 space-y-4">
+              <div>
+                <label htmlFor="pos-delivered-by" className="block text-sm font-semibold text-gray-800 mb-2">
+                  Trabajadora que entrega el dinero
+                </label>
+                <select id="pos-delivered-by" className="input w-full"
+                  value={deliveredBy} onChange={e => setDeliveredBy(e.target.value)} disabled={!!savedAudit}>
+                  <option value="">{savedAudit ? 'Sin responsable registrada' : 'Selecciona una trabajadora'}</option>
+                  {savedAudit?.delivered_by && (
+                    <option value={deliveredBy}>{savedAudit.delivered_by_name}</option>
+                  )}
+                  {workers.filter(worker => worker.id !== savedAudit?.delivered_by).map(worker => (
+                    <option key={worker.id} value={worker.id}>{worker.full_name}</option>
+                  ))}
+                </select>
+                {!savedAudit && workers.length === 0 && (
+                  <p className="text-sm text-amber-700 mt-2">No hay trabajadoras activas con asistencia o actividad registrada en esta jornada.</p>
+                )}
+                <p className="text-xs text-gray-400 mt-2">Entrega consolidada de todo el POS de la jornada.</p>
               </div>
-            )}
 
-            {/* Card por vendedora (solo seller_id no nulo) */}
-            {posSellerRows.length === 0 && (
-              <div className="text-center py-10 text-gray-400 text-sm">
-                No hay ventas asignadas a vendedoras en esta jornada.
-              </div>
-            )}
-
-            {posSellerRows.map(s => {
-              const key        = String(s.seller_id)
-              const totalVenta = s.pos_cash + s.pos_transfer
-              const expCash    = s.expenses_cash || 0          // gastos que ella pagó de su caja
-              const expected   = s.pos_cash - expCash          // lo que debe entregar = efectivo - sus gastos
-              const delivered  = deliveries[key]
-              const diff       = delivered !== '' && delivered != null
-                ? (parseInt(delivered) || 0) - expected
-                : null
-
-              return (
-                <div key={key} className="card p-0 overflow-hidden border-l-4 border-blue-300">
-                  {/* Nombre vendedora */}
-                  <div className="px-5 py-3 bg-blue-50 border-b border-blue-100 flex items-center justify-between">
-                    <p className="font-bold text-blue-800 text-sm">{s.seller_name}</p>
-                    {diff === null ? (
-                      <span className="text-xs text-gray-400">Sin registrar</span>
-                    ) : diff === 0 ? (
-                      <span className="text-xs font-semibold text-green-600 bg-green-100 px-2.5 py-1 rounded-full">Cuadrada</span>
-                    ) : diff < 0 ? (
-                      <span className="text-xs font-semibold text-red-600 bg-red-100 px-2.5 py-1 rounded-full">Faltante {fmt(Math.abs(diff))}</span>
-                    ) : (
-                      <span className="text-xs font-semibold text-amber-600 bg-amber-100 px-2.5 py-1 rounded-full">Sobrante {fmt(diff)}</span>
-                    )}
-                  </div>
-
-                  <div className="p-5 space-y-4">
-                    {/* Stats */}
-                    <div className="grid grid-cols-3 gap-3">
-                      <div className="text-center">
-                        <p className="text-[10px] text-gray-400 uppercase tracking-wide mb-1">Total vendido</p>
-                        <p className="text-base font-bold text-gray-800">{fmt(totalVenta)}</p>
-                      </div>
-                      <div className="text-center">
-                        <p className="text-[10px] text-gray-400 uppercase tracking-wide mb-1">Transferencias</p>
-                        <p className="text-base font-bold text-cyan-600">{s.pos_transfer > 0 ? fmt(s.pos_transfer) : <span className="text-gray-300">—</span>}</p>
-                      </div>
-                      <div className="text-center">
-                        <p className="text-[10px] text-gray-400 uppercase tracking-wide mb-1">Gastos registrados</p>
-                        <p className="text-base font-bold text-red-400">{expCash > 0 ? `- ${fmt(expCash)}` : <span className="text-gray-300">—</span>}</p>
-                      </div>
-                    </div>
-
-                    {/* Cuadre */}
-                    <div className="bg-gray-50 rounded-xl p-4">
-                      <div className="flex items-center justify-between mb-3">
-                        <div>
-                          <p className="text-[10px] text-gray-400 uppercase tracking-wide">Efectivo a entregar</p>
-                          <p className="text-xl font-bold text-blue-700">{fmt(expected)}</p>
-                          {expCash > 0 && (
-                            <p className="text-[10px] text-gray-400 mt-0.5">{fmt(s.pos_cash)} − {fmt(expCash)} gastos</p>
-                          )}
-                        </div>
-                        <div className="text-right">
-                          <p className="text-[10px] text-gray-400 uppercase tracking-wide mb-1">¿Cuánto entregó?</p>
-                          <input
-                            type="number"
-                            min="0"
-                            placeholder="0"
-                            className="input text-right py-1.5 text-sm w-36"
-                            value={delivered ?? ''}
-                            onChange={e => setDeliveries(prev => ({ ...prev, [key]: e.target.value }))}
-                          />
-                        </div>
-                      </div>
-                      {diff !== null && (
-                        <div className={`text-center text-sm font-semibold py-1.5 rounded-lg ${
-                          diff === 0 ? 'bg-green-100 text-green-700' :
-                          diff < 0  ? 'bg-red-100 text-red-700' :
-                                      'bg-amber-100 text-amber-700'
-                        }`}>
-                          {diff === 0
-                            ? 'Cuadrada — entrega correcta'
-                            : diff < 0
-                              ? `Descuadrada — faltante de ${fmt(Math.abs(diff))}`
-                              : `Descuadrada — sobrante de ${fmt(diff)}`
-                          }
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              )
-            })}
-
-            {posSellerRows.length > 0 && (
-              <div className="flex items-center justify-between pt-1">
-                <button disabled={savingDeliveries} onClick={handleSaveDeliveries}
-                  className="btn-primary text-sm py-1.5">
-                  {savingDeliveries ? 'Guardando...' : 'Guardar entregas'}
-                </button>
-              </div>
-            )}
+              <table className="w-full text-sm">
+                <caption className="text-left font-semibold text-gray-800 pb-3">Análisis de la entrega POS</caption>
+                <thead className="text-xs text-gray-400 uppercase border-b border-gray-100">
+                  <tr><th className="text-left py-2 font-medium">Concepto</th><th className="text-right py-2 font-medium">Valor</th></tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  <tr><td className="py-3">Total vendido POS</td><td className="text-right font-semibold">{fmt(p.pos_total)}</td></tr>
+                  <tr><td className="py-3">Transferencias POS</td><td className="text-right text-cyan-600">{fmt(p.pos_transfer)}</td></tr>
+                  <tr><td className="py-3">Gastos POS pagados de caja en efectivo</td><td className="text-right text-red-500">− {fmt(p.expenses_from_cash)}</td></tr>
+                  <tr className="bg-blue-50 text-blue-800 font-bold"><td className="py-3 pl-3 rounded-l-lg">Efectivo a entregar</td><td className="text-right pr-3 rounded-r-lg">{fmt(expectedCash)}</td></tr>
+                  <tr>
+                    <td className="py-3"><label htmlFor="pos-delivered-amount">Efectivo entregado</label></td>
+                    <td className="py-3 text-right">
+                      <input id="pos-delivered-amount" type="number" min="0" max="999999999999" step="1" placeholder="0"
+                        className="input text-right py-1.5 text-sm w-36" value={deliveredAmount}
+                        disabled={!!savedAudit} onChange={e => setDeliveredAmount(e.target.value)} />
+                    </td>
+                  </tr>
+                  <tr className={cashDifference === null ? 'text-gray-400' : cashDifference === 0 ? 'text-green-700' : cashDifference < 0 ? 'text-red-600' : 'text-amber-700'}>
+                    <td className="py-3 font-semibold">{cashDifference === null ? 'Diferencia' : cashDifference === 0 ? 'Caja cuadrada' : cashDifference < 0 ? 'Faltante' : 'Sobrante'}</td>
+                    <td className="text-right font-bold">{cashDifference === null ? '—' : fmt(Math.abs(cashDifference))}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
           </div>
         )}
 
@@ -620,15 +528,15 @@ function POSResumenModal({ shiftId, onClose }) {
             <div className="flex items-center gap-2 text-sm text-green-700 bg-green-50 border border-green-200 rounded-xl px-4 py-2">
               <span className="font-semibold">POS entregado</span>
               <span className="text-gray-400">·</span>
-              <span>{p.arqueos.pos.audited_by}</span>
+              <span>{p.arqueos.pos.delivered_by_name || p.arqueos.pos.audited_by}</span>
               <span className="text-gray-400">·</span>
               <span>{fmtDtShort(p.arqueos.pos.created_at)}</span>
             </div>
           ) : (
             <button
-              disabled={saving}
+              disabled={saving || !deliveredBy || !validDeliveredAmount}
               onClick={handleMarkPOSDelivered}
-              className="btn-primary"
+              className="btn-primary disabled:!bg-gray-200 disabled:!text-gray-500 disabled:!shadow-none disabled:cursor-not-allowed"
             >
               {saving ? 'Guardando...' : 'Marcar como entregado'}
             </button>

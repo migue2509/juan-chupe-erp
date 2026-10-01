@@ -12,6 +12,7 @@ from apps.sales.models import Sale, SaleItem
 from apps.sales.selectors import active_sales
 from .models import CashAudit, SellerCashDelivery
 from .serializers import CashAuditSerializer
+from .services import pos_handover_workers
 
 
 class CashAuditViewSet(viewsets.ModelViewSet):
@@ -101,12 +102,10 @@ class CashAuditViewSet(viewsets.ModelViewSet):
         return Response({'ok': True})
 
     def perform_create(self, serializer):
-        obj = serializer.save(audited_by=self.request.user)
-        obj.calculate_difference()
+        serializer.save(audited_by=self.request.user)
 
     def perform_update(self, serializer):
-        obj = serializer.save()
-        obj.calculate_difference()
+        serializer.save()
 
     @action(detail=False, methods=['get'], url_path='prefill')
     def prefill(self, request):
@@ -213,6 +212,8 @@ class CashAuditViewSet(viewsets.ModelViewSet):
                 'audited_by':    a.audited_by.full_name if a.audited_by else '—',
                 'created_at':    a.created_at,
                 'actual_cash':   int(a.actual_cash),
+                'delivered_by': a.delivered_by_id,
+                'delivered_by_name': a.delivered_by_name,
                 'cash_difference': int(a.cash_difference),
             }
 
@@ -481,6 +482,7 @@ class CashAuditViewSet(viewsets.ModelViewSet):
 
         return Response({
             'shift_id': shift.id,
+            'pos_handover_workers': list(pos_handover_workers(shift).values('id', 'full_name')),
             # POS
             'pos_total':              pos_total,
             'pos_cash':               pos_cash,

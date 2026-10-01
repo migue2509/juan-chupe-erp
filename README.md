@@ -29,7 +29,7 @@ El objetivo principal es reducir registros manuales, evitar inconsistencias oper
 - Anulación de facturas con devolución de inventario.
 - Gestión de domicilios, estados y domiciliarios.
 - Arqueo de caja por POS y domicilios.
-- Cuadre de dinero entregado por vendedora.
+- Cuadre consolidado del dinero POS entregado por jornada.
 - Registro de gastos y compras.
 - Reportes diarios, semanales, mensuales, por rango y por plataformas.
 - Mapa de domicilios y puntos de calor.
@@ -50,7 +50,7 @@ El objetivo principal es reducir registros manuales, evitar inconsistencias oper
 | Productos | Administración de sabores, tamaños de vaso, productos y toppings. |
 | Inventario | Stock de bolsas, vasos y toppings, entradas, ajustes y movimientos. |
 | Promociones | Promociones POS, Rappi y DiDi con cálculo proporcional y comisión. |
-| Arqueo | Validación de efectivo, transferencias, inventario vendido y entregas por vendedora. |
+| Arqueo | Validación de efectivo, transferencias, inventario vendido y entrega consolidada POS con responsable. |
 | Reportes | Reportes financieros, comerciales, de inventario y de plataformas. |
 | Mapa | Visualización de domicilios con coordenadas y mapa de calor. |
 | Usuarios | Administración de usuarios, roles, contraseñas y estado de cuenta. |
@@ -68,7 +68,7 @@ El objetivo principal es reducir registros manuales, evitar inconsistencias oper
 - Los domicilios cancelados no cuentan como ventas activas.
 - El cierre de jornada requiere arqueo POS.
 - Si existen domicilios activos, el cierre requiere arqueo de domicilios.
-- El efectivo POS debe coincidir con la suma entregada por las vendedoras.
+- La entrega POS se registra de forma consolidada por jornada, con una trabajadora activa con asistencia o actividad como responsable. El efectivo esperado resta las transferencias y los gastos POS pagados de caja en efectivo al total vendido POS.
 - Los gastos pueden afectar o no afectar la caja diaria.
 - Los gastos se separan por origen: POS o domicilios.
 - Las ventas pueden ser en efectivo, transferencia o pago mixto.

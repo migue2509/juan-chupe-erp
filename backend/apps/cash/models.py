@@ -16,6 +16,11 @@ class CashAudit(models.Model):
     )
     channel  = models.CharField(max_length=20, choices=CHANNEL_CHOICES, default='pos')
     audited_by = models.ForeignKey('users.User', on_delete=models.SET_NULL, null=True)
+    delivered_by = models.ForeignKey(
+        'users.User', on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='cash_handovers',
+    )
+    delivered_by_name = models.CharField(max_length=100, blank=True)
 
     # Ventas acumuladas (del sistema)
     expected_cash     = models.DecimalField(max_digits=12, decimal_places=0, default=Decimal('0'))
