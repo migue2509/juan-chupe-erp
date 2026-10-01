@@ -20,6 +20,27 @@ const FLAVOR_CATS = [
 
 const emptyItem = () => ({ cup_size_id: null, flavor_ids: [], topping_id: null, unit_price: 0, quantity: 1 })
 
+function FlavorChoice({ flavor, selected, onClick }) {
+  const stock = Number(flavor.bag?.stock_ml ?? 0)
+  const unavailable = !flavor.is_active || !Number.isFinite(stock) || stock <= 0
+  const low = !unavailable && stock < Number(flavor.bag?.min_stock_ml ?? 0)
+  return (
+    <button type="button" onClick={onClick} disabled={unavailable && !selected}
+      aria-pressed={!!selected}
+      className={`flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium border transition-all disabled:cursor-not-allowed ${
+        selected ? 'border-brand-pink bg-pink-50 text-brand-pink'
+          : unavailable ? 'border-gray-100 bg-gray-50 text-gray-400'
+            : low ? 'border-amber-200 bg-amber-50 text-amber-700'
+              : 'border-gray-200 text-gray-500 hover:border-gray-300'
+      }`}>
+      <span>{flavor.emoji || '🍧'}</span>{flavor.name}
+      {(unavailable || low) && (
+        <span className="text-[10px]">· {!flavor.is_active ? 'No disponible' : unavailable ? 'Sin stock' : 'Stock bajo'}</span>
+      )}
+    </button>
+  )
+}
+
 const PAYMENT_MODES = [
   { key: 'cash',     label: 'Efectivo' },
   { key: 'transfer', label: 'Transferencia' },
@@ -32,6 +53,7 @@ export default function Billing() {
   const [loading,     setLoading]    = useState(true)
   const [selected,    setSelected]   = useState(null)
   const [editMode,    setEditMode]   = useState(false)
+  const [loadingFlavors, setLoadingFlavors] = useState(false)
   const [flavors,     setFlavors]    = useState([])
   const [cupSizes,    setCupSizes]   = useState([])
   const [toppings,    setToppings]   = useState([])
@@ -74,6 +96,19 @@ export default function Billing() {
     window.addEventListener('focus', onFocus)
     return () => window.removeEventListener('focus', onFocus)
   }, [])
+
+  const startEdit = async () => {
+    setLoadingFlavors(true)
+    try {
+      const response = await getAllFlavors()
+      setFlavors(response.data?.results ?? response.data ?? [])
+      setEditMode(true)
+    } catch {
+      toast.error('No se pudo actualizar la disponibilidad de sabores. Intenta de nuevo.')
+    } finally {
+      setLoadingFlavors(false)
+    }
+  }
 
   const openDetail = (inv) => {
     setSelected(inv)
@@ -416,7 +451,7 @@ export default function Billing() {
               <div className="flex items-center gap-2">
                 {!selected.voided && !editMode && isAdmin && (
                   <>
-                    <button onClick={() => setEditMode(true)} className="btn-secondary py-1.5 text-xs">
+                    <button onClick={startEdit} disabled={loadingFlavors} className="btn-secondary py-1.5 text-xs disabled:opacity-50 disabled:cursor-wait">
                       <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                         <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
                         <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
@@ -534,7 +569,7 @@ export default function Billing() {
                         {/* Sabores */}
                         <div className="space-y-2">
                           {FLAVOR_CATS.map(cat => {
-                            const catFlavors = flavors.filter(f => f.category === cat.value && f.is_active)
+                            const catFlavors = flavors.filter(f => f.category === cat.value && (f.is_active || ePromoConfig.cups[ePromoConfig.activeCup]?.flavorIds.includes(f.id)))
                             if (!catFlavors.length) return null
                             return (
                               <div key={cat.value}>
@@ -543,12 +578,8 @@ export default function Billing() {
                                   {catFlavors.map(f => {
                                     const sel = ePromoConfig.cups[ePromoConfig.activeCup]?.flavorIds.includes(f.id)
                                     return (
-                                      <button key={f.id} type="button" onClick={() => toggleEPromoFlavor(f.id)}
-                                        className={`flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium border transition-all ${
-                                          sel ? 'border-brand-pink bg-pink-50 text-brand-pink' : 'border-gray-200 text-gray-500 hover:border-gray-300'
-                                        }`}>
-                                        <span>{f.emoji || '🍧'}</span>{f.name}
-                                      </button>
+                                      <FlavorChoice key={f.id} flavor={f} selected={sel}
+                                        onClick={() => toggleEPromoFlavor(f.id)} />
                                     )
                                   })}
                                 </div>
@@ -631,7 +662,7 @@ export default function Billing() {
                                 </label>
                                 <div className="space-y-2">
                                   {FLAVOR_CATS.map(cat => {
-                                    const catFlavors = flavors.filter(f => f.category === cat.value && f.is_active)
+                                    const catFlavors = flavors.filter(f => f.category === cat.value && (f.is_active || item.flavor_ids.includes(f.id)))
                                     if (!catFlavors.length) return null
                                     return (
                                       <div key={cat.value}>
@@ -642,16 +673,8 @@ export default function Billing() {
                                           {catFlavors.map(f => {
                                             const sel = item.flavor_ids.includes(f.id)
                                             return (
-                                              <button key={f.id} type="button"
-                                                onClick={() => toggleFlavor(i, f.id)}
-                                                className={`flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium border transition-all ${
-                                                  sel
-                                                    ? 'border-brand-pink bg-pink-50 text-brand-pink'
-                                                    : 'border-gray-200 text-gray-500 hover:border-gray-300'
-                                                }`}>
-                                                <span>{f.emoji || '🍧'}</span>
-                                                {f.name}
-                                              </button>
+                                              <FlavorChoice key={f.id} flavor={f} selected={sel}
+                                                onClick={() => toggleFlavor(i, f.id)} />
                                             )
                                           })}
                                         </div>

@@ -171,6 +171,34 @@ class ActiveSalesReportTests(TestCase):
         self.assertEqual(topping_row['sales_qty'], 2)
         self.assertEqual(topping_row['sales_revenue'], 4000)
 
+    def test_pos_liquidation_deducts_only_active_pos_courtesies(self):
+        from apps.promotions.models import Promotion
+
+        self._sale(quantity=2)
+        self._sale(is_courtesy=True, courtesy_paid=Decimal('3000'))
+        self._sale(is_courtesy=True, courtesy_paid=Decimal('0'))
+        self._sale(is_courtesy=True, courtesy_paid=Decimal('1000'), voided=True)
+        self._sale(is_courtesy=True, courtesy_paid=Decimal('1000'), is_delivery=True)
+        platform, _ = self._sale(is_courtesy=True, courtesy_paid=Decimal('1000'))
+        platform.promotion = Promotion.objects.create(name='Rappi', category='rappi', promo_price=7000)
+        platform.save()
+
+        response = self.client.get('/api/cash/prefill/', {'shift_id': self.shift.pk})
+
+        self.assertEqual(response.status_code, 200, response.data)
+        gross = sum(row['sales_revenue'] for row in response.data['catalog'])
+        self.assertEqual(gross, 28000)
+        self.assertEqual(response.data['pos_courtesy_discount'], Decimal('11000'))
+        self.assertEqual(gross - response.data['pos_courtesy_discount'], response.data['pos_total'])
+        self.assertEqual(response.data['pos_total'], Decimal('17000'))
+
+    def test_pos_liquidation_without_courtesies_has_no_discount(self):
+        self._sale(quantity=2)
+        response = self.client.get('/api/cash/prefill/', {'shift_id': self.shift.pk})
+        self.assertEqual(response.status_code, 200, response.data)
+        self.assertEqual(response.data['pos_courtesy_discount'], Decimal('0'))
+        self.assertEqual(sum(row['sales_revenue'] for row in response.data['catalog']), response.data['pos_total'])
+
     def test_range_report_ignores_cancelled_delivery_sales(self):
         self._seed_sales()
         today = timezone.localdate().isoformat()

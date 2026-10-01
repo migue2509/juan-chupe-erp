@@ -121,6 +121,7 @@ function POSResumenModal({ shiftId, onClose }) {
   const cups     = (p.catalog || []).filter(r => r.product_type === 'cup')
   const toppings = (p.catalog || []).filter(r => r.product_type === 'topping')
   const totalLiq = (p.catalog || []).reduce((s, r) => s + (r.sales_revenue || 0), 0)
+  const courtesyDiscount = Number(p.pos_courtesy_discount || 0)
   const COL = '2fr 110px 70px 110px'
 
   const workers = p.pos_handover_workers || []
@@ -443,11 +444,19 @@ function POSResumenModal({ shiftId, onClose }) {
                 </>
               )}
 
+              {courtesyDiscount > 0 && (
+                <div className="grid items-center px-4 py-3 bg-pink-50 border-t border-pink-100 text-pink-700"
+                  style={{ gridTemplateColumns: COL, minWidth: '600px' }}>
+                  <span className="text-sm font-semibold">Descuento por cortesías</span>
+                  <span /><span />
+                  <span className="text-center text-sm font-bold">− {fmt(courtesyDiscount)}</span>
+                </div>
+              )}
               <div className="grid px-4 py-3 bg-emerald-50 border-t-2 border-emerald-200 font-bold text-emerald-800"
                 style={{ gridTemplateColumns: COL, minWidth: '600px' }}>
                 <span className="text-sm">TOTAL LIQUIDACIÓN POS</span>
                 <span /><span />
-                <span className="text-center text-base">{fmt(totalLiq)}</span>
+                <span className="text-center text-base">{fmt(totalLiq - courtesyDiscount)}</span>
               </div>
             </div>
           )}

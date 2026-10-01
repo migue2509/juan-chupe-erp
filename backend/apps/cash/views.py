@@ -139,6 +139,10 @@ class CashAuditViewSet(viewsets.ModelViewSet):
         pos_total    = _total(pos_sales)
         pos_transfer = _transfer(pos_sales)
         pos_cash     = _cash(pos_sales)
+        pos_courtesy_discount = sum(
+            (max(s.total - s.paid_total, Decimal('0')) for s in pos_sales if s.is_courtesy),
+            Decimal('0'),
+        )
 
         delivery_total    = _total(delivery_sales)
         delivery_transfer = _transfer(delivery_sales)
@@ -485,6 +489,7 @@ class CashAuditViewSet(viewsets.ModelViewSet):
             'pos_handover_workers': list(pos_handover_workers(shift).values('id', 'full_name')),
             # POS
             'pos_total':              pos_total,
+            'pos_courtesy_discount':  pos_courtesy_discount,
             'pos_cash':               pos_cash,
             'pos_transfer':           pos_transfer,
             'expenses_from_cash':     expenses_pos_cash,       # gastos efectivo que salen de caja
