@@ -7,7 +7,7 @@ from django.utils import timezone
 from core.permissions import IsOperative, IsAdmin
 from apps.shifts.models import Shift
 from .models import Delivery, Domiciliario, HeatmapPoint
-from .serializers import DeliverySerializer, DomiciliarioSerializer
+from .serializers import DeliverySerializer, DomiciliarioSerializer, HeatmapPointSerializer
 
 
 class DomiciliarioViewSet(viewsets.ModelViewSet):
@@ -110,6 +110,13 @@ class DeliveryViewSet(viewsets.ModelViewSet):
             'total_with_coords': total_with_coords + len(historical_points),
             'total_deliveries':  total_deliveries,
         })
+
+    @action(detail=False, methods=['post'], url_path='heatmap/points', permission_classes=[IsAdmin])
+    def create_heatmap_point(self, request):
+        serializer = HeatmapPointSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        point = serializer.save()
+        return Response(HeatmapPointSerializer(point).data, status=status.HTTP_201_CREATED)
 
     @action(detail=True, methods=['post'], permission_classes=[IsOperative])
     def cancel(self, request, pk=None):

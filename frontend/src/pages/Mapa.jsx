@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
-import { getDeliveryHeatmap } from '../api'
+import { createHeatmapPoint, getDeliveryHeatmap } from '../api'
 import { loadLeaflet } from '../utils/leafletLoader'
+import { Icon } from '../components/Icons'
+import toast from 'react-hot-toast'
 
 const MED_LAT    = 6.2442
 const MED_LNG    = -75.5812
@@ -14,6 +16,7 @@ export default function Mapa() {
   const mapRef    = useRef(null)
   const mapObjRef = useRef(null)
   const heatRef   = useRef(null)
+  const draftMarkerRef = useRef(null)
 
   const [data,    setData]    = useState(null)
   const [loading, setLoading] = useState(true)
@@ -24,13 +27,17 @@ export default function Mapa() {
   const [selected, setSelected] = useState(null) // punto seleccionado en el mapa
   const [legendOpen, setLegendOpen] = useState(false)
   const [panelOpen,  setPanelOpen]  = useState(true)
+  const [addingPoint, setAddingPoint] = useState(false)
+  const [pointAddress, setPointAddress] = useState('')
+  const [pointCoords, setPointCoords] = useState(null)
+  const [savingPoint, setSavingPoint] = useState(false)
 
-  const fetchData = async () => {
+  const fetchData = async (from = dateFrom, to = dateTo) => {
     setLoading(true)
     try {
       const params = {}
-      if (dateFrom) params.date_from = dateFrom
-      if (dateTo)   params.date_to   = dateTo
+      if (from) params.date_from = from
+      if (to)   params.date_to   = to
       const r = await getDeliveryHeatmap(params)
       setData(r.data)
     } catch (e) {
@@ -108,6 +115,45 @@ export default function Mapa() {
     }
   }, [])
 
+  useEffect(() => {
+    const map = mapObjRef.current
+    if (!map || !mapReady) return
+
+    const selectPoint = (event) => {
+      setPointCoords({ latitude: event.latlng.lat, longitude: event.latlng.lng })
+    }
+
+    if (addingPoint) {
+      map.getContainer().style.cursor = 'crosshair'
+      map.on('click', selectPoint)
+    }
+
+    return () => {
+      map.off('click', selectPoint)
+      map.getContainer().style.cursor = ''
+    }
+  }, [addingPoint, mapReady])
+
+  useEffect(() => {
+    const map = mapObjRef.current
+    const L = window.L
+    if (!map || !L) return
+
+    if (draftMarkerRef.current) {
+      draftMarkerRef.current.remove()
+      draftMarkerRef.current = null
+    }
+    if (addingPoint && pointCoords) {
+      draftMarkerRef.current = L.circleMarker([pointCoords.latitude, pointCoords.longitude], {
+        radius: 8,
+        color: '#0f766e',
+        fillColor: '#14b8a6',
+        fillOpacity: 0.9,
+        weight: 3,
+      }).addTo(map)
+    }
+  }, [addingPoint, pointCoords, mapReady])
+
   // Actualizar heat map cuando llegan datos
   useEffect(() => {
     if (!data || !mapReady || !mapObjRef.current) return
@@ -155,6 +201,45 @@ export default function Mapa() {
     fetchData()
   }
 
+  const handleCreatePoint = async (event) => {
+    event.preventDefault()
+    if (!pointCoords) {
+      toast.error('Selecciona la ubicación haciendo clic en el mapa.')
+      return
+    }
+    setSavingPoint(true)
+    try {
+      await createHeatmapPoint({
+        address: pointAddress.trim(),
+        latitude: pointCoords.latitude.toFixed(7),
+        longitude: pointCoords.longitude.toFixed(7),
+      })
+      toast.success('Dirección agregada al mapa')
+      setAddingPoint(false)
+      setPointAddress('')
+      setPointCoords(null)
+      setDateFrom('')
+      setDateTo('')
+      await fetchData('', '')
+    } catch (error) {
+      const responseData = error.response?.data
+      const message = responseData?.detail || Object.entries(responseData ?? {})
+        .map(([field, messages]) => `${field}: ${Array.isArray(messages) ? messages.join(', ') : messages}`)
+        .join('; ')
+      toast.error(message || 'No se pudo agregar la dirección')
+    } finally {
+      setSavingPoint(false)
+    }
+  }
+
+  const startAddingPoint = () => {
+    setSelected(null)
+    setPointAddress('')
+    setPointCoords(null)
+    setAddingPoint(true)
+    setPanelOpen(true)
+  }
+
   const pct = data
     ? data.total_deliveries > 0
       ? Math.round((data.total_with_coords / data.total_deliveries) * 100)
@@ -185,7 +270,7 @@ export default function Mapa() {
           <div>
             <h1 className="text-xl font-bold text-gray-900">Mapa de domicilios</h1>
             <p className="text-sm text-gray-400 mt-0.5">
-              Zonas de calor de entregas en Medellín
+              Zonas de calor y ubicaciones guardadas en Medellín
             </p>
           </div>
 
@@ -206,6 +291,10 @@ export default function Mapa() {
               </div>
             </div>
           )}
+          <button type="button" onClick={startAddingPoint} className="btn-primary text-sm py-2 px-3">
+            <Icon name="plus" className="w-4 h-4" />
+            Agregar dirección
+          </button>
         </div>
 
         {/* Filtros de fecha */}
@@ -343,10 +432,43 @@ export default function Mapa() {
 
         {/* Panel lateral */}
         <div className={`flex-shrink-0 border-l border-gray-100 bg-white flex flex-col overflow-hidden transition-all duration-300 ${panelOpen ? 'w-72' : 'w-0'}`}>
-          {selected ? (
+          {addingPoint ? (
             <>
               <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
-                <p className="text-sm font-semibold text-gray-700">Detalle del domicilio</p>
+                <div>
+                  <p className="text-sm font-semibold text-gray-700">Agregar dirección</p>
+                  <p className="text-xs text-gray-400 mt-0.5">No crea un domicilio ni una venta</p>
+                </div>
+                <button type="button" onClick={() => setAddingPoint(false)} className="text-gray-400 hover:text-gray-600" title="Cancelar">✕</button>
+              </div>
+              <form onSubmit={handleCreatePoint} className="p-4 space-y-4 overflow-y-auto">
+                <p className="text-xs text-gray-500">Haz clic en el mapa para fijar el punto. Luego escribe la dirección y guarda.</p>
+                <div>
+                  <label className="label" htmlFor="map-point-address">Dirección o referencia</label>
+                  <textarea id="map-point-address" className="input min-h-20 resize-y" required maxLength={300}
+                    placeholder="Ej. Calle 10 # 20-30, barrio..."
+                    value={pointAddress} onChange={event => setPointAddress(event.target.value)} />
+                </div>
+                <div>
+                  <p className="label">Ubicación seleccionada</p>
+                  <p className="text-xs font-mono text-gray-500">
+                    {pointCoords
+                      ? `${pointCoords.latitude.toFixed(6)}, ${pointCoords.longitude.toFixed(6)}`
+                      : 'Haz clic en el mapa'}
+                  </p>
+                </div>
+                <div className="flex gap-2">
+                  <button type="submit" disabled={savingPoint} className="btn-primary flex-1 justify-center">
+                    {savingPoint ? 'Guardando...' : 'Guardar ubicación'}
+                  </button>
+                  <button type="button" onClick={() => setAddingPoint(false)} className="btn-secondary">Cancelar</button>
+                </div>
+              </form>
+            </>
+          ) : selected ? (
+            <>
+              <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
+                <p className="text-sm font-semibold text-gray-700">Detalle de ubicación</p>
                 <div className="flex items-center gap-2">
                   <button onClick={() => setSelected(null)} className="text-gray-400 hover:text-gray-600 text-lg leading-none">✕</button>
                   <button onClick={() => setPanelOpen(false)} className="text-gray-300 hover:text-gray-500 leading-none" title="Cerrar panel">
@@ -361,10 +483,10 @@ export default function Mapa() {
                   <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wide mb-1">Dirección</p>
                   <p className="text-sm text-gray-800">{selected.address || '—'}</p>
                 </div>
-                <div>
+                {selected.status !== 'historical' && <div>
                   <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wide mb-1">Cliente</p>
                   <p className="text-sm text-gray-800">{selected.four_digits || '—'}</p>
-                </div>
+                </div>}
                 <div>
                   <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wide mb-1">Estado</p>
                   <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${statusColor[selected.status] || 'bg-gray-100 text-gray-600'}`}>
@@ -389,7 +511,7 @@ export default function Mapa() {
             <div className="flex-1 flex flex-col">
               <div className="px-4 py-3 border-b border-gray-100 flex items-start justify-between gap-2">
                 <div>
-                  <p className="text-sm font-semibold text-gray-700">Últimos domicilios</p>
+                  <p className="text-sm font-semibold text-gray-700">Ubicaciones recientes</p>
                   <p className="text-xs text-gray-400 mt-0.5">Haz clic en un punto del mapa para ver detalles</p>
                 </div>
                 <button onClick={() => setPanelOpen(false)} className="text-gray-300 hover:text-gray-500 mt-0.5 flex-shrink-0" title="Cerrar panel">
@@ -427,8 +549,8 @@ export default function Mapa() {
                       <polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"/>
                       <line x1="8" y1="2" x2="8" y2="18"/><line x1="16" y1="6" x2="16" y2="22"/>
                     </svg>
-                    <p className="text-sm">No hay domicilios con ubicación</p>
-                    <p className="text-xs mt-1 text-center px-6">Los próximos domicilios desde el POS aparecerán aquí</p>
+                    <p className="text-sm">No hay ubicaciones guardadas</p>
+                    <p className="text-xs mt-1 text-center px-6">Agrega una dirección o registra domicilios desde el POS</p>
                   </div>
                 )}
               </div>

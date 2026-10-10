@@ -1,7 +1,8 @@
 from rest_framework import serializers
+from decimal import Decimal
 from django.utils import timezone
 from apps.sales.serializers import SaleSerializer
-from .models import Delivery, Domiciliario
+from .models import Delivery, Domiciliario, HeatmapPoint
 
 
 class DomiciliarioSerializer(serializers.ModelSerializer):
@@ -38,3 +39,13 @@ class DeliverySerializer(serializers.ModelSerializer):
             'created_at', 'delivered_at',
         ]
         read_only_fields = ['id', 'created_at', 'shift']
+
+
+class HeatmapPointSerializer(serializers.ModelSerializer):
+    latitude = serializers.DecimalField(max_digits=10, decimal_places=7, min_value=Decimal('-90'), max_value=Decimal('90'))
+    longitude = serializers.DecimalField(max_digits=10, decimal_places=7, min_value=Decimal('-180'), max_value=Decimal('180'))
+
+    class Meta:
+        model = HeatmapPoint
+        fields = ['id', 'address', 'latitude', 'longitude', 'created_at']
+        read_only_fields = ['id', 'created_at']
