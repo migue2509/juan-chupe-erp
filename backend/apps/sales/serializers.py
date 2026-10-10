@@ -35,6 +35,8 @@ class SaleCreateSerializer(serializers.Serializer):
     items = SaleItemCreateSerializer(many=True, min_length=1)
 
     def validate(self, attrs):
+        if attrs.get('is_courtesy') and not attrs.get('notes', '').strip():
+            raise serializers.ValidationError({'notes': 'La descripción es obligatoria para una cortesía.'})
         if attrs.get('is_delivery'):
             if not attrs.get('delivery_client', '').strip():
                 raise serializers.ValidationError({'detail': 'El cliente es obligatorio para domicilios.'})

@@ -133,6 +133,46 @@ class SaleDeliveryEditTests(TestCase):
         self.assertIn('seller_id', response.data)
         self.assertEqual(Sale.objects.count(), 0)
 
+    def test_create_courtesy_sale_requires_and_saves_description(self):
+        payload = {
+            'payment_method': 'cash',
+            'is_courtesy': True,
+            'courtesy_paid': '0',
+            'cash_received': '0',
+            'items': [{
+                'cup_size_id': self.cup.pk,
+                'flavor_ids': [self.flavor.pk],
+                'unit_price': '7000',
+                'quantity': 1,
+            }],
+        }
+
+        missing_description = self.client.post('/api/sales/create-sale/', payload, format='json')
+
+        self.assertEqual(missing_description.status_code, 400)
+        self.assertIn('notes', missing_description.data)
+        self.assertEqual(Sale.objects.count(), 0)
+
+        payload['notes'] = 'Cortesía por compensación al cliente'
+        response = self.client.post('/api/sales/create-sale/', payload, format='json')
+
+        self.assertEqual(response.status_code, 201, response.data)
+        self.assertEqual(response.data['notes'], payload['notes'])
+
+    def test_edit_sale_cannot_mark_courtesy_without_description(self):
+        sale = self._sale()
+
+        response = self.client.patch(
+            f'/api/sales/{sale.pk}/edit/',
+            {'is_courtesy': True},
+            format='json',
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn('notes', response.data)
+        sale.refresh_from_db()
+        self.assertFalse(sale.is_courtesy)
+
     def test_edit_sale_rejects_invalid_seller_id(self):
         sale = self._sale()
 

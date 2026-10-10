@@ -54,6 +54,7 @@ export default function POS() {
   const [deliveryNotes,     setDeliveryNotes]     = useState('')
   const [isCourtesy,        setIsCourtesy]        = useState(false)
   const [courtesyPaid,      setCourtesyPaid]      = useState('')
+  const [courtesyDescription, setCourtesyDescription] = useState('')
   const [courtesyMethod,    setCourtesyMethod]    = useState('cash')  // 'cash' | 'transfer'
   const [courtesyTransferRef, setCourtesyTransferRef] = useState('')
   const [submitting,        setSubmitting]        = useState(false)
@@ -232,6 +233,10 @@ export default function POS() {
       toast.error('El valor recibido por cortesia no puede superar el total')
       return
     }
+    if (isCourtesy && !courtesyDescription.trim()) {
+      toast.error('Escribe la descripción de la cortesía')
+      return
+    }
 
     if (!isCourtesy && !platformChannel) {
       if (paymentMethod === 'cash' && cashAmount < orderTotal) {
@@ -270,6 +275,7 @@ export default function POS() {
         delivery_lng:     isDelivery && deliveryLng != null ? parseFloat(Number(deliveryLng).toFixed(6)) : null,
         is_courtesy: isCourtesy,
         courtesy_paid: courtesyAmount,
+        notes: isCourtesy ? courtesyDescription.trim() : '',
         items: items.map(i => ({
           cup_size_id: i.cupSizeId || null,
           flavor_ids:  i.flavorIds || [],
@@ -296,6 +302,7 @@ export default function POS() {
       setDeliveryNotes('')
       setIsCourtesy(false)
       setCourtesyPaid('')
+      setCourtesyDescription('')
       setCourtesyMethod('cash')
       setCourtesyTransferRef('')
       setPaymentMethod('cash')
@@ -874,7 +881,7 @@ export default function POS() {
           {!platformChannel && (
             <label className="flex items-center gap-2.5 cursor-pointer select-none">
               <input type="checkbox" checked={isCourtesy}
-                onChange={e => { setIsCourtesy(e.target.checked); setCourtesyPaid(''); setCourtesyMethod('cash'); setCourtesyTransferRef('') }}
+                onChange={e => { setIsCourtesy(e.target.checked); setCourtesyPaid(''); setCourtesyDescription(''); setCourtesyMethod('cash'); setCourtesyTransferRef('') }}
                 className="w-4 h-4 accent-brand-pink" />
               <span className="text-sm text-gray-600 flex items-center gap-1.5">
                 <svg className="w-4 h-4 text-gray-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -891,6 +898,13 @@ export default function POS() {
               <p className="text-xs text-pink-600 font-medium">
                 La diferencia entre el total y lo recibido se registrará como gasto automáticamente.
               </p>
+
+              <div>
+                <label className="label" htmlFor="courtesy-description">Descripción de la cortesía</label>
+                <textarea id="courtesy-description" className="input text-sm min-h-20 resize-y" maxLength={500}
+                  placeholder="Indica el motivo de la cortesía..." required value={courtesyDescription}
+                  onChange={e => setCourtesyDescription(e.target.value)} />
+              </div>
 
               {/* Método de pago cortesía */}
               <div className="flex gap-2">

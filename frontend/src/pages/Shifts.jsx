@@ -1713,6 +1713,7 @@ function ShiftDetail({ shift, onBack, onShiftUpdate }) {
                               {s.is_courtesy ? (
                                 <div className="p-3 bg-pink-50 border border-pink-100 rounded-xl space-y-1 mb-1">
                                   <p className="text-xs font-semibold text-pink-600 uppercase tracking-wide">Cortesía</p>
+                                  {s.notes && <p className="text-sm text-gray-700">Descripción: {s.notes}</p>}
                                   <div className="flex justify-between text-sm">
                                     <span className="text-gray-500">Valor de la factura</span>
                                     <span className="font-medium text-gray-700">{fmt(s.total)}</span>

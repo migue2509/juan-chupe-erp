@@ -214,6 +214,10 @@ export default function Billing() {
 
   const handleSave = async () => {
     if (eItems.length === 0) { toast.error('Debe haber al menos un producto'); return }
+    if (eForm.is_courtesy && !eForm.notes.trim()) {
+      toast.error('Escribe la descripción de la cortesía')
+      return
+    }
     for (const [i, it] of eItems.entries()) {
       if (!it.cup_size_id) { toast.error(`Item ${i + 1}: elige un tamaño de vaso`); return }
       if (it.flavor_ids.length === 0) { toast.error(`Item ${i + 1}: elige al menos un sabor`); return }
@@ -863,8 +867,9 @@ export default function Billing() {
 
                     {/* Notas */}
                     <div>
-                      <label className="label">Notas</label>
-                      <input className="input" value={eForm.notes}
+                      <label className="label">{eForm.is_courtesy ? 'Descripción de la cortesía' : 'Notas'}</label>
+                      <input className="input" required={eForm.is_courtesy}
+                        placeholder={eForm.is_courtesy ? 'Indica el motivo de la cortesía...' : ''} value={eForm.notes}
                         onChange={e => setEForm(f => ({ ...f, notes: e.target.value }))} />
                     </div>
                   </div>
@@ -922,7 +927,7 @@ export default function Billing() {
                   </div>
                   {sale.notes && (
                     <div className="col-span-2">
-                      <p className="text-xs text-gray-400 mb-0.5">Notas</p>
+                      <p className="text-xs text-gray-400 mb-0.5">{sale.is_courtesy ? 'Descripción de la cortesía' : 'Notas'}</p>
                       <p className="text-gray-600">{sale.notes}</p>
                     </div>
                   )}

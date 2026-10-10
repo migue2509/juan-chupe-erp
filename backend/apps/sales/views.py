@@ -419,6 +419,8 @@ class SaleViewSet(viewsets.ReadOnlyModelViewSet):
                     request.data.get('courtesy_paid'),
                     'El valor pagado en cortesia'
                 )
+            if sale.is_courtesy and ('is_courtesy' in request.data or 'notes' in request.data) and not sale.notes.strip():
+                raise ValidationError({'notes': 'La descripción es obligatoria para una cortesía.'})
 
             # ── Si vienen items nuevos → revertir inventario y reemplazar ──
             if 'items' in request.data:
