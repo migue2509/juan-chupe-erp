@@ -5,6 +5,14 @@ from .models import Flavor, CupSize, Product, Topping
 class FlavorSerializer(serializers.ModelSerializer):
     bag = serializers.SerializerMethodField()
 
+    def validate_name(self, value):
+        flavors = Flavor.objects.filter(name=value)
+        if self.instance is not None:
+            flavors = flavors.exclude(pk=self.instance.pk)
+        if flavors.exists():
+            raise serializers.ValidationError('Ya existe un sabor con este nombre.')
+        return value
+
     def get_bag(self, obj):
         """Retorna info básica de la FlavorBag asociada (evita import circular)"""
         try:

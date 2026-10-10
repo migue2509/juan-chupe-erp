@@ -23,7 +23,7 @@ const TABS = [
   { key: 'toppings', label: 'Toppings',            icon: 'promotions' },
 ]
 
-const EMPTY_FLAVOR  = { name: '', category: 'water', emoji: '🍓', min_stock_ml: 500, licores: '' }
+const EMPTY_FLAVOR  = { name: '', category: 'creamy', emoji: '🍓', min_stock_ml: 500, licores: '' }
 
 function EmojiPicker({ value, onChange }) {
   const [open, setOpen] = useState(false)
@@ -181,7 +181,13 @@ export default function Products() {
       await createFlavor({ name: flavorForm.name, category: flavorForm.category, emoji: flavorForm.emoji, min_stock_ml: flavorForm.min_stock_ml, licores: flavorForm.licores })
       toast.success(`Bolsa "${flavorForm.name}" creada`)
       setFlavorForm(EMPTY_FLAVOR); setShowCreate(false); load()
-    } catch { toast.error('Error al crear bolsa') }
+    } catch (error) {
+      const data = error.response?.data
+      const message = data?.detail || Object.entries(data ?? {})
+        .map(([field, messages]) => `${field}: ${Array.isArray(messages) ? messages.join(', ') : messages}`)
+        .join('; ')
+      toast.error(message || 'Error al crear bolsa')
+    }
     setSaving(false)
   }
   const handleFlavorSave = async (form) => {
