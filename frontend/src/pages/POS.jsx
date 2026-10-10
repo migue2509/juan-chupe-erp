@@ -315,7 +315,7 @@ export default function POS() {
 
       {/* ── Left panel ── */}
       <div className="flex-1 space-y-4 overflow-y-auto min-w-0">
-        <h1>Punto de Venta</h1>
+        <h1>Punto físico</h1>
 
         {/* ── Promos de plataforma — solo admin (oculto a vendedoras) ── */}
         {user?.role === 'admin' && ['rappi', 'didi'].map(platform => {

@@ -12,7 +12,7 @@ class Expense(models.Model):
     ]
 
     ORIGIN_CHOICES = [
-        ('pos',      'Punto de Venta'),
+        ('pos',      'Punto físico'),
         ('delivery', 'Domicilios'),
     ]
 
@@ -25,7 +25,7 @@ class Expense(models.Model):
     registered_by = models.ForeignKey('users.User', on_delete=models.SET_NULL, null=True)
     category = models.CharField(max_length=20, choices=CATEGORY_CHOICES)
     origin = models.CharField(max_length=10, choices=ORIGIN_CHOICES, default='pos',
-        help_text='¿Este gasto es del punto de venta o de domicilios?')
+        help_text='¿Este gasto es del punto físico o de domicilios?')
     description = models.CharField(max_length=200)
     amount = models.DecimalField(
         max_digits=10,

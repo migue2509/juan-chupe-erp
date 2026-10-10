@@ -63,7 +63,7 @@ class CashAuditSerializer(serializers.ModelSerializer):
             worker = attrs.get('delivered_by', getattr(self.instance, 'delivered_by', None))
             if worker is None:
                 raise serializers.ValidationError({
-                    'delivered_by': 'Selecciona la trabajadora que entrega el efectivo POS.'
+                    'delivered_by': 'Selecciona la trabajadora que entrega el efectivo del punto físico.'
                 })
             # Preserve a historical handover when editing other audit fields.
             unchanged_worker = (

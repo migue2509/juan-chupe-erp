@@ -550,7 +550,7 @@ export default function Mapa() {
                       <line x1="8" y1="2" x2="8" y2="18"/><line x1="16" y1="6" x2="16" y2="22"/>
                     </svg>
                     <p className="text-sm">No hay ubicaciones guardadas</p>
-                    <p className="text-xs mt-1 text-center px-6">Agrega una dirección o registra domicilios desde el POS</p>
+                    <p className="text-xs mt-1 text-center px-6">Agrega una dirección o registra domicilios desde el punto físico</p>
                   </div>
                 )}
               </div>

@@ -25,7 +25,7 @@ export const getShiftCloseErrorMessage = (error) => {
     return getApiErrorMessage(error, 'No se pudo cerrar la jornada')
   }
 
-  const labels = { pos: 'POS', delivery: 'Domicilios' }
+  const labels = { pos: 'Punto físico', delivery: 'Domicilios' }
   const channels = missing.map(channel => labels[channel] || channel).join(' y ')
   return `Antes de cerrar marca como entregado: ${channels}.`
 }

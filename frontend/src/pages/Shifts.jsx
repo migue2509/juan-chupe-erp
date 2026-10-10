@@ -5,8 +5,8 @@ import { getApiErrorMessage, getShiftCloseErrorMessage } from '../utils/apiError
 import { confirmAction } from '../utils/confirmAction'
 import toast from 'react-hot-toast'
 
-const AUDIT_SHORT_LABELS = { pos: 'POS', delivery: 'Dom.' }
-const AUDIT_FULL_LABELS = { pos: 'POS', delivery: 'Domicilios' }
+const AUDIT_SHORT_LABELS = { pos: 'Punto físico', delivery: 'Dom.' }
+const AUDIT_FULL_LABELS = { pos: 'Punto físico', delivery: 'Domicilios' }
 
 const getShiftAuditBadge = (shift) => {
   if (shift.has_audit) {
@@ -188,7 +188,7 @@ function POSResumenModal({ shiftId, onClose }) {
 
     if (!deliveredBy) {
       setActiveTab('entrega')
-      toast.error('Selecciona quién entrega el efectivo POS')
+      toast.error('Selecciona quién entrega el efectivo del punto físico')
       return
     }
     if (!validDeliveredAmount) {
@@ -209,10 +209,10 @@ function POSResumenModal({ shiftId, onClose }) {
         actual_transfer:   0,
         items:             buildAuditItems(),
       })
-      toast.success('POS marcado como entregado')
+      toast.success('Punto físico marcado como entregado')
       reload()
     } catch (e) {
-      toast.error(getApiErrorMessage(e, 'No se pudo guardar la entrega POS'))
+      toast.error(getApiErrorMessage(e, 'No se pudo guardar la entrega del punto físico'))
     }
     setSaving(false)
   }
@@ -222,8 +222,8 @@ function POSResumenModal({ shiftId, onClose }) {
       <div className="bg-white rounded-2xl w-full max-w-3xl max-h-[92vh] flex flex-col shadow-2xl">
         <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between flex-shrink-0">
           <div>
-            <h2 className="font-bold text-gray-900">Resumen POS — Jornada #{shiftId}</h2>
-            <p className="text-xs text-gray-400 mt-0.5">Liquidación de ventas en punto de venta</p>
+            <h2 className="font-bold text-gray-900">Resumen Punto físico — Jornada #{shiftId}</h2>
+            <p className="text-xs text-gray-400 mt-0.5">Liquidación de ventas del punto físico</p>
           </div>
           <button onClick={onClose} className="btn-ghost px-2 py-1 text-gray-400">✕</button>
         </div>
@@ -231,7 +231,7 @@ function POSResumenModal({ shiftId, onClose }) {
         {/* ── Tab navigation ── */}
         <div className="px-6 border-b border-gray-100 flex gap-0 flex-shrink-0">
           {[
-            { key: 'entrega',     label: 'Entrega POS' },
+            { key: 'entrega',     label: 'Entrega Punto físico' },
             { key: 'liquidacion', label: 'Liquidación' },
           ].map(tab => (
             <button key={tab.key} onClick={() => setActiveTab(tab.key)}
@@ -247,14 +247,14 @@ function POSResumenModal({ shiftId, onClose }) {
 
         <div className="flex-1 overflow-y-auto">
 
-        {/* ══════════════ TAB: ENTREGA POS ══════════════ */}
+        {/* ══════════════ TAB: ENTREGA PUNTO FÍSICO ══════════════ */}
         {activeTab === 'entrega' && (
           <div className="p-6 space-y-4">
 
             {/* Resumen global compacto */}
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
               <div className="card p-3 text-center">
-                <p className="text-[10px] text-gray-400 uppercase tracking-wide mb-1">Total POS</p>
+                <p className="text-[10px] text-gray-400 uppercase tracking-wide mb-1">Total Punto físico</p>
                 <p className="text-lg font-bold text-blue-700">{fmt(p.pos_total)}</p>
               </div>
               <div className="card p-3 text-center">
@@ -289,18 +289,18 @@ function POSResumenModal({ shiftId, onClose }) {
                 {!savedAudit && workers.length === 0 && (
                   <p className="text-sm text-amber-700 mt-2">No hay trabajadoras activas con asistencia o actividad registrada en esta jornada.</p>
                 )}
-                <p className="text-xs text-gray-400 mt-2">Entrega consolidada de todo el POS de la jornada.</p>
+                <p className="text-xs text-gray-400 mt-2">Entrega consolidada de todas las ventas del punto físico en la jornada.</p>
               </div>
 
               <table className="w-full text-sm">
-                <caption className="text-left font-semibold text-gray-800 pb-3">Análisis de la entrega POS</caption>
+                <caption className="text-left font-semibold text-gray-800 pb-3">Análisis de la entrega del punto físico</caption>
                 <thead className="text-xs text-gray-400 uppercase border-b border-gray-100">
                   <tr><th className="text-left py-2 font-medium">Concepto</th><th className="text-right py-2 font-medium">Valor</th></tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
-                  <tr><td className="py-3">Total vendido POS</td><td className="text-right font-semibold">{fmt(p.pos_total)}</td></tr>
-                  <tr><td className="py-3">Transferencias POS</td><td className="text-right text-cyan-600">{fmt(p.pos_transfer)}</td></tr>
-                  <tr><td className="py-3">Gastos POS pagados de caja en efectivo</td><td className="text-right text-red-500">− {fmt(p.expenses_from_cash)}</td></tr>
+                  <tr><td className="py-3">Total vendido en Punto físico</td><td className="text-right font-semibold">{fmt(p.pos_total)}</td></tr>
+                  <tr><td className="py-3">Transferencias del Punto físico</td><td className="text-right text-cyan-600">{fmt(p.pos_transfer)}</td></tr>
+                  <tr><td className="py-3">Gastos del Punto físico pagados en efectivo</td><td className="text-right text-red-500">− {fmt(p.expenses_from_cash)}</td></tr>
                   <tr className="bg-blue-50 text-blue-800 font-bold"><td className="py-3 pl-3 rounded-l-lg">Efectivo a entregar</td><td className="text-right pr-3 rounded-r-lg">{fmt(expectedCash)}</td></tr>
                   <tr>
                     <td className="py-3"><label htmlFor="pos-delivered-amount">Efectivo entregado</label></td>
@@ -326,11 +326,11 @@ function POSResumenModal({ shiftId, onClose }) {
             {/* Cards POS */}
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
               <div className="card p-4 text-center">
-                <p className="text-xs text-gray-400 uppercase tracking-wide mb-1">Ventas POS</p>
+                <p className="text-xs text-gray-400 uppercase tracking-wide mb-1">Ventas Punto físico</p>
                 <p className="text-xl font-bold text-blue-700">{fmt(p.pos_total)}</p>
               </div>
               <div className="card p-4 text-center">
-                <p className="text-xs text-gray-400 uppercase tracking-wide mb-1">Efectivo POS</p>
+                <p className="text-xs text-gray-400 uppercase tracking-wide mb-1">Efectivo Punto físico</p>
                 <p className="text-xl font-bold text-gray-800">{fmt(p.pos_cash)}</p>
                 {p.pos_transfer > 0 && <p className="text-xs text-gray-400">Transfer: {fmt(p.pos_transfer)}</p>}
               </div>
@@ -341,7 +341,7 @@ function POSResumenModal({ shiftId, onClose }) {
               </div>
             </div>
             <ExpenseSummary
-              title="Gastos POS"
+              title="Gastos Punto físico"
               affectsCash={Number(p.expenses_from_cash || 0) + Number(p.expenses_pos_transfer || 0)}
               outsideCash={Number(p.expenses_pos_no_cash || 0)}
               cash={Number(p.expenses_from_cash || 0)}
@@ -454,7 +454,7 @@ function POSResumenModal({ shiftId, onClose }) {
               )}
               <div className="grid px-4 py-3 bg-emerald-50 border-t-2 border-emerald-200 font-bold text-emerald-800"
                 style={{ gridTemplateColumns: COL, minWidth: '600px' }}>
-                <span className="text-sm">TOTAL LIQUIDACIÓN POS</span>
+                <span className="text-sm">TOTAL LIQUIDACIÓN PUNTO FÍSICO</span>
                 <span /><span />
                 <span className="text-center text-base">{fmt(totalLiq - courtesyDiscount)}</span>
               </div>
@@ -544,7 +544,7 @@ function POSResumenModal({ shiftId, onClose }) {
         <div className="px-6 py-4 border-t border-gray-100 flex items-center justify-between gap-3 flex-shrink-0">
           {p?.arqueos?.pos ? (
             <div className="flex items-center gap-2 text-sm text-green-700 bg-green-50 border border-green-200 rounded-xl px-4 py-2">
-              <span className="font-semibold">POS entregado</span>
+              <span className="font-semibold">Punto físico entregado</span>
               <span className="text-gray-400">·</span>
               <span>{p.arqueos.pos.delivered_by_name || p.arqueos.pos.audited_by}</span>
               <span className="text-gray-400">·</span>
@@ -857,14 +857,14 @@ function ArqueoModal({ shiftId, onClose, onSaved }) {
           {prefill && (
             <>
               <div>
-                <p className="text-[10px] font-bold text-blue-500 uppercase tracking-widest mb-2">POS — Caja física</p>
+                <p className="text-[10px] font-bold text-blue-500 uppercase tracking-widest mb-2">Punto físico — Caja</p>
                 <div className="grid grid-cols-3 gap-3">
                   <div className="card p-4 text-center">
-                    <p className="text-xs text-gray-400 uppercase tracking-wide mb-1">Ventas POS</p>
+                    <p className="text-xs text-gray-400 uppercase tracking-wide mb-1">Ventas Punto físico</p>
                     <p className="text-xl font-bold text-blue-700">{fmt(prefill.pos_total)}</p>
                   </div>
                   <div className="card p-4 text-center">
-                    <p className="text-xs text-gray-400 uppercase tracking-wide mb-1">Efectivo POS</p>
+                    <p className="text-xs text-gray-400 uppercase tracking-wide mb-1">Efectivo Punto físico</p>
                     <p className="text-xl font-bold text-gray-800">{fmt(prefill.pos_cash)}</p>
                   </div>
                   <div className="card p-4 text-center border-2 border-blue-200">
@@ -874,7 +874,7 @@ function ArqueoModal({ shiftId, onClose, onSaved }) {
                   </div>
                 </div>
                 <div className="card p-3 mt-2 border-l-4 border-red-200">
-                  <p className="text-[10px] font-bold text-red-500 uppercase tracking-widest mb-2">Gastos POS</p>
+                  <p className="text-[10px] font-bold text-red-500 uppercase tracking-widest mb-2">Gastos Punto físico</p>
                   <div className="grid grid-cols-4 gap-2">
                     <div className="text-center"><p className="text-xs text-gray-400 mb-0.5">Afectan caja</p><p className="text-sm font-bold text-red-500">- {fmt((prefill.expenses_from_cash||0)+(prefill.expenses_pos_transfer||0))}</p></div>
                     <div className="text-center"><p className="text-xs text-gray-400 mb-0.5">No afectan caja</p><p className="text-sm font-bold text-gray-400">- {fmt(prefill.expenses_pos_no_cash||0)}</p></div>
@@ -1169,14 +1169,14 @@ function ViewArqueoModal({ arqueoId, shiftId, onClose }) {
           {/* POS */}
           {prefill && (
             <div>
-              <p className="text-[10px] font-bold text-blue-500 uppercase tracking-widest mb-2">POS — Caja física</p>
+              <p className="text-[10px] font-bold text-blue-500 uppercase tracking-widest mb-2">Punto físico — Caja</p>
               <div className="grid grid-cols-3 gap-3">
                 <div className="card p-4 text-center">
-                  <p className="text-xs text-gray-400 uppercase tracking-wide mb-1">Ventas POS</p>
+                  <p className="text-xs text-gray-400 uppercase tracking-wide mb-1">Ventas Punto físico</p>
                   <p className="text-xl font-bold text-blue-700">{fmt(prefill.pos_total)}</p>
                 </div>
                 <div className="card p-4 text-center">
-                  <p className="text-xs text-gray-400 uppercase tracking-wide mb-1">Efectivo POS</p>
+                  <p className="text-xs text-gray-400 uppercase tracking-wide mb-1">Efectivo Punto físico</p>
                   <p className="text-xl font-bold text-gray-800">{fmt(prefill.pos_cash)}</p>
                 </div>
                 <div className="card p-4 text-center border-2 border-blue-200">
@@ -1186,7 +1186,7 @@ function ViewArqueoModal({ arqueoId, shiftId, onClose }) {
                 </div>
               </div>
               <div className="card p-3 mt-2 border-l-4 border-red-200">
-                <p className="text-[10px] font-bold text-red-500 uppercase tracking-widest mb-2">Gastos POS</p>
+                <p className="text-[10px] font-bold text-red-500 uppercase tracking-widest mb-2">Gastos Punto físico</p>
                 <div className="grid grid-cols-4 gap-2">
                   <div className="text-center"><p className="text-xs text-gray-400 mb-0.5">Afectan caja</p><p className="text-sm font-bold text-red-500">- {fmt((prefill.expenses_from_cash||0)+(prefill.expenses_pos_transfer||0))}</p></div>
                   <div className="text-center"><p className="text-xs text-gray-400 mb-0.5">No afectan caja</p><p className="text-sm font-bold text-gray-400">- {fmt(prefill.expenses_pos_no_cash||0)}</p></div>
@@ -1387,7 +1387,7 @@ function ShiftDetail({ shift, onBack, onShiftUpdate }) {
 
   const CHANNELS = [
     { key: 'all',      label: 'Todos' },
-    { key: 'pos',      label: 'POS' },
+    { key: 'pos',      label: 'Punto físico' },
     { key: 'delivery', label: 'Domicilios' },
     { key: 'rappi',    label: 'Rappi' },
     { key: 'didi',     label: 'DiDi' },
@@ -1417,7 +1417,7 @@ function ShiftDetail({ shift, onBack, onShiftUpdate }) {
         <div className="flex gap-2">
           <button onClick={() => setShowPOS(true)}
             className={`text-xs py-1.5 px-3 ${detail?.arqueos?.pos ? 'badge-lime cursor-pointer' : 'btn-secondary'}`}>
-            {detail?.arqueos?.pos ? 'POS entregado' : 'Resumen POS'}
+            {detail?.arqueos?.pos ? 'Punto físico entregado' : 'Resumen Punto físico'}
           </button>
           <button onClick={() => setShowDom(true)}
             className={`text-xs py-1.5 px-3 ${detail?.arqueos?.delivery ? 'badge-lime cursor-pointer' : 'btn-secondary'}`}>
@@ -1459,11 +1459,11 @@ function ShiftDetail({ shift, onBack, onShiftUpdate }) {
               <>
                 <div className="grid grid-cols-3 gap-3">
                   <div className="stat-card">
-                    <p className="stat-label">Total (POS + Domicilios)</p>
+                    <p className="stat-label">Total (Punto físico + Domicilios)</p>
                     <p className="text-xl font-bold text-gray-900 tabular-nums">{fmt(detail.summary.all_total)}</p>
                   </div>
                   <div className="stat-card">
-                    <p className="stat-label">Efectivo POS</p>
+                    <p className="stat-label">Efectivo Punto físico</p>
                     <p className="text-xl font-bold text-green-600 tabular-nums">{fmt(detail.summary.pos_cash)}</p>
                     <p className="text-xs text-gray-400">Transfer: {fmt(detail.summary.pos_transfer)}</p>
                   </div>
@@ -1544,19 +1544,19 @@ function ShiftDetail({ shift, onBack, onShiftUpdate }) {
               <>
                 <div className="grid grid-cols-3 gap-3">
                   <div className="stat-card">
-                    <p className="stat-label">Total POS</p>
+                    <p className="stat-label">Total Punto físico</p>
                     <p className="text-xl font-bold text-blue-700 tabular-nums">{fmt(detail.summary.pos_total)}</p>
                   </div>
                   <div className="stat-card">
-                    <p className="stat-label">Efectivo POS</p>
+                    <p className="stat-label">Efectivo Punto físico</p>
                     <p className="text-xl font-bold text-green-600 tabular-nums">{fmt(detail.summary.pos_cash)}</p>
                   </div>
                   <div className="stat-card">
-                    <p className="stat-label">Transferencias POS</p>
+                    <p className="stat-label">Transferencias Punto físico</p>
                     <p className="text-xl font-bold text-indigo-600 tabular-nums">{fmt(detail.summary.pos_transfer)}</p>
                   </div>
                 </div>
-                <ExpenseSummary title="Gastos POS" affectsCash={expAfecta}
+                <ExpenseSummary title="Gastos Punto físico" affectsCash={expAfecta}
                   outsideCash={expNoAfecta} cash={expEfectivo} transfer={expTransfer} />
               </>
             )
@@ -1667,7 +1667,7 @@ function ShiftDetail({ shift, onBack, onShiftUpdate }) {
                             <span className={`badge text-xs w-fit ${
                               s.is_courtesy ? 'bg-pink-100 text-pink-600' :
                               s.is_delivery ? 'badge-cyan' : 'badge-pink'}`}>
-                              {s.is_courtesy ? 'Cortesía' : s.is_delivery ? 'Domicilio' : 'POS'}
+                              {s.is_courtesy ? 'Cortesía' : s.is_delivery ? 'Domicilio' : 'Punto físico'}
                             </span>
                           )}
                           <span className={`badge text-xs w-fit ${PAYMENT_BADGE[s.payment_method] ?? 'badge-gray'}`}>
@@ -1829,7 +1829,7 @@ function ShiftDetail({ shift, onBack, onShiftUpdate }) {
                         {CAT_LABEL[e.category] ?? e.category}
                       </span>
                       <span className={`badge text-xs w-fit ${ORIGIN_BADGE[e.origin] ?? 'badge-gray'}`}>
-                        {e.origin === 'delivery' ? 'Domicilios' : 'POS'}
+                        {e.origin === 'delivery' ? 'Domicilios' : 'Punto físico'}
                       </span>
                       <div>
                         <p className="text-sm font-medium text-gray-800">{e.description}</p>

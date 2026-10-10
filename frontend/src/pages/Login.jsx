@@ -46,7 +46,7 @@ export default function Login() {
               <img src="/logo-neon.png" alt="Juan Chupe" className="w-11 h-11 object-contain" />
             </div>
             <h1 className="text-xl font-bold text-white leading-snug">Juan Chupe Granizados ERP</h1>
-            <p className="text-xs text-slate-400 mt-1">Sistema de Punto de Venta</p>
+            <p className="text-xs text-slate-400 mt-1">Sistema para el Punto físico</p>
             <div className="w-full h-px mt-6" style={{ background: 'rgba(255,255,255,0.07)' }} />
           </div>
 

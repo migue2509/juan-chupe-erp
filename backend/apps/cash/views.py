@@ -57,7 +57,7 @@ class CashAuditViewSet(viewsets.ModelViewSet):
                         raise ValueError('Cada entrega debe ser un objeto.')
                     sid = d.get('seller_id')
                     if sid in (None, ''):
-                        raise ValueError('seller_id es requerido para entregas POS.')
+                        raise ValueError('seller_id es requerido para entregas del punto físico.')
                     try:
                         seller_id = int(sid)
                     except (TypeError, ValueError):

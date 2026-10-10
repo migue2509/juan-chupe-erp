@@ -23,7 +23,7 @@ const EMPTY_ITEM = { cup_size: '', quantity: 1, custom_name: '' }
 const CATEGORY_COLORS = {
   rappi: { badge: 'bg-[#FF424D] text-white', border: 'border-[#FF424D]/40', label: 'Rappi' },
   didi:  { badge: 'bg-[#FF6600] text-white', border: 'border-[#FF6600]/40', label: 'DiDi' },
-  pos:   { badge: 'bg-brand-navy text-white', border: 'border-brand-lime/60', label: 'POS' },
+  pos:   { badge: 'bg-brand-navy text-white', border: 'border-brand-lime/60', label: 'Punto físico' },
 }
 
 export default function Promotions() {
@@ -189,7 +189,7 @@ export default function Promotions() {
               <label className="label">Canal de venta</label>
               <select className="input" value={form.category}
                 onChange={e => setForm(f => ({ ...f, category: e.target.value }))}>
-                <option value="pos">POS — Punto de venta</option>
+                <option value="pos">Punto físico</option>
                 <option value="rappi">Rappi</option>
                 <option value="didi">DiDi</option>
               </select>
@@ -385,7 +385,7 @@ export default function Promotions() {
       {/* POS */}
       {posPromos.length > 0 && (
         <div>
-          {platformPromos.length > 0 && <p className="label mb-3">Punto de Venta</p>}
+          {platformPromos.length > 0 && <p className="label mb-3">Punto físico</p>}
           <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-4">
             {posPromos.map(p => (
               <div key={p.id} className={`card border-2 transition-all ${p.is_active ? 'border-brand-lime/60' : 'border-gray-100 opacity-60'}`}>

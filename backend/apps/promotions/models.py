@@ -4,7 +4,7 @@ from decimal import Decimal
 
 class Promotion(models.Model):
     CATEGORY_CHOICES = [
-        ('pos',   'Punto de Venta'),
+        ('pos',   'Punto físico'),
         ('rappi', 'Rappi'),
         ('didi',  'DiDi'),
     ]
@@ -15,7 +15,7 @@ class Promotion(models.Model):
         max_length=10, choices=CATEGORY_CHOICES, default='pos',
         help_text='Canal de venta de esta promoción'
     )
-    # ── Campos para promos POS (un solo tamaño de vaso) ──
+    # ── Campos para promociones de Punto físico (un solo tamaño de vaso) ──
     cup_size = models.ForeignKey(
         'products.CupSize', on_delete=models.SET_NULL,
         null=True, blank=True, related_name='promotions'

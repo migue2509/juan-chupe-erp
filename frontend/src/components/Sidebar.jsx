@@ -13,7 +13,7 @@ const GROUPS_ADMIN = [
   {
     label: 'Operaciones',
     items: [
-      { to: '/pos',        label: 'Punto de Venta', icon: 'pos' },
+      { to: '/pos',        label: 'Punto físico', icon: 'pos' },
       { to: '/billing',    label: 'Facturas',        icon: 'billing' },
       { to: '/deliveries', label: 'Domicilios',      icon: 'deliveries' },
       { to: '/expenses',   label: 'Gastos',          icon: 'expenses' },
@@ -67,7 +67,7 @@ const GROUPS_SELLER = [
   {
     label: 'Operaciones',
     items: [
-      { to: '/pos',        label: 'Punto de Venta', icon: 'pos' },
+      { to: '/pos',        label: 'Punto físico', icon: 'pos' },
       { to: '/billing',    label: 'Facturas',        icon: 'billing' },
       { to: '/deliveries', label: 'Domicilios',      icon: 'deliveries' },
       { to: '/expenses',   label: 'Gastos',          icon: 'expenses' },
@@ -92,7 +92,7 @@ const GROUPS_DELIVERY = [
   {
     label: 'Operaciones',
     items: [
-      { to: '/pos',        label: 'Punto de Venta', icon: 'pos' },
+      { to: '/pos',        label: 'Punto físico', icon: 'pos' },
       { to: '/billing',    label: 'Facturas',        icon: 'billing' },
       { to: '/deliveries', label: 'Domicilios',      icon: 'deliveries' },
       { to: '/expenses',   label: 'Gastos',          icon: 'expenses' },

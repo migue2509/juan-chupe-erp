@@ -25,7 +25,7 @@ const PERIODS  = [
 ]
 const CHANNELS = [
   { key: 'all',      label: 'Todos' },
-  { key: 'pos',      label: 'Punto de Venta' },
+  { key: 'pos',      label: 'Punto físico' },
   { key: 'delivery', label: 'Domicilios' },
   { key: 'rappi',    label: 'Rappi' },
   { key: 'didi',     label: 'DiDi' },

@@ -41,7 +41,7 @@ class Command(BaseCommand):
                 '  ✓ Usuarios\n'
                 '  ✓ Productos (sabores, vasos, toppings)\n'
                 '  ✓ Promociones\n'
-                '  ✓ Métodos de pago / Config POS\n'
+                '  ✓ Métodos de pago / Configuración de pagos\n'
                 '  ✓ Horarios de nómina (WorkdaySchedule)\n'
             ))
             return

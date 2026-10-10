@@ -375,7 +375,7 @@ export default function Billing() {
                   inv.sale_detail?.is_courtesy ? 'bg-pink-100 text-pink-600' :
                   inv.sale_detail?.is_delivery ? 'badge-cyan' : 'badge-pink'}`}>
                   {inv.sale_detail?.is_courtesy ? 'Cortesía' :
-                   inv.sale_detail?.is_delivery ? 'Domicilio' : 'POS'}
+                   inv.sale_detail?.is_delivery ? 'Domicilio' : 'Punto físico'}
                 </span>
               )}
               <span className={`badge text-xs w-fit ${PAYMENT_BADGE[inv.sale_detail?.payment_method] ?? 'badge-gray'}`}>
@@ -916,7 +916,7 @@ export default function Billing() {
                       <span className="badge" style={{ background: '#FF6600', color: '#fff' }}>DiDi</span>
                     ) : (
                       <span className={`badge ${sale.is_delivery ? 'badge-cyan' : 'badge-pink'}`}>
-                        {sale.is_delivery ? 'Domicilio' : 'Punto de Venta'}
+                        {sale.is_delivery ? 'Domicilio' : 'Punto físico'}
                       </span>
                     )}
                   </div>

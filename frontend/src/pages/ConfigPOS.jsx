@@ -263,7 +263,7 @@ export default function ConfigPOS() {
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Métodos de pago</h1>
           <p className="text-sm text-gray-500 mt-0.5">
-            QR y números de transferencia que verá el cliente en el POS
+            QR y números de transferencia que verá el cliente en el punto físico
           </p>
         </div>
         <button onClick={() => setModal('new')} className="btn-primary flex items-center gap-2">
@@ -276,7 +276,7 @@ export default function ConfigPOS() {
       <div className="rounded-xl bg-brand-pink/10 border border-brand-pink/20 p-4 text-sm text-brand-pink flex gap-3">
         <Icon name="info" className="w-5 h-5 shrink-0 mt-0.5" />
         <p>
-          Cuando el cliente pague por transferencia en el POS, verá automáticamente el QR y
+          Cuando el cliente pague por transferencia en el punto físico, verá automáticamente el QR y
           el número de cada método activo configurado aquí.
         </p>
       </div>

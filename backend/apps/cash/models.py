@@ -7,7 +7,7 @@ class CashAudit(models.Model):
     """Arqueo de caja al cierre de jornada — uno por canal (pos / delivery)"""
 
     CHANNEL_CHOICES = [
-        ('pos',      'POS'),
+        ('pos',      'Punto físico'),
         ('delivery', 'Domicilios'),
     ]
 

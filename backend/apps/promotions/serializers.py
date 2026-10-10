@@ -45,9 +45,9 @@ class PromotionSerializer(serializers.ModelSerializer):
             cup_size = data['cup_size']
         else:
             cup_size = getattr(self.instance, 'cup_size', None)
-        # POS promos require a cup_size; Rappi/DiDi use PromotionItem
+        # Las promociones de Punto físico requieren vaso; Rappi/DiDi usan PromotionItem.
         if category == 'pos' and cup_size is None:
-            raise serializers.ValidationError({'cup_size': 'Debes seleccionar un vaso para promos POS.'})
+            raise serializers.ValidationError({'cup_size': 'Debes seleccionar un vaso para promociones del punto físico.'})
         return data
 
     class Meta:

@@ -15,7 +15,7 @@ const PAYMENT_BADGE  = { cash: 'badge-gray', transfer: 'badge-cyan', mixed: 'bad
 
 const FILTERS = [
   { key: 'all',      label: 'Todos' },
-  { key: 'pos',      label: 'Punto de Venta' },
+  { key: 'pos',      label: 'Punto físico' },
   { key: 'delivery', label: 'Domicilios' },
   { key: 'rappi',    label: 'Rappi' },
   { key: 'didi',     label: 'DiDi' },
@@ -567,7 +567,7 @@ export default function Dashboard() {
                       <span className={`badge text-[11px] ${
                         sale.is_courtesy ? 'bg-pink-100 text-pink-600' :
                         sale.is_delivery ? 'badge-cyan' : 'badge-pink'}`}>
-                        {sale.is_courtesy ? 'Cortesía' : sale.is_delivery ? 'Domicilio' : 'POS'}
+                        {sale.is_courtesy ? 'Cortesía' : sale.is_delivery ? 'Domicilio' : 'Punto físico'}
                       </span>
                     )}
                     {delivSt && (

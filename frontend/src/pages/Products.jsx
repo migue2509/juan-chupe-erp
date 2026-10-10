@@ -327,7 +327,7 @@ export default function Products() {
                 <label className="label">Licores que contiene</label>
                 <input className="input" placeholder="Ej: Ron, Aguardiente, Vodka (separados por coma)"
                   value={flavorForm.licores} onChange={e => setFlavorForm(f => ({ ...f, licores: e.target.value }))} />
-                <p className="text-xs text-gray-400 mt-1">Aparecen como etiquetas en el POS</p>
+                <p className="text-xs text-gray-400 mt-1">Aparecen como etiquetas en el Punto físico</p>
               </div>
               <div>
                 <label className="label">Stock mínimo (ml)</label>

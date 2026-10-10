@@ -41,7 +41,7 @@ class ShiftViewSet(viewsets.ReadOnlyModelViewSet):
                 return Response({'detail': 'No hay jornada activa.'}, status=status.HTTP_400_BAD_REQUEST)
             missing_audits = get_missing_close_audits(shift)
             if missing_audits:
-                labels = {'pos': 'POS', 'delivery': 'Domicilios'}
+                labels = {'pos': 'Punto físico', 'delivery': 'Domicilios'}
                 channels = ' y '.join(labels[channel] for channel in missing_audits)
                 return Response(
                     {

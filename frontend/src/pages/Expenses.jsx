@@ -16,7 +16,7 @@ const CATEGORIES = [
 ]
 
 const ORIGINS = [
-  { value: 'pos',      label: 'Punto de Venta' },
+  { value: 'pos',      label: 'Punto físico' },
   { value: 'delivery', label: 'Domicilios' },
 ]
 
@@ -204,7 +204,7 @@ export default function Expenses() {
           <span className="stat-value text-gray-400">{fmt(totalNoCash)}</span>
         </div>
         <div className="stat-card">
-          <span className="stat-label">Punto de Venta</span>
+          <span className="stat-label">Punto físico</span>
           <span className="stat-value text-brand-pink">{fmt(totalPos)}</span>
         </div>
         <div className="stat-card">
@@ -351,7 +351,7 @@ export default function Expenses() {
         <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
           <h2>Historial <span className="text-sm font-normal text-gray-400">({filtered.length})</span></h2>
           <div className="flex gap-1 p-1 bg-gray-100 rounded-xl">
-            {[{ k: 'all', l: 'Todos' }, { k: 'pos', l: 'POS' }, { k: 'delivery', l: 'Domicilios' }].map(f => (
+            {[{ k: 'all', l: 'Todos' }, { k: 'pos', l: 'Punto físico' }, { k: 'delivery', l: 'Domicilios' }].map(f => (
               <button key={f.k} onClick={() => setFilterOrigin(f.k)}
                 className={`px-3 py-1 rounded-lg text-xs font-semibold transition-all ${
                   filterOrigin === f.k ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'
