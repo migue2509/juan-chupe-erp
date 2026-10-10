@@ -205,8 +205,10 @@ export default function POS() {
     if (items.some(i => Number(i.qty || 0) < 1)) { toast.error('Cada producto debe tener cantidad mayor a 0'); return }
     if (items.some(i => Number(i.unit_price || 0) < 0)) { toast.error('Ningun producto puede tener precio negativo'); return }
     if (isDelivery && !deliveryFourDigits.trim()) { toast.error('El nombre/identificación del cliente es obligatorio para domicilios'); return }
-    if (isDelivery && !deliveryAddress.trim()) { toast.error('Selecciona la direccion del domicilio en el mapa'); return }
-    if (isDelivery && (deliveryLat == null || deliveryLng == null)) { toast.error('Selecciona la ubicacion del domicilio en el mapa'); return }
+    if (isDelivery && deliveryAddress.trim() && (deliveryLat == null || deliveryLng == null)) {
+      toast.error('Si agregas una dirección, selecciona la ubicación en el mapa');
+      return
+    }
 
     let cashAmount = 0
     let transferValue = 0
@@ -795,7 +797,7 @@ export default function POS() {
             <div className="space-y-2 p-3 bg-cyan-50 border border-cyan-100 rounded-xl">
               {/* Selector de ubicación */}
               <div>
-                <label className="label">Ubicación <span className="text-red-400">*</span></label>
+                <label className="label">Ubicación <span className="text-gray-400">(opcional)</span></label>
                 {deliveryLat ? (
                   <div className="flex items-center gap-2">
                     <div className="flex-1 flex items-center gap-2 bg-white border border-cyan-200 rounded-xl px-3 py-2">
@@ -813,7 +815,7 @@ export default function POS() {
                   <button onClick={() => setShowMapPicker(true)}
                     className="w-full flex items-center justify-center gap-2 bg-white border-2 border-dashed border-cyan-300 rounded-xl py-2.5 text-sm text-cyan-600 hover:bg-cyan-50 hover:border-cyan-400 transition-all">
                     <Icon name="pin" className="w-4 h-4" />
-                    Buscar dirección
+                    Buscar dirección (opcional)
                   </button>
                 )}
               </div>
